@@ -1,0 +1,36 @@
+# Unreal Engine：可以重新生成的文件夹
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Build/
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+
+# IDE / 工程文件（用 .uproject 右键 “Generate Visual Studio project files” 重新生成）
+.vs/
+.vscode/
+.idea/
+*.sln
+*.slnx
+*.suo
+*.sdf
+*.VC.db
+*.opendb
+
+# 编译产物
+*.pdb
+*.dll
+*.exe
+*.lib
+*.obj
+
+# Blender 自动备份
+*.blend1
+*.blend2
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+__pycache__/
