@@ -102,7 +102,7 @@ void ADysisPrismActor::Interact(APawn* Player, bool bFromFront)
 {
 	if (NumSlots <= 0) return;
 	CurrentSlot = (CurrentSlot + 1) % NumSlots;   // 每转一格换一种颜色（红→橙→…→紫→红）
-	// TODO(M6)：色散光束按 GetCurrentIor() 用 RefractDir 重算七道细光（顶角 45°，两侧各折一次）。
+	UpdateDispersionBeams();   // 色散光束已接（7 道 IOR 折射；视觉颜色待美术材质 Emissive 色阶）
 	if (IsIndigoOnTarget() && !bIndigoFired)
 	{
 		bIndigoFired = true;
