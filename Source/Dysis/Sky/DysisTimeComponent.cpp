@@ -28,7 +28,9 @@ ADysisSkyActor* UDysisTimeComponent::ResolveSky()
 {
 	if (!SkyActor && GetWorld())
 	{
-		for (TActorIterator<ADysisSkyActor> It(GetWorld()); It; ++It) { SkyActor = *It; break; }
+		// （Mac clang 会把"for + break"的单次循环当错误，MSVC 不报——跨平台写法：迭代器判一次）
+		TActorIterator<ADysisSkyActor> It(GetWorld());
+		if (It) SkyActor = *It;
 	}
 	return SkyActor;
 }

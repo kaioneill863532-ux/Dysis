@@ -67,6 +67,13 @@ FRotator ADysisSkyActor::GetMainLightRotation() const
 
 void ADysisSkyActor::SetTime(float H)
 {
+	// P1-9（调研 §15.8）：H 没变就别碰灯——时间组件每帧都调本函数，但只在 H 变化时广播，
+	// 早退不漏任何真变化；省掉的是每帧灯光全量重设（VSM 重建的触发器）。PreviewH 拖动值每帧不同，不受影响。
+	if (FMath::IsNearlyEqual(CurrentH, H, 1e-6f))
+	{
+		return;
+	}
+
 	CurrentH = H;
 	SunDir = UDysisSkyLibrary::DysisSunDir(H);
 	MoonDir = UDysisSkyLibrary::DysisMoonDir(H);

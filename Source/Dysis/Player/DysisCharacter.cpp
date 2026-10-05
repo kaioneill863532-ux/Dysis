@@ -1,5 +1,7 @@
 ﻿#include "DysisCharacter.h"
+#include "DysisCharacterMovement.h"
 #include "Sky/DysisTimeComponent.h"
+#include "Interaction/DysisInteractComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "EnhancedInputComponent.h"
@@ -10,8 +12,12 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "UObject/UObjectGlobals.h"
+#include "UI/DysisHUD.h"
+#include "UI/DysisDialogueComponent.h"
 
-ADysisCharacter::ADysisCharacter()
+ADysisCharacter::ADysisCharacter(const FObjectInitializer& ObjectInitializer)
+    : Super(ObjectInitializer.SetDefaultSubobjectClass<UDysisCharacterMovement>(ACharacter::CharacterMovementComponentName))
 {
 	GetCapsuleComponent()->InitCapsuleSize(35.f, 90.f);
 	bUseControllerRotationYaw = true;
@@ -24,6 +30,7 @@ ADysisCharacter::ADysisCharacter()
 	Camera->bUsePawnControlRotation = true;
 
 	Time = CreateDefaultSubobject<UDysisTimeComponent>(TEXT("DysisTime"));
+	Interact = CreateDefaultSubobject<UDysisInteractComponent>(TEXT("DysisInteract"));
 
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	Move->MaxWalkSpeed = WalkSpeed;
@@ -46,6 +53,7 @@ void ADysisCharacter::PostInitializeComponents()
 	LookAction = MakeAction(TEXT("IA_DysisLook"), EInputActionValueType::Axis2D);
 	JumpAction = MakeAction(TEXT("IA_DysisJump"), EInputActionValueType::Boolean);
 	RunAction = MakeAction(TEXT("IA_DysisRun"), EInputActionValueType::Boolean);
+	InteractAction = MakeAction(TEXT("IA_DysisInteract"), EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this, TEXT("IMC_Dysis"));
 	auto Swizzle = [this]() { return NewObject<UInputModifierSwizzleAxis>(this); };   // 默认 YXZ：键值放到 Y（前后）
@@ -57,6 +65,7 @@ void ADysisCharacter::PostInitializeComponents()
 	Mapping->MapKey(LookAction, EKeys::Mouse2D);
 	Mapping->MapKey(JumpAction, EKeys::SpaceBar);
 	Mapping->MapKey(RunAction, EKeys::LeftShift);
+	Mapping->MapKey(InteractAction, EKeys::E);   // 摸一下（game-design：交互 = 四个基础行为之一）
 }
 
 void ADysisCharacter::PawnClientRestart()
@@ -78,7 +87,18 @@ void ADysisCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		In->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		In->BindAction(RunAction, ETriggerEvent::Started, this, &ADysisCharacter::RunOn);
 		In->BindAction(RunAction, ETriggerEvent::Completed, this, &ADysisCharacter::RunOff);
+		In->BindAction(InteractAction, ETriggerEvent::Started, this, &ADysisCharacter::TryInteractPressed);
 	}
+}
+
+void ADysisCharacter::TryInteractPressed()
+{
+	// 对白播放中，E 键先当"下一句"（演出优先于世界交互——设计：对话是过场）。
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		if (ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
+			if (H->ActiveDialogue && H->ActiveDialogue->IsPlaying())
+			{ H->ActiveDialogue->Advance(); return; }
+	if (Interact) Interact->TryInteract();
 }
 
 void ADysisCharacter::Move(const FInputActionValue& Value)
@@ -98,3 +118,30 @@ void ADysisCharacter::Look(const FInputActionValue& Value)
 
 void ADysisCharacter::RunOn() { GetCharacterMovement()->MaxWalkSpeed = RunSpeed; }
 void ADysisCharacter::RunOff() { GetCharacterMovement()->MaxWalkSpeed = WalkSpeed; }
+
+// ───── coyote（调研 §8.1 gdtactics 项目版；0.14 s 来自灰盒）─────
+bool ADysisCharacter::CanJumpInternal_Implementation() const
+{
+    return Super::CanJumpInternal_Implementation() || bCanCoyoteJump;
+}
+
+void ADysisCharacter::Falling()
+{
+    Super::Falling();                                 // 从地面进入下落那一刻起表
+    bCanCoyoteJump = true;
+    GetWorldTimerManager().SetTimer(CoyoteTimerHandle,
+        [this]() { bCanCoyoteJump = false; }, FMath::Max(CoyoteTime, 0.0f), false);
+}
+
+void ADysisCharacter::OnJumped_Implementation()
+{
+    Super::OnJumped_Implementation();
+    bCanCoyoteJump = false;                           // 用掉了就灭
+}
+
+void ADysisCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
+{
+    Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
+    if (!bPressedJump && !GetCharacterMovement()->IsFalling())
+        bCanCoyoteJump = false;                       // 落地/站稳即清
+}
