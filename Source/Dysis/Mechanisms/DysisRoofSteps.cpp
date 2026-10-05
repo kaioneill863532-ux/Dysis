@@ -14,7 +14,7 @@ namespace
 		const double T = FMath::Clamp((X - A) / (B - A), 0.0, 1.0);
 		return T * T * (3.0 - 2.0 * T);
 	}
-	double Wrap360(double A)
+	double WrapRoofAz(double A)   // 避免与 SkyLibrary 的 Wrap360 在 unity build 冲突
 	{
 		double R = FMath::Fmod(A, 360.0);
 		if (R < 0.0) R += 360.0;
@@ -135,8 +135,8 @@ void ADysisRoofSteps::DriveUp(float DeltaTime)
 	double t = 1.0;
 	if (!Time->bNight)
 	{
-		const double Az = Wrap360(FMath::Atan2(Time->FootCm.Y, Time->FootCm.X) * 180.0 / UE_DOUBLE_PI);
-		t = SmoothStep(0.0, UDysisSkyLibrary::DysisConst(TEXT("UP_SPAN")), Wrap360(Az - LandAzDeg));
+		const double Az = WrapRoofAz(FMath::Atan2(Time->FootCm.Y, Time->FootCm.X) * 180.0 / UE_DOUBLE_PI);
+		t = SmoothStep(0.0, UDysisSkyLibrary::DysisConst(TEXT("UP_SPAN")), WrapRoofAz(Az - LandAzDeg));
 	}
 
 	const double RingY = UDysisSkyLibrary::DysisConst(TEXT("RING_Y"));   // 30.3

@@ -2,12 +2,12 @@
 
 namespace
 {
-	const double Deg = UE_DOUBLE_PI / 180.0;
+    const double OpticsDeg = UE_DOUBLE_PI / 180.0;   // 避免与 SkyLibrary 的 Deg 在 unity build 冲突
 }
 
 FVector UDysisOpticsLibrary::AzRyToCm(double AzDeg, double R, double Y)
 {
-	const double Az = AzDeg * Deg;
+	const double Az = AzDeg * OpticsDeg;
 	// 机关清单坐标换算原话：X = 100·r·cos(az)，Y = 100·r·sin(az)，Z = 100·y；北=+X、东=+Y。
 	return FVector(100.0 * R * FMath::Cos(Az), 100.0 * R * FMath::Sin(Az), 100.0 * Y);
 }
@@ -51,7 +51,7 @@ bool UDysisOpticsLibrary::IsRainbowDir(FVector FromHeadCm, FVector ToPointCm, FV
 	// 虹在"太阳正对面 42°"的圆上（设计 9.1）：影头 → 像素方向 与 −SunDir 的夹角落在带宽内即显虹。
 	const FVector3d V = (FVector3d(ToPointCm) - FVector3d(FromHeadCm)).GetSafeNormal();
 	const double CosA = FMath::Clamp(V.Dot(-FVector3d(SunDir).GetSafeNormal()), -1.0, 1.0);
-	return FMath::Abs(FMath::Acos(CosA) / Deg - 42.0) <= BandDeg;
+	return FMath::Abs(FMath::Acos(CosA) / OpticsDeg - 42.0) <= BandDeg;
 }
 
 double UDysisOpticsLibrary::PrismIor(int32 ColorIndex)
@@ -63,6 +63,6 @@ double UDysisOpticsLibrary::PrismIor(int32 ColorIndex)
 
 FVector UDysisOpticsLibrary::DirFromAzPitch(double AzDeg, double PitchDeg)
 {
-	const double Az = AzDeg * Deg, P = PitchDeg * Deg;
+	const double Az = AzDeg * OpticsDeg, P = PitchDeg * OpticsDeg;
 	return FVector(FMath::Cos(P) * FMath::Cos(Az), FMath::Cos(P) * FMath::Sin(Az), FMath::Sin(P));
 }

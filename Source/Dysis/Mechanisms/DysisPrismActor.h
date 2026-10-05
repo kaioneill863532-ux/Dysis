@@ -31,6 +31,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Prism")
 	int32 IndigoSlot = 5;
 
+	/** §4 色散光束：true = 每帧更新 7 道按 IOR 折射的细光（红→紫各不同角度）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Prism")
+	bool bSpawnDispersionBeams = true;
+
+	/** 色散光束截面（厘米，设计 9.1"七道细细的彩色光线，不可以踩"）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Prism")
+	FVector BeamExtentCm = FVector(200, 15, 15);
+
 	/** 靛色落进眼睛那一刻广播（塞勒涅醒来→众神对话挂这）。 */
 	UPROPERTY(BlueprintAssignable, Category = "Dysis|Prism")
 	FDysisPrismIndigo OnIndigoOnTarget;
@@ -56,6 +64,13 @@ protected:
 
 	int32 CurrentSlot = 0;
 	bool bIndigoFired = false;   // 对话只触发一次（单调）
+
+	/** 色散光束 Actor 数组（7 道，红→紫）。 */
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class ADysisBeamActor>> DispersionBeams;
+
+	/** 每帧更新色散光束的方向（按当前 IOR 用 Snell 折射计算）。 */
+	void UpdateDispersionBeams();
 
 	/** 演出：靛色入眼自动播众神对话（设计 9.3 六句 + 钉住 RELIEF_H）。 */
 	UPROPERTY(VisibleAnywhere, Category = "Dysis|Prism")

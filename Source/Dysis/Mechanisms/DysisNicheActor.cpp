@@ -55,7 +55,19 @@ void ADysisNicheActor::Interact(APawn* Player, bool bFromFront)
 	case EDysisNiche::Sun:     ADysisHUD::Notify(GetWorld(), DysisCopy::SunNicheOpened); break;
 	case EDysisNiche::Moon:    ADysisHUD::Notify(GetWorld(), DysisCopy::MoonNicheOpened); break;
 	}
-	// TODO(M6/M7)：开盖动画（Sequencer）、碎片光效、集齐三龛的黎明结局触发（AllNichesCollected）。
+
+	// 黎明结局判定：集齐三个碎片 → 广播（设计 §8 + O-5：赫利俄斯"等她集齐了日、虹、月，黎明会来接她"）。
+	if (UDysisSaveSubsystem* SaveSys = GetGameInstanceSave())
+	{
+		SaveSys->GetCurrent()->SetNiche(Niche, true);
+		if (SaveSys->GetCurrent()->AllNichesCollected())
+		{
+			ADysisHUD::Notify(GetWorld(),
+				TEXT("日、虹、月的碎片在你手中汇聚。赫利俄斯说：黎明会来接她。"), 8.0f);
+			// TODO（美术）：黎明结局 Sequencer——天色渐亮、和声终章。
+		}
+	}
+	// 黎明结局判定已接（集齐三龛→通知）；开盖动画/碎片光效待美术（Sequencer+Niagara）。
 }
 
 FText ADysisNicheActor::GetInteractPrompt() const
