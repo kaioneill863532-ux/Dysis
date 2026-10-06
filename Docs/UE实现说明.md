@@ -11,8 +11,9 @@ UE 5.8 里“日月在天上的固定轨道”和“时间由玩家站的位置�
 | `Source/Dysis/Sky/DysisSkyActor.h/.cpp` | `ADysisSkyActor`：太阳光（Atmosphere Sun Light 0）+ 月光（1）+ 月亮圆盘，`SetTime(H)` |
 | `Source/Dysis/Sky/DysisTimeComponent.h/.cpp` | `UDysisTimeComponent`：挂在玩家身上，每帧算 H；控制台 `Dysis.Go`、`Dysis.Where` |
 | `Source/Dysis/Player/DysisCharacter.h/.cpp`、`DysisGameMode.h/.cpp` | 测试用的第一人称玩家（WASD、鼠标、空格跳、Shift 跑）和 GameMode。组员有自己的 Character 就不用它，把 `UDysisTimeComponent` 加过去即可 |
-| `Content/Dysis/Maps/Dysis_Temple` | 神殿关卡：建筑、区域 Tag、DysisSky、SkyAtmosphere、SkyLight、HeightFog、PlayerStart，GameMode = DysisGameMode |
+| `Content/Dysis/Maps/Dysis_Temple` | 神殿关卡：建筑、区域 Tag、DysisSky、SkyAtmosphere、SkyLight、HeightFog、PlayerStart，GameMode = DysisGameMode；**玩法 Actor 48 个**（大纲 `Dysis_Gameplay` 文件夹：光柱×8、水面/月光大道、屋顶踏步、拉杆/石板、机关驱动×21、三龛、金苹果/接光、BGM、开场导演——由 `Art/Models/temple-v0.12/ue_import_gameplay.py` 摆放，幂等可重跑） |
 | `Content/Dysis/Sky/M_DysisMoonDisc` | 月亮圆盘材质（无光照、半透明，标量参数 Opacity） |
+| `Content/Dysis/Audio/M_*_Long/Full.uasset` | BGM 两首（SoundWave，`ue_import_gameplay.py` 从同目录 .wav 导入）；音乐管理器在关卡里找 `DysisMusic` |
 
 `Source/Dysis/Dysis.Build.cs` 里加了 `PublicIncludePaths.Add(ModuleDirectory);`，子文件夹按 `"Sky/xxx.h"` 引用。
 
