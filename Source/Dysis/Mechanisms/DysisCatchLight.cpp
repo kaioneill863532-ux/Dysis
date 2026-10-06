@@ -2,6 +2,7 @@
 #include "Sky/DysisSkyActor.h"
 #include "Sky/DysisSkyLibrary.h"
 #include "Sky/DysisTimeComponent.h"
+#include "Audio/DysisMusicManager.h"
 #include "Interaction/DysisGoldenApple.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
@@ -63,6 +64,12 @@ void ADysisCatchLight::Tick(float DeltaTime)
 	Time->SetNight(true);
 	OnCaught.Broadcast();
 
+	// BGM 切夜：白天淡出 → 安静 → 夜晚《月光》淡入（README 接入步骤第三条）。
+	if (ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this))
+	{
+		Music->SwitchToNight();
+	}
+
 	// 金苹果拿起（设计 §6 日5："举起来的苹果还在光里。接住最后一缕阳光"——光从这一刻开始陪你走夜路）。
 	if (Apple) Apple->PickUp();
 
@@ -72,8 +79,9 @@ void ADysisCatchLight::Tick(float DeltaTime)
 		for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
 			if (It->GetName().Contains(BridgeDoorName))
 			{
-				FRotator R = It->GetActorRotation();
-				It->SetActorRotation(FRotator(R.Pitch, -141.40f, R.Roll));
+				// 文案表/机关清单：桥门关位 -141.40°（Pitch/Roll 保持门柱原始值）。
+				const FRotator Original = It->GetActorRotation();
+				It->SetActorRotation(FRotator(Original.Pitch, -141.40f, Original.Roll));
 				break;
 			}
 

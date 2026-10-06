@@ -13,7 +13,16 @@ public class Dysis : ModuleRules
 		// 日落回廊：Source/Dysis 下的子文件夹（Sky/、Player/）按 "Sky/xxx.h" 引用
 		PublicIncludePaths.Add(ModuleDirectory);
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		// 材质参数集合（DysisMPCComponent/MPCFactory）、LevelSequence（PrismActor 众神对话/PrologueDirector）、Niagara 瀑布水雾（规划中）
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"Materials",
+			"LevelSequence",
+			"MovieScene",
+			"UMG",
+			"Slate",
+			"SlateCore",
+		});
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
