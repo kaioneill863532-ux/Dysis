@@ -76,6 +76,75 @@ namespace DysisCopy
 	inline static const TCHAR* RespawnHint =
 		TEXT("作为十二时辰之一，狄西斯轻松回到了上一个落脚点。她不好意思地看了看赫利俄斯和他的马。");
 
+	// ═══════ 查看显示（非机关，走近自动显示的描述文字）═══════
+
+	/// 塞勒涅浮雕（激活前）
+	inline static const TCHAR* ViewSeleneRelief =
+		TEXT("刻着月神塞勒涅的浮雕，眼部镶着青金石。七色之中，她只认第六种颜色。");
+	/// 抱月女神雕像（激活前）
+	inline static const TCHAR* ViewGoddessIdle =
+		TEXT("一尊抱着月亮的塞勒涅神像，她怀里的月色黯淡无光。");
+	/// 抱月女神雕像（激活后）
+	inline static const TCHAR* ViewGoddessLit =
+		TEXT("一尊抱着月亮的塞勒涅神像，她的怀里绽放出明亮的月光。");
+	/// 三相机关
+	inline static const TCHAR* ViewTripleStatue =
+		TEXT("可被转动的托镜天使像，似乎会在不同光照下显露出不同样貌。");
+	/// 伊莉丝浮雕
+	inline static const TCHAR* ViewIrisRelief =
+		TEXT("刻着彩虹女神伊莉丝的浮雕，但上面的彩虹少了一半。中间的金边勾勒成人形，这里缺一个能把自己\u201c画\u201d进浮雕的人。");
+	/// 天鹅湖浮雕（激活前）
+	inline static const TCHAR* ViewSwanRelief =
+		TEXT("一群洁白的天鹅正在湖中游觅，黑天鹅去哪了？");
+	/// 浑天仪殿顶（有金苹果）
+	inline static const TCHAR* ViewArmillaryTopApple =
+		TEXT("一架浑天仪，它的太阳在落日的照射下变成了一颗耀眼的金苹果。");
+	/// 浑天仪殿顶（已取苹果）
+	inline static const TCHAR* ViewArmillaryTopEmpty =
+		TEXT("一架浑天仪，上面的太阳已经被取下来了。");
+	/// 浑天仪水亭（未放苹果）
+	inline static const TCHAR* ViewArmillaryPavEmpty =
+		TEXT("一架浑天仪，它的月亮处是一个托盘。");
+	/// 浑天仪水亭（已放苹果）
+	inline static const TCHAR* ViewArmillaryPavLit =
+		TEXT("一架浑天仪，一轮明月在其上转动。");
+	/// 藏着波吕丢刻斯的墙（月光照到前）
+	inline static const TCHAR* ViewPolluxWall =
+		TEXT("墙后有人在呢喃。");
+	/// 月门
+	inline static const TCHAR* ViewMoonGate =
+		TEXT("一面刻着月轮的石墙，墙后传来隐隐的回音。");
+	/// 卡斯托耳雕像（解谜前）
+	inline static const TCHAR* ViewCastor =
+		TEXT("双子座中波吕丢刻斯的同伴。咦，波吕丢刻斯去哪里了？");
+
+	// ═══════ 解谜后反馈（三相机关月光照到 / 多阶段）═══════
+
+	/// 三相月光照到月之龛
+	inline static const TCHAR* FeedbackMoonNicheLit =
+		TEXT("镜子转过的刹那，月光被反射到了不远处。那里的墙被月光照透，一座神龛隐现其中。");
+	/// 三相月光照向月门
+	inline static const TCHAR* FeedbackMoonGateLit =
+		TEXT("反射的月光越过中庭，落在那扇刻着月轮的石墙上。月光照出了它的另一面。");
+	/// 三相月光照向波吕丢刻斯
+	inline static const TCHAR* FeedbackPolluxRevealed =
+		TEXT("托镜天使反射的月光扫到对面，墙壁忽而透明了。波吕丢刻斯立于其中。");
+	/// 三相月光照过女神像（第一次）
+	inline static const TCHAR* FeedbackGoddessFirstLit =
+		TEXT("瀑布后面，塞勒涅的月亮被月光扫到，亮了一下。");
+	/// 三相月光照过女神像（第二次，下月桥后）
+	inline static const TCHAR* FeedbackGoddessSecondLit =
+		TEXT("月光照过瀑布的另一面，整个扑进了塞勒涅的怀里，明亮的月光从其间绽放。神像所指的地方缓缓伸出一截断桥。");
+	/// 双子合拢
+	inline static const TCHAR* FeedbackTwinsUnited =
+		TEXT("双子并肩站在月光里，一座月桥从他们的脚下延伸出去。");
+	/// 影桥接通
+	inline static const TCHAR* FeedbackShadowBridge =
+		TEXT("穹顶窄桥的影子落在水面上。它的影子接过断桥，直通水中央。");
+	/// 一层水闸再交互（无关闭选项）
+	inline static const TCHAR* FeedbackWaterGateReinteract =
+		TEXT("瀑布从\u201c另一面\u201d倾泻下来，将塞勒涅的神像护在身后。");
+
 	// ═══════ 交互显示（按 E ）═══════
 
 	inline static const TCHAR* PromptWaterGate    = TEXT("打开水闸");
