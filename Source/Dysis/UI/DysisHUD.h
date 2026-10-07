@@ -1,4 +1,4 @@
-﻿// 日落回廊 · 交互提示 HUD（M7 先行，零资产：纯 C++ AHUD + 引擎字体，不建任何 WBP）。
+﻿// 日落回廊 · 交互提示 HUD（M7 先行，纯 C++ AHUD，不建任何 WBP；字体 = 思源宋体 FontFace，缺资产时退回引擎字体）。
 // 设计原则"不用文字指路"——正常玩法无 HUD；仅"摸一下"的目标名提示（GetInteractPrompt）与
 // 调试信息（Dysis.Where 的屏幕版，按 F3 切换）。正式 UI（开场/结局/对话）仍走 WBP + 美术。
 #pragma once
@@ -9,6 +9,7 @@
 
 class UDysisInteractComponent;
 class UDysisDialogueComponent;
+class UFontFace;
 
 UCLASS()
 class DYSIS_API ADysisHUD : public AHUD
@@ -22,7 +23,12 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD")
 	bool bShowDebug = false;
 
+	/** UI 字体（思源宋体 FontFace，tools/import_fonts.py 导入）；空 = 引擎默认字体（CJK 回退可用）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|HUD")
+	TObjectPtr<UFontFace> FontFace;
+
 	virtual void DrawHUD() override;
+	virtual void BeginPlay() override;
 
 	/** 场上正在播的对话组件。 */
 	UPROPERTY(Transient)
@@ -41,6 +47,9 @@ protected:
 	UDysisInteractComponent* ResolveInteract();
 	void DrawDialogue();
 	void DrawNotification();
+
+	/** 画一行 UI 文字：有 FontFace 用思源宋体（16px 基准 × Scale），否则退回引擎默认字体。 */
+	void DrawUIText(const FString& Text, const FLinearColor& Color, float X, float Y, float Scale);
 
 private:
 	TWeakObjectPtr<UDysisInteractComponent> CachedInteract;

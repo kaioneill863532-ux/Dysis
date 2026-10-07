@@ -6,11 +6,38 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
+#include "Engine/FontFace.h"
+#include "Fonts/SlateFontInfo.h"
 #include "GameFramework/PlayerController.h"
 
 ADysisHUD::ADysisHUD()
 {
 	PrimaryActorTick.bCanEverTick = false;   // DrawHUD 每帧由引擎调，不需要自己的 Tick
+}
+
+void ADysisHUD::BeginPlay()
+{
+	Super::BeginPlay();
+	// 思源宋体（tools/import_fonts.py 导入的 FontFace）。资产不在（旧分支/被删）时静默退回默认字体。
+	if (!FontFace)
+	{
+		FontFace = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/SourceHanSerifSC-Regular.SourceHanSerifSC-Regular"));
+	}
+}
+
+void ADysisHUD::DrawUIText(const FString& Text, const FLinearColor& Color, float X, float Y, float Scale)
+{
+	if (!Canvas) return;
+	if (FontFace)
+	{
+		FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), FSlateFontInfo(FontFace, 16.0f * Scale), Color);
+		Item.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f), FVector2D(1.0f, 1.0f));
+		Canvas->DrawItem(Item);
+	}
+	else
+	{
+		DrawText(Text, Color, X, Y, nullptr, Scale, false);
+	}
 }
 
 UDysisInteractComponent* ADysisHUD::ResolveInteract()
@@ -45,7 +72,6 @@ void ADysisHUD::DrawNotification()
 	if (NotificationTimer <= 0.0f || !Canvas || NotificationText.IsEmpty()) return;
 
 	// 通知框：底部中间偏上（比对话低一层），淡入淡出由透明度渐变——文案表所有非对话文本的显示口。
-	// 字体：默认引擎字体（中文回退）；美术建思源宋体 .ufont 资产后在 Font UPROPERTY 处指定即可。
 	const float Alpha = (NotificationTimer > NotificationDuration - 0.5f)
 		? (NotificationDuration - NotificationTimer) / 0.5f   // 前 0.5s 淡入
 		: (NotificationTimer < 1.0f ? NotificationTimer / 1.0f : 1.0f);  // 后 1s 淡出
@@ -56,7 +82,7 @@ void ADysisHUD::DrawNotification()
 	FLinearColor Color(0.95f, 0.92f, 0.85f, Alpha * 0.9f);   // 暖白
 
 	DrawRect(FLinearColor(0, 0, 0.05f, Alpha * 0.4f), X - 20.0f, Y - 8.0f, TextW + 40.0f, 32.0f);
-	DrawText(NotificationText, Color, X, Y, nullptr, 0.85f, false);
+	DrawUIText(NotificationText, Color, X, Y, 0.85f);
 }
 
 void ADysisHUD::DrawDialogue()
@@ -69,11 +95,11 @@ void ADysisHUD::DrawDialogue()
 	const FString Line = ActiveDialogue->Lines[Idx].ToString();
 	const float Y = Canvas->SizeY - 90.0f;
 	DrawRect(FLinearColor(0, 0, 0.04f, 0.55f), 0, Y - 12.0f, Canvas->SizeX, 52.0f);
-	DrawText(Line, FLinearColor(0.92f, 0.92f, 1.0f, 0.95f), 40.0f, Y, nullptr, 1.1f, false);
+	DrawUIText(Line, FLinearColor(0.92f, 0.92f, 1.0f, 0.95f), 40.0f, Y, 1.1f);
 	FString Dots;
 	for (int32 i = 0; i < ActiveDialogue->Lines.Num(); ++i) Dots += (i == Idx ? TEXT("●") : TEXT("○"));
-	DrawText(Dots, FLinearColor(0.7f, 0.75f, 0.9f, 0.8f), 40.0f, Y + 26.0f, nullptr, 0.7f, false);
-	DrawText(TEXT("[E] 下一句"), FLinearColor(0.6f, 0.62f, 0.7f, 0.8f), Canvas->SizeX - 150.0f, Y + 26.0f, nullptr, 0.7f, false);
+	DrawUIText(Dots, FLinearColor(0.7f, 0.75f, 0.9f, 0.8f), 40.0f, Y + 26.0f, 0.7f);
+	DrawUIText(TEXT("[E] 下一句"), FLinearColor(0.6f, 0.62f, 0.7f, 0.8f), Canvas->SizeX - 150.0f, Y + 26.0f, 0.7f);
 }
 
 void ADysisHUD::DrawHUD()
@@ -94,7 +120,7 @@ void ADysisHUD::DrawHUD()
 				{
 					const FString Line = TEXT("[E] ") + Prompt.ToString();
 					const float X = Canvas->SizeX * 0.5f - Line.Len() * 4.0f;
-					DrawText(Line, FLinearColor(1.0f, 0.95f, 0.8f, 0.9f), X, Canvas->SizeY * 0.5f + 40.0f, nullptr, 0.9f, false);
+					DrawUIText(Line, FLinearColor(1.0f, 0.95f, 0.8f, 0.9f), X, Canvas->SizeY * 0.5f + 40.0f, 0.9f);
 				}
 			}
 		}
@@ -118,7 +144,7 @@ void ADysisHUD::DrawHUD()
 					const FString Info = FString::Printf(TEXT("zone=%s  H=%.2f  clock=%02d:%02d  %s"),
 						*Time->Zone, Time->H, int32(Clock) % 24, int32(Clock * 60.0f) % 60,
 						Time->bNight ? TEXT("night") : TEXT("day"));
-					DrawText(Info, FLinearColor::Green, 24.0f, 24.0f, nullptr, 0.8f, false);
+					DrawUIText(Info, FLinearColor::Green, 24.0f, 24.0f, 0.8f);
 				}
 	}
 }

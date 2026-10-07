@@ -18,10 +18,9 @@ public class Dysis : ModuleRules
 		{
 			"LevelSequence",
 			"MovieScene",
+			"Slate",       // HUD 的 FSlateFontInfo/FCanvasTextItem（思源宋体 FontFace 画字）
+			"SlateCore",
 		});
-
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
 		
 		// Uncomment if you are using online features
 		// PrivateDependencyModuleNames.Add("OnlineSubsystem");
