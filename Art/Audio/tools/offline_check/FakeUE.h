@@ -217,6 +217,12 @@ struct FVector
 	static double DotProduct(const FVector& A, const FVector& B) { return A.X * B.X + A.Y * B.Y + A.Z * B.Z; }
 	static FVector CrossProduct(const FVector& A, const FVector& B) { return FVector(A.Y * B.Z - A.Z * B.Y, A.Z * B.X - A.X * B.Z, A.X * B.Y - A.Y * B.X); }
 };
+struct FVector2D
+{
+	double X = 0, Y = 0;
+	FVector2D() {}
+	FVector2D(double x, double y) : X(x), Y(y) {}
+};
 struct FVector2f
 {
 	float X = 0, Y = 0;
@@ -535,7 +541,16 @@ public:
 	AHUD* GetHUD() const { return nullptr; }
 	void ConsoleCommand(const FString&) {}
 };
-class UCanvas : public UObject { public: float SizeX = 0, SizeY = 0; };
+// HUD 画字（clion-code 2e8e3a1：思源宋体 FontFace）
+class UFontFace : public UObject {};
+struct FSlateFontInfo { FSlateFontInfo(const UObject*, float) {} };
+struct FCanvasItem { virtual ~FCanvasItem() {} };
+struct FCanvasTextItem : FCanvasItem
+{
+	FCanvasTextItem(const FVector2D&, const FText&, const FSlateFontInfo&, const FLinearColor&) {}
+	void EnableShadow(const FLinearColor&, const FVector2D& = FVector2D(1.0, 1.0)) {}
+};
+class UCanvas : public UObject { public: float SizeX = 0, SizeY = 0; void DrawItem(FCanvasItem&) {} };
 class UFont;
 class AHUD : public AActor
 {

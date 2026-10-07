@@ -69,6 +69,8 @@ def emit(events):
         '#include "Audio/DysisSfxSettings.h"',
         '#include "Sound/SoundBase.h"',
         "",
+        "#include <initializer_list>   // Make() 的路径表（MSVC 上不靠 CoreMinimal 间接带进来）",
+        "",
         "namespace DysisSfxDefaults",
         "{",
         "\tstatic FDysisSfxEvent Make(const TCHAR* Key, const TCHAR* Label, EDysisSfxCategory Category, bool b2D,",
