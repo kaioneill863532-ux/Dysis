@@ -1,11 +1,13 @@
 # 狄西斯的日落回廊 · 音效一键导入 + 接入
 #
-# 做三件事（可以重跑，重跑安全）：
+# 做四件事（可以重跑，重跑安全）：
 #   1) 把 Art/Audio/SFX/<编号_名字>/*.wav（265 个）导入成 /Game/Dysis/Audio/SFX/<编号_名字>/ 下的 SoundWave，
 #      循环素材（环境、掉落中、捧着金苹果……）设成 Looping。已经导入、WAV 也没改过的跳过。
-#   2) 打开 Dysis_Temple，摆一个音效总调度 DysisSfxDirector（大纲：Dysis_Audio/DysisSfx），
+#   2) 殿内混响：用 Art/Audio/ir/IR_Temple_Rotunda.wav（和预览网页同一份圆殿冲激响应）生成
+#      /Game/Dysis/Audio/Reverb 下的冲激响应、卷积混响效果、混响 Submix（要 Synthesis 插件，Dysis.uproject 里已经打开）。
+#   3) 打开 Dysis_Temple，摆一个音效总调度 DysisSfxDirector（大纲：Dysis_Audio/DysisSfx），
 #      按大纲名字自动绑定：瀑布/水池/桥门/塞勒涅浮雕……这些位置，和 21 个机关驱动/石板各自的音效。
-#   3) 保存，并检查：每一项音效的文件都在、Looping 对。
+#   4) 保存，并检查：每一项音效的文件都在、Looping 对、混响生成了。
 #
 # 用法 A（编辑器里）：先编译（C++ 里有新的音效代码），打开工程 → 工具 → 执行 Python 脚本…，选这个文件。
 # 用法 B（无头命令行）：
@@ -15,7 +17,7 @@
 # 重跑 ue_import_gameplay.py（它会删掉重摆机关 Actor）以后，再跑一次本脚本，把绑定指到新的机关上；
 # 忘了也没关系：DysisSfxDirector 开局发现绑定的机关不在了，会自己按名字重新找一遍。
 #
-# 调音量、快慢：Project Settings → Game → Dysis 音效（改动存在 Config/DefaultGame.ini）。
+# 调音量、快慢、混响：Project Settings → Game → Dysis 音效（改动存在 Config/DefaultGame.ini）。
 import json
 import os
 
@@ -27,6 +29,9 @@ LABEL = "DysisSfx"
 TAG = "DysisSfx"
 FOLDER = "Dysis_Audio"
 REIMPORT_ALL = False   # True = 不管有没有改过，全部重新导入
+REVERB_DIR = "/Game/Dysis/Audio/Reverb"
+REVERB_ASSETS = ("IR_Temple_Rotunda", "SubmixFX_TempleReverb", "Submix_TempleReverb")
+REVERB_SUBMIX = REVERB_DIR + "/Submix_TempleReverb"
 
 
 def say(msg):
@@ -119,7 +124,30 @@ def fix_looping_and_save(files):
     return saved, problems
 
 
-# ───────────────────────── 2) 关卡里的总调度 ─────────────────────────
+# ───────────────────────── 2) 殿内混响 ─────────────────────────
+
+def build_reverb():
+    """生成殿内卷积混响（冲激响应 → 卷积混响效果 → Submix）并保存。返回 None = 成功，否则是原因。"""
+    ir = os.path.join(project_dir(), "Art", "Audio", "ir", "IR_Temple_Rotunda.wav")
+    if not os.path.exists(ir):
+        return "找不到 %s" % ir
+    if is_lfs_pointer(ir):
+        return "%s 是 Git LFS 指针，不是声音（先 git lfs pull）" % ir
+    lib = getattr(unreal, "DysisSfxLibrary", None)
+    if lib is None or not hasattr(lib, "build_temple_reverb"):
+        return "找不到 DysisSfxLibrary.build_temple_reverb——先编译工程（Source/Dysis/Audio/DysisSfxReverb.cpp）"
+    result = str(lib.build_temple_reverb(ir))
+    say("混响：" + result)
+    if not result.startswith("成功"):
+        return result
+    for name in REVERB_ASSETS:
+        path = REVERB_DIR + "/" + name
+        if not unreal.EditorAssetLibrary.save_asset(path, False):
+            return "保存 %s 失败" % path
+    return None
+
+
+# ───────────────────────── 3) 关卡里的总调度 ─────────────────────────
 
 def all_actors():
     sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -180,7 +208,7 @@ def place_director():
     return director
 
 
-# ───────────────────────── 3) 检查 ─────────────────────────
+# ───────────────────────── 4) 检查 ─────────────────────────
 
 def check(files):
     missing, wrong_loop = [], []
@@ -207,16 +235,21 @@ def run():
     saved, problems = fix_looping_and_save(todo) if todo else (0, [])
     for p in problems:
         say("  ✗ " + p)
+    reverb_problem = build_reverb()
+    if reverb_problem:
+        say("  ✗ 混响没生成：%s（音效本身不受影响；见 Art/Audio/README.md 的“混响”一节）" % reverb_problem)
     place_director()
     missing, wrong_loop = check(files)
-    say("检查：%d 个文件，缺 %d 个，Looping 不对 %d 个" % (len(files), len(missing), len(wrong_loop)))
+    reverb_ok = unreal.load_asset(REVERB_SUBMIX) is not None
+    say("检查：%d 个文件，缺 %d 个，Looping 不对 %d 个；殿内混响%s" % (len(files), len(missing), len(wrong_loop),
+                                                         "已生成" if reverb_ok else "没有"))
     for m in missing[:20]:
         say("  缺 " + m)
     for w in wrong_loop[:20]:
         say("  Looping 不对 " + w)
-    ok = not bad and not problems and not missing and not wrong_loop
+    ok = not bad and not problems and not missing and not wrong_loop and reverb_ok
     say("完成：%s。下一步：PIE 里按 ~ 输入 Dysis.Sfx.Debug 1，走一走、拉一拉机关，屏幕左上角会显示每次播了哪一项；"
-        "调音量/快慢在 Project Settings → Game → Dysis 音效。" % ("全部通过" if ok else "有问题，见上面"))
+        "调音量/快慢/混响在 Project Settings → Game → Dysis 音效（Dysis.Sfx.Reverb 看混响状态）。" % ("全部通过" if ok else "有问题，见上面"))
     return ok
 
 

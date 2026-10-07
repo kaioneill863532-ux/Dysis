@@ -1,12 +1,13 @@
 ﻿// 狄西斯的日落回廊 · 音效自动化测试（Session Frontend → Automation → Dysis.Sfx，或命令行
 //   UnrealEditor-Cmd Dysis.uproject -ExecCmds="Automation RunTests Dysis.Sfx; Quit" -unattended -nullrhi）
 //   Table  ：事件表本身（不需要资产）——名字不重复、每项都有文件、代码里用到的名字都在表里。
-//   Assets ：每个声音文件都导入了，循环项的 SoundWave 是 Looping（要先跑 Art/Audio/ue_import_sfx.py）。
+//   Assets ：每个声音文件都导入了，循环项的 SoundWave 是 Looping，殿内混响 Submix 生成了（要先跑 Art/Audio/ue_import_sfx.py）。
 //   Levels ：区域 → 第几关（关卡标题）和灰盒一致。
 #include "Audio/DysisSfxDirector.h"
 #include "Audio/DysisSfxSettings.h"
 #include "Misc/AutomationTest.h"
 #include "Sound/SoundBase.h"
+#include "Sound/SoundSubmix.h"
 #include "Sound/SoundWave.h"
 
 namespace DysisSfxTestKeys
@@ -54,6 +55,7 @@ bool FDysisSfxTableTest::RunTest(const FString&)
 		TestTrue(FString::Printf(TEXT("%s 至少一个文件"), *E.Key.ToString()), E.Sounds.Num() > 0);
 		TestTrue(FString::Printf(TEXT("%s 音量在 0–4"), *E.Key.ToString()), E.Volume >= 0.0f && E.Volume <= 4.0f);
 		TestTrue(FString::Printf(TEXT("%s 快慢在 0.25–4"), *E.Key.ToString()), E.Pitch >= 0.25f && E.Pitch <= 4.0f);
+		TestTrue(FString::Printf(TEXT("%s 混响在 0–3"), *E.Key.ToString()), E.ReverbSend >= 0.0f && E.ReverbSend <= 3.0f);
 		Files += E.Sounds.Num();
 	}
 	TestEqual(TEXT("文件总数（和 Art/Audio/manifest.json 一致）"), Files, 265);
@@ -103,6 +105,17 @@ bool FDysisSfxAssetsTest::RunTest(const FString&)
 		}
 	}
 	TestEqual(TEXT("缺的声音文件"), Missing, 0);
+
+	// 殿内混响：Submix 在，且挂了效果（ue_import_sfx.py 生成）。
+	const USoundSubmix* Reverb = Cast<USoundSubmix>(S->ReverbSubmix.LoadSynchronous());
+	if (!Reverb)
+	{
+		AddError(FString::Printf(TEXT("殿内混响没生成：%s（跑 Art/Audio/ue_import_sfx.py；要打开 Synthesis 插件）"), *S->ReverbSubmix.ToString()));
+	}
+	else
+	{
+		TestTrue(TEXT("殿内混响 Submix 挂了卷积混响效果"), Reverb->SubmixEffectChain.Num() > 0 && Reverb->SubmixEffectChain[0] != nullptr);
+	}
 	return true;
 }
 

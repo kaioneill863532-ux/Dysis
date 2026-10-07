@@ -49,6 +49,10 @@ UDysisSfxSettings::UDysisSfxSettings()
 	AddNameRule(TEXT("Tide"), EDysisFootSurface::Water);
 	AddNameRule(TEXT("Wet"), EDysisFootSurface::WetStone);
 
+	// 殿内卷积混响（ue_import_sfx.py 生成；没生成时为空引用，播放时自动跳过混响）。
+	ReverbSubmix = TSoftObjectPtr<USoundSubmixBase>(FSoftObjectPath(FString::Printf(TEXT("%s/%s.%s"),
+		DysisSfxReverb::Folder, DysisSfxReverb::SubmixName, DysisSfxReverb::SubmixName)));
+
 	// 殿外（灰盒区域：out=岛上，beam:isle=开场光路，crown=屋顶，rbridge=屋顶细桥）。
 	OutdoorZones = { TEXT("out"), TEXT("beam:isle"), TEXT("crown"), TEXT("rbridge") };
 }

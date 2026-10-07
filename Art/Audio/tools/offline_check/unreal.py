@@ -1,7 +1,9 @@
 # 假的 unreal 模块：只实现 ue_import_sfx.py 用到的部分，记录调用，供 test_import_script.py 断言。
 import os
 LOG = []
-STATE = dict(project=None, assets={}, tasks=[], actors=[], saved_assets=0, saved_maps=0, loaded_map=None, autobind=0)
+STATE = dict(project=None, assets={}, tasks=[], actors=[], saved_assets=0, saved_maps=0, loaded_map=None, autobind=0,
+             reverb_builds=0, saved_reverb=[])
+REVERB = ("IR_Temple_Rotunda", "SubmixFX_TempleReverb", "Submix_TempleReverb")
 
 def log_warning(m): LOG.append(m); print(m)
 def log(m): LOG.append(m)
@@ -44,7 +46,22 @@ class AssetToolsHelpers:
 def load_asset(path): return STATE["assets"].get(path)
 def load_object(outer, path): return None
 
+class DysisSfxLibrary:
+    @staticmethod
+    def build_temple_reverb(ir_wav_file):
+        assert os.path.exists(ir_wav_file) and ir_wav_file.endswith("/Art/Audio/ir/IR_Temple_Rotunda.wav"), ir_wav_file
+        with open(ir_wav_file, "rb") as fh:
+            assert fh.read(4) == b"RIFF", "IR 不是 wav（LFS 指针？）"
+        STATE["reverb_builds"] += 1
+        for n in REVERB:
+            STATE["assets"]["/Game/Dysis/Audio/Reverb/" + n] = _Asset("/Game/Dysis/Audio/Reverb/" + n)
+        return "成功：/Game/Dysis/Audio/Reverb/Submix_TempleReverb.Submix_TempleReverb（mock）"
+
 class EditorAssetLibrary:
+    @staticmethod
+    def save_asset(path, only_if_is_dirty=True):
+        if path not in STATE["assets"]: return False
+        STATE["saved_reverb"].append(path); return True
     @staticmethod
     def save_loaded_asset(asset, only_if_is_dirty=True):
         STATE["saved_assets"] += 1

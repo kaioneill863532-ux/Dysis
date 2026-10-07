@@ -1,10 +1,10 @@
 # 音效：一键导入、自动接入、在 UE 里调
 
-265 个音效文件（48 kHz、16 位、干声），分成 101 项“事件”（例如“石头上走一步”“拉杆拉下”“光路显形”），已经按游戏里的触发条件接好了。程序只需要做下面三步。
+265 个音效文件（48 kHz、16 位、干声），分成 101 项“事件”（例如“石头上走一步”“拉杆拉下”“光路显形”），已经按游戏里的触发条件接好了；殿内带和预览网页同一份圆殿混响。程序只需要做下面三步。
 
 ## 一键接入（三步）
 
-1. **拉文件、编译。** WAV 走 Git LFS，先 `git lfs pull`。再编译工程，C++ 在 `Source/Dysis/Audio/`。
+1. **拉文件、编译。** WAV 走 Git LFS，先 `git lfs pull`。再编译工程，C++ 在 `Source/Dysis/Audio/`。`Dysis.uproject` 里打开了引擎自带的 Synthesis 插件（卷积混响要用）。
 2. **跑导入脚本。** 二选一：
    - 编辑器里：工具 → 执行 Python 脚本…，选 `Art/Audio/ue_import_sfx.py`。
    - 命令行（无头）：
@@ -14,11 +14,12 @@
 
    脚本做了这几件事：
    - 把 WAV 导入成 `/Game/Dysis/Audio/SFX/<编号_名字>/` 下的 SoundWave，循环素材设成 Looping。
+   - 生成殿内混响：`/Game/Dysis/Audio/Reverb/` 下的冲激响应、卷积混响效果、混响 Submix（见下面“殿内混响”）。
    - 在 `Dysis_Temple` 里放一个音效总调度 `DysisSfx`（大纲文件夹 `Dysis_Audio`），按大纲名字把位置和机关绑定好。
    - 保存关卡，最后检查一遍。
 
    脚本可以重跑：没改过的 WAV 会跳过，旧的 `DysisSfx` 会删掉重放。
-3. **提交** `Content/Dysis/Audio/SFX/` 和 `Dysis_Temple`。
+3. **提交** `Content/Dysis/Audio/`（音效和混响）和 `Dysis_Temple`。
 
 **验证：** PIE 里按 `~` 输入 `Dysis.Sfx.Debug 1`，然后走一走、跳一跳、拉一拉机关。屏幕左上角会列出每次播了哪一项、多大声、多快。
 
@@ -26,16 +27,17 @@
 - 再跑一次 `ue_import_sfx.py`，把绑定存进关卡。
 - 忘了也能用。总调度开局发现绑定的东西不在了，会按名字重新找一遍。
 
-## 在 UE 里调每一项的音量、快慢
+## 在 UE 里调每一项的音量、快慢、混响
 
 **Project Settings → Game → Dysis 音效**：
 
 | 区域 | 内容 |
 |---|---|
 | 总音量 | 音效总音量，以及“脚步 / 玩家动作 / 机关 / 剧情与奇观 / 环境 / 界面”六个分类的音量。 |
-| 每一项 | 101 行，展开一行就有这些滑块和开关：<br>• 音量<br>• 快慢（UE 里速度和音高一起变：1.2 = 快 20%、高约 3 个半音）<br>• 音量随机 ±、快慢随机 ±<br>• 2D / 3D、满音量半径、衰减距离<br>• 最短间隔、同时最多几个、启用<br>• 声音文件（可以换成别的 SoundWave/SoundCue） |
+| 每一项 | 101 行，展开一行就有这些滑块和开关：<br>• 音量<br>• 快慢（UE 里速度和音高一起变：1.2 = 快 20%、高约 3 个半音）<br>• 音量随机 ±、快慢随机 ±<br>• 2D / 3D、满音量半径、衰减距离<br>• 最短间隔、同时最多几个、启用<br>• 混响多少（0 = 不带，1 = 和预览版一样）<br>• 声音文件（可以换成别的 SoundWave/SoundCue） |
 | 脚步 | 走一步、快走一步的距离；什么区域、什么名字的地面算什么材质；浅水高度；湿石离瀑布多近。 |
-| 环境 | 哪些区域算殿外、屋顶高度、进出殿的过渡时间、入夜鸟鸣淡出时间、海风从多高开始响。 |
+| 混响 | 殿内混响（总量）、殿外混响、远处多带的混响、混响 Submix。 |
+| 环境 | 哪些区域算殿外、屋顶高度、进出殿的过渡时间（混响也按这个过渡）、入夜鸟鸣淡出时间、海风从多高开始响。 |
 
 - **PIE 运行时直接拖滑块**：马上生效，并在耳边试听这一项（循环项会在正在响的循环上直接变）。
 - **改动的保存**：自动存进 `Config/DefaultGame.ini`，提交这个文件就等于把调好的数值交给大家。
@@ -51,8 +53,41 @@
 | `Dysis.Sfx.Volume Footsteps 0.8` / `Dysis.Sfx.Volume Foot.Stone.Walk 0.8` | 改分类或单项音量 |
 | `Dysis.Sfx.Pitch Mech.Statue.Turn 1.08` | 改快慢 |
 | `Dysis.Sfx.Enable Story.Selene.SleepTalk 0` | 关掉一项 |
+| `Dysis.Sfx.Reverb` / `Dysis.Sfx.Reverb 0.8` / `Dysis.Sfx.Reverb Foot.Stone.Walk 0.5` | 看混响状态 / 改殿内混响总量 / 改单项混响 |
 | `Dysis.Sfx.Check` | 检查每个文件都导入了 |
 | `Dysis.Sfx.Save` / `Dysis.Sfx.ResetAll` | 存进 ini / 恢复出厂值 |
+
+## 殿内混响
+
+用的是预览网页里那份石头圆殿的冲激响应（`Art/Audio/ir/IR_Temple_Rotunda.wav`，5 秒立体声），在 UE 里做成卷积混响。导入脚本生成 `/Game/Dysis/Audio/Reverb/` 下三个资产（重跑会更新）：
+
+| 资产 | 是什么 |
+|---|---|
+| `IR_Temple_Rotunda` | 冲激响应 |
+| `SubmixFX_TempleReverb` | 卷积混响效果（只出湿声） |
+| `Submix_TempleReverb` | 混响 Submix，挂着上面的效果，接到主输出 |
+
+- **怎么起作用：** 每个声音照常输出（干声），另外按“这一项的混响多少 × 殿内混响”送一路到 `Submix_TempleReverb`。
+  - 总调度每帧报玩家在殿内还是殿外。进殿时混响在“进出殿过渡时间”（默认 1.5 秒）里慢慢加上，出殿慢慢减掉；正在响的循环也跟着变。
+  - 离得远的声音多带一点混响（干声随距离变小，混响在殿里到处差不多一样响）。
+- **音量对齐预览版：** 送 1.0 = 预览网页里开混响的效果（干声 1 + 湿声 0.42，网页卷积器的自动归一也算进去了）。
+- **设置页“混响”一栏：**
+  - 殿内混响（默认 1）：总量，0 = 关掉。
+  - 殿外混响（默认 0）：岛上、屋顶也想要一点空间感时调高。
+  - 远处多带的混响（默认 1）：最远处的声音混响翻倍；0 = 不按远近变。
+  - 混响 Submix：默认指向生成的 `Submix_TempleReverb`，改了要重开 PIE。
+- **每一项的“混响多少”出厂值：**
+  - 0：近处/远处海浪、海风、白天鸟鸣、殿内底噪（这些在殿外，或素材本身就是空间声），和悬停、确认、返回、开始游戏、碎片悬停这些界面音。
+  - 0.3：掉落中、水雾，提示、文字、对话翻页。
+  - 0.5：瀑布近、远；0.6：水池。
+  - 1：其余全部（脚步、机关、剧情）。
+- **试听**（拖滑块、`Dysis.Sfx.Play`）按殿内算，在哪儿都能听到这一项的混响。
+- **没生成混响时**声音照常播，只是不带混响；`Dysis.Sfx.Reverb` 会说“没有”。
+- **脚本生成失败时手动建**（例如以后引擎改了类名，脚本会打印“失败：……”）：
+  1. 把 `IR_Temple_Rotunda.wav` 拖进内容浏览器的 `/Game/Dysis/Audio/Reverb/`，右键 → Create Impulse Response，Normalization Volume 设 −6.5 dB（和脚本生成的一样响）。
+  2. 新建 Submix Effect Preset → Convolution Reverb，起名 `SubmixFX_TempleReverb`：Impulse Response 选上一步的，Wet 0 dB、Dry −96 dB。
+  3. 新建 Sound Submix，起名 `Submix_TempleReverb`，Submix Effect Chain 加上一步的效果。
+- **打包：** 音效和混响只被设置页（软引用）用到，`Config/DefaultGame.ini` 里已经把 `/Game/Dysis/Audio` 加进“一定要打包的目录”。
 
 ## 什么时候响（已经接好的触发条件）
 
@@ -164,11 +199,11 @@ if (UDysisSfxSubsystem* Sfx = UDysisSfxSubsystem::Get(this))
 
 - UE 自动化测试（Session Frontend → Automation → `Dysis.Sfx`）：
   - `Dysis.Sfx.Table`：101 项、265 个文件、名字不重复，代码里用到的每个事件名都在表里。
-  - `Dysis.Sfx.Assets`：每个文件都导入了，Looping 对。需要先跑导入脚本。
+  - `Dysis.Sfx.Assets`：每个文件都导入了，Looping 对，殿内混响生成了。需要先跑导入脚本。
   - `Dysis.Sfx.Levels`：区域 → 关卡标题的对照和灰盒一致。
 - 没有 UE 的机器上：
   - `bash Art/Audio/tools/offline_check/check_cpp.sh`：对音效 C++ 和它引用的工程头文件做 clang 类型检查，警告当错误。
-  - `python3 Art/Audio/tools/offline_check/test_import_script.py`：用假的 `unreal` 模块把导入脚本跑两遍并核对。
+  - `python3 Art/Audio/tools/offline_check/test_import_script.py`：用假的 `unreal` 模块把导入脚本跑三遍并核对（第三遍模拟“C++ 还没编译新代码”，脚本要能报出来、不崩）。
 
 这两项都只是替身检查，最终以 UE 里编译、运行为准。
 
@@ -181,6 +216,7 @@ if (UDysisSfxSubsystem* Sfx = UDysisSfxSubsystem::Get(this))
    - 或者改名字以后点“自动绑定”。
 3. **PIE 里开 `Dysis.Sfx.Debug 1`，把序到月5 走一遍。** 夜里那些机关的触发现在是 v1 近似（入夜就动），声音跟着它们走；以后触发条件改了，声音会自动跟上。
 4. **青铜地面在哪。** 现在按名字（Bronze、Copper、铜沿 `_Curb`、浑天仪）判断；有别的青铜地面，在设置页“按名字判定材质”里加一行。
+5. **混响。** 导入脚本里应该有一行“混响：成功：……”。PIE 里输入 `Dysis.Sfx.Reverb`，应该显示“混响 Submix 就绪”；从岛上走进殿、再走上屋顶，听混响慢慢加上、减掉。太湿或太干就调“殿内混响”。
 
 ## 文件
 
@@ -188,13 +224,14 @@ if (UDysisSfxSubsystem* Sfx = UDysisSfxSubsystem::Get(this))
 |---|---|
 | `Art/Audio/SFX/<编号_名字>/*.wav` | 265 个音效源文件（LFS） |
 | `Art/Audio/manifest.json` | 文件清单：哪一条、循环与否、响度、原始的触发说明 |
-| `Art/Audio/ir/IR_Temple_Rotunda.wav` | 石头圆殿的脉冲响应（要做卷积混响时用） |
+| `Art/Audio/ir/IR_Temple_Rotunda.wav` | 石头圆殿的冲激响应（殿内卷积混响用，导入脚本读它） |
 | `Art/Audio/ue_import_sfx.py` | 一键导入 + 接入 |
 | `Art/Audio/tools/sfx_events.py` | 事件表：事件名、中文说明、分类、2D/3D、衰减、默认音量和快慢 |
 | `Art/Audio/tools/gen_sfx_table.py` | 由事件表和 manifest 生成 `DysisSfxDefaults.cpp`（换了 WAV 或加了事件就重跑） |
 | `Art/Audio/tools/offline_check/` | 没有 UE 时的检查工具 |
 | `Source/Dysis/Audio/DysisSfxSettings.*` | 设置页（每一项的滑块） |
-| `Source/Dysis/Audio/DysisSfxSubsystem.*` | 播放：随机不重复、冷却、并发上限、循环、控制台命令、蓝图库 |
+| `Source/Dysis/Audio/DysisSfxSubsystem.*` | 播放：随机不重复、冷却、并发上限、循环、混响发送、控制台命令、蓝图库 |
+| `Source/Dysis/Audio/DysisSfxReverb.cpp` | 一键生成殿内混响资产（读 IR、对齐预览版音量，导入脚本调用） |
 | `Source/Dysis/Audio/DysisSfxDirector.*` | 总调度：看玩法状态、环境混音、关卡标题、界面音 |
 | `Source/Dysis/Audio/DysisFootstepComponent.*` | 脚步、起跳、落地、掉落、回档 |
 | `Source/Dysis/Audio/DysisSfxDefaults.cpp` | 出厂表（生成的，不要手改） |

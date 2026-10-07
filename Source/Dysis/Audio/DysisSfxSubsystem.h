@@ -3,6 +3,7 @@
 // 随机不重复地挑一个版本，乘上“音量 × 分类音量 × 总音量”和“快慢”，2D 或放在世界里的某个位置播。
 // 循环（环境、掉落中、捧着金苹果……）用 LoopId 管：开、调音量（带平滑）、低通、移动、淡出停。
 // 设置页里的滑块每帧都读，所以改了立刻听得到；正在响的循环也会跟着变。
+// 殿内混响：每个声音按“这一项的混响多少 × 殿内程度（总调度报）”送一路到圆殿卷积混响（Submix_TempleReverb）。
 //
 // 控制台（PIE 里按 ~）：
 //   Dysis.Sfx.Play Mech.Lever.Pull [第几个]   在耳边试听一项
@@ -10,6 +11,7 @@
 //   Dysis.Sfx.Volume <事件名|Master|Footsteps|Player|Mechanism|Story|Ambience|UI> 0.8
 //   Dysis.Sfx.Pitch <事件名> 1.1             改快慢
 //   Dysis.Sfx.Enable <事件名> 0|1
+//   Dysis.Sfx.Reverb [事件名] [0.8]          殿内混响：不带数 = 看状态；一个数 = 总量；事件名+数 = 单项
 //   Dysis.Sfx.Debug [0|1]                     屏幕上显示每次播了哪一项
 //   Dysis.Sfx.Check                           检查每个声音文件都导入了
 //   Dysis.Sfx.Save                            把当前数值存进 Config/DefaultGame.ini
@@ -27,6 +29,7 @@ class UAudioComponent;
 class USoundAttenuation;
 class USoundBase;
 class USceneComponent;
+class USoundSubmixBase;
 
 UCLASS()
 class DYSIS_API UDysisSfxSubsystem : public UTickableWorldSubsystem
@@ -73,6 +76,18 @@ public:
 
 	bool IsLoopActive(FName LoopId) const;
 
+	// ───── 混响 ─────
+
+	/** 殿内程度（0 = 殿外，1 = 殿内；总调度每帧报，进出殿时平滑变）。正在响的循环会跟着变。 */
+	void SetReverbEnvironment(float Indoor01) { ReverbIndoor = FMath::Clamp(Indoor01, 0.0f, 1.0f); }
+	float GetReverbEnvironment() const { return ReverbIndoor; }
+
+	/** 殿内混响的 Submix（第一次用时加载并接进音频设备；没生成时返回空，声音照常播、只是不带混响）。 */
+	USoundSubmixBase* GetReverbSubmix();
+
+	/** 这一项现在该送多少混响（已乘殿内程度和远近）。Location 为空 = 不算远近。 */
+	float ReverbSendFor(const FDysisSfxEvent& Event, const FVector* Location, float Indoor01) const;
+
 	// ───── 调试 ─────
 
 	void SetDebug(bool bOn) { bDebug = bOn; }
@@ -100,6 +115,7 @@ private:
 		float Rate = 1.0f;         // 每秒变化量
 		float PitchScale = 1.0f;
 		bool bStopping = false;
+		float LastSend = -1.0f;    // 上次送到混响的量（变了才重发）
 	};
 
 	struct FPending
@@ -129,6 +145,7 @@ private:
 	void DebugPrint(const FString& Line) const;
 	double Now() const;
 	void StartPreload();
+	void ApplyReverb(UAudioComponent* Comp, const FDysisSfxEvent& Event, const FVector* Location, float Indoor01);
 
 	/** 同步加载过的声音（防 GC）。 */
 	UPROPERTY(Transient)
@@ -142,6 +159,10 @@ private:
 	UPROPERTY(Transient)
 	TMap<FName, TObjectPtr<USoundAttenuation>> Attenuations;
 
+	/** 殿内混响 Submix（GetReverbSubmix 第一次成功时填上）。 */
+	UPROPERTY(Transient)
+	TObjectPtr<USoundSubmixBase> ReverbSubmix;
+
 	TMap<FName, FVector2f> AttenuationParams;
 	TMap<FName, FKeyState> KeyStates;
 	TMap<FName, FLoop> Loops;
@@ -149,8 +170,11 @@ private:
 
 	FStreamableManager Streamable;
 	TSharedPtr<FStreamableHandle> PreloadHandle;
+	TSharedPtr<FStreamableHandle> ReverbLoadHandle;
 	FDelegateHandle EditedHandle;
 	bool bDebug = false;
+	float ReverbIndoor = 1.0f;     // 没有总调度报的时候（别的测试关卡）按殿内算
+	bool bReverbTried = false;
 };
 
 /** 界面音效（给 UMG 按钮、碎片栏用）。 */
@@ -188,4 +212,12 @@ public:
 	/** 停一条循环。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Sfx", meta = (WorldContext = "WorldContextObject"))
 	static void StopDysisSfxLoop(const UObject* WorldContextObject, FName LoopId, float FadeOutSeconds = 1.0f);
+
+	/**
+	 * 编辑器用（ue_import_sfx.py 会调）：读圆殿 IR 的 wav，生成 /Game/Dysis/Audio/Reverb 下的
+	 * 冲激响应、卷积混响效果、Submix 三个资产（已有就更新）。音量按预览版对齐：干声 1 + 湿声 0.42。
+	 * 需要打开 Synthesis 插件。返回“成功：……”或“失败：……”；资产生成后要保存（脚本会存）。
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sfx|Editor")
+	static FString BuildTempleReverb(const FString& IrWavFile);
 };

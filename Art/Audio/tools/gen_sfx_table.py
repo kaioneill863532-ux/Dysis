@@ -73,7 +73,7 @@ def emit(events):
         "{",
         "\tstatic FDysisSfxEvent Make(const TCHAR* Key, const TCHAR* Label, EDysisSfxCategory Category, bool b2D,",
         "\t\tfloat InnerCm, float FalloffCm, float Volume, float Pitch, float VolumeJitter, float PitchJitter,",
-        "\t\tbool bNoRepeat, float Cooldown, int32 MaxInstances, bool bLoop, std::initializer_list<const TCHAR*> Paths)",
+        "\t\tbool bNoRepeat, float Cooldown, int32 MaxInstances, bool bLoop, float ReverbSend, std::initializer_list<const TCHAR*> Paths)",
         "\t{",
         "\t\tFDysisSfxEvent E;",
         "\t\tE.Key = FName(Key);",
@@ -90,6 +90,7 @@ def emit(events):
         "\t\tE.CooldownSeconds = Cooldown;",
         "\t\tE.MaxInstances = MaxInstances;",
         "\t\tE.bLoop = bLoop;",
+        "\t\tE.ReverbSend = ReverbSend;",
         "\t\tfor (const TCHAR* P : Paths)",
         "\t\t{",
         "\t\t\tE.Sounds.Add(TSoftObjectPtr<USoundBase>(FSoftObjectPath(P)));",
@@ -107,7 +108,7 @@ def emit(events):
         lines.append(
             f"\t\tOut.Add(Make({cstr(e['key'])}, {cstr(e['label'])}, C::{e['cat']}, {'true' if e['d2'] else 'false'}, "
             f"{fnum(e['inner'])}, {fnum(e['falloff'])}, {fnum(e['vol'])}, {fnum(e['pitch'])}, {fnum(e['vj'])}, {fnum(e['pj'])}, "
-            f"{'true' if e['norep'] else 'false'}, {fnum(e['cd'])}, {int(e['maxn'])}, {'true' if e['loop'] else 'false'},")
+            f"{'true' if e['norep'] else 'false'}, {fnum(e['cd'])}, {int(e['maxn'])}, {'true' if e['loop'] else 'false'}, {fnum(e['rev'])},")
         lines.append(f"\t\t\t{{ {paths} }}));")
     lines += ["\t}", "}", ""]
     return "\n".join(lines)

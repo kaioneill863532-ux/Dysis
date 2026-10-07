@@ -19,6 +19,7 @@ public class Dysis : ModuleRules
 			"LevelSequence",
 			"MovieScene",
 			"DeveloperSettings",   // 音效设置页（Audio/DysisSfxSettings：Project Settings → Game → Dysis 音效）
+			"AssetRegistry",       // 殿内混响资产一键生成（Audio/DysisSfxReverb.cpp，编辑器里用）
 		});
 
 		// Uncomment if you are using Slate UI

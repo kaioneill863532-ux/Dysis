@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cmath>
+#include <cstring>
 #include <vector>
 #include <deque>
 #include <map>
@@ -124,6 +125,10 @@ public:
 	void Reset() { V.clear(); }
 	void Empty() { V.clear(); }
 	void SetNum(int32 N) { V.resize(N); }
+	void SetNumZeroed(int32 N) { V.assign(N, T()); }
+	void SetNumUninitialized(int32 N) { V.resize(N); }
+	T* GetData() { return V.empty() ? nullptr : &V[0]; }
+	const T* GetData() const { return V.empty() ? nullptr : &V[0]; }
 	void Init(const T& X, int32 N) { V.assign(N, X); }
 	template <typename P> void Sort(P Pred) { (void)Pred; }
 	typename std::deque<T>::iterator begin() { return V.begin(); }
@@ -248,6 +253,13 @@ struct FTransform
 struct FColor { uint8 R = 0, G = 0, B = 0, A = 255; FColor() {} FColor(uint8 r, uint8 g, uint8 b, uint8 a = 255) : R(r), G(g), B(b), A(a) {} static const FColor Green, Red, Yellow, Cyan; };
 struct FLinearColor { float R = 0, G = 0, B = 0, A = 1; FLinearColor() {} FLinearColor(float r, float g, float b, float a = 1.f) : R(r), G(g), B(b), A(a) {} static const FLinearColor Green; };
 
+struct FMemory
+{
+	static void* Memcpy(void* D, const void* S, size_t N) { return std::memcpy(D, S, N); }
+	static void* Memzero(void* D, size_t N) { return std::memset(D, 0, N); }
+	static int32 Memcmp(const void* A, const void* B, size_t N) { return std::memcmp(A, B, N); }
+};
+
 struct FMath
 {
 	template <typename T> static T Clamp(T X, T A, T B) { return X < A ? A : (X > B ? B : X); }
@@ -257,6 +269,8 @@ struct FMath
 	template <typename T> static T Square(T A) { return A * A; }
 	template <typename T, typename U> static T Lerp(const T& A, const T& B, const U& Alpha) { return (T)(A + (B - A) * Alpha); }
 	static float Pow(float A, float B) { return std::pow(A, B); }
+	static float Sqrt(float A) { return std::sqrt(A); }
+	static double Sqrt(double A) { return std::sqrt(A); }
 	static float Fmod(float A, float B) { return std::fmod(A, B); }
 	static float FInterpConstantTo(float Cur, float Target, float Dt, float Speed) { (void)Dt; (void)Speed; return Target + 0 * Cur; }
 	static float FRandRange(float A, float B) { return (A + B) * 0.5f; }
@@ -317,23 +331,42 @@ using FSimpleMulticastDelegate = TFakeMulticast<>;
 // ── UObject ──
 class UClass;
 class UWorld;
+class UFunction;
+class UStruct;
+enum EObjectFlags : uint32 { RF_NoFlags = 0, RF_Public = 1, RF_Standalone = 2, RF_Transactional = 4, RF_Transient = 8 };
+inline EObjectFlags operator|(EObjectFlags A, EObjectFlags B) { return (EObjectFlags)((uint32)A | (uint32)B); }
 class UObject
 {
 public:
 	virtual ~UObject() {}
+	static UClass* StaticClass() { return nullptr; }
 	virtual UWorld* GetWorld() const { return nullptr; }
 	FString GetName() const { return FString(); }
+	FString GetPathName() const { return FString(); }
 	UClass* GetClass() const { return nullptr; }
+	bool IsA(const UClass*) const { return true; }
 	bool Modify(bool = true) { return true; }
+	void PostEditChange() {}
+	bool MarkPackageDirty() const { return true; }
+	UFunction* FindFunction(FName) const { return nullptr; }
+	virtual void ProcessEvent(UFunction*, void*) {}
 	virtual void PostInitProperties() {}
 	bool TryUpdateDefaultConfigFile(const FString& = FString(), bool = true) { return true; }
 	void SaveConfig() {}
 };
-class UClass : public UObject { public: template <typename T> bool ImplementsInterface(T*) const { return true; } };
+class UStruct : public UObject { public: bool IsChildOf(const UStruct*) const { return true; } };
+class UScriptStruct : public UStruct {};
+class UFunction : public UStruct { public: uint16 ParmsSize = 0; };
+class UClass : public UStruct { public: template <typename T> bool ImplementsInterface(T*) const { return true; } };
+class UPackage : public UObject {};
+inline UPackage* CreatePackage(const TCHAR*) { return nullptr; }
+template <typename T> T* FindObject(UObject*, const TCHAR*, bool = false) { return nullptr; }
+template <typename T> T* LoadObject(UObject*, const TCHAR*, const TCHAR* = nullptr, uint32 = 0) { return nullptr; }
 struct FPropertyChangedChainEvent { int32 GetArrayIndex(const FString&) const { return -1; } };
 class UInterface : public UObject {};
 
 template <typename T> T* NewObject(UObject* Outer = nullptr, const FName& Name = FName()) { (void)Outer; (void)Name; return new T(); }
+template <typename T> T* NewObject(UObject* Outer, const UClass* Class, FName Name = FName(), EObjectFlags Flags = RF_NoFlags) { (void)Outer; (void)Class; (void)Name; (void)Flags; return nullptr; }
 template <typename T> T* GetMutableDefault() { static T D; return &D; }
 template <typename T> const T* GetDefault() { return GetMutableDefault<T>(); }
 template <typename To, typename From> To* Cast(From* P) { return dynamic_cast<To*>(P); }
@@ -379,6 +412,7 @@ struct FSoftObjectPath
 	FString Path;
 	FSoftObjectPath() {}
 	FSoftObjectPath(const TCHAR* In) : Path(In) {}
+	FSoftObjectPath(const FString& In) : Path(In) {}
 	bool IsValid() const { return !Path.IsEmpty(); }
 	FString GetLongPackageName() const { return Path; }
 	FString ToString() const { return Path; }
@@ -492,6 +526,7 @@ public:
 	UCapsuleComponent* GetCapsuleComponent() const { return nullptr; }
 };
 class AStaticMeshActor : public AActor {};
+class APlayerCameraManager : public AActor { public: FVector GetCameraLocation() const { return FVector(); } };
 class AHUD;
 class APlayerController : public AController
 {
@@ -532,10 +567,12 @@ public:
 	virtual TStatId GetStatId() const = 0;
 };
 class UGameInstance : public UObject { public: template <typename T> T* GetSubsystem() const { return nullptr; } };
+class FAudioDevice;
 class UWorld : public UObject
 {
 public:
 	template <typename T> T* GetSubsystem() const { return nullptr; }
+	FAudioDevice* GetAudioDeviceRaw() const { return nullptr; }
 	double GetTimeSeconds() const { return 0; }
 	float GetDeltaSeconds() const { return 0; }
 	APlayerController* GetFirstPlayerController() const { return nullptr; }
@@ -586,6 +623,12 @@ struct FSoundAttenuationSettings
 	float LPFRadiusMin = 0, LPFRadiusMax = 0, LPFFrequencyAtMin = 0, LPFFrequencyAtMax = 0;
 };
 class USoundAttenuation : public UObject { public: FSoundAttenuationSettings Attenuation; };
+class USoundSubmixBase : public UObject {};
+class USoundSubmixWithParentBase : public USoundSubmixBase {};
+class USoundEffectPreset : public UObject {};
+class USoundEffectSubmixPreset : public USoundEffectPreset {};
+class USoundSubmix : public USoundSubmixWithParentBase { public: TArray<TObjectPtr<USoundEffectSubmixPreset>> SubmixEffectChain; };
+class FAudioDevice { public: virtual ~FAudioDevice() {} virtual void RegisterSoundSubmix(const USoundSubmixBase*, bool = false) {} };
 class UAudioComponent : public USceneComponent
 {
 public:
@@ -595,6 +638,7 @@ public:
 	void SetPitchMultiplier(float) {}
 	void SetLowPassFilterEnabled(bool) {}
 	void SetLowPassFilterFrequency(float) {}
+	void SetSubmixSend(USoundSubmixBase*, float) {}
 };
 namespace EAttachLocation { enum Type { KeepRelativeOffset, KeepWorldPosition, SnapToTarget, SnapToTargetIncludingScale }; }
 class UGameplayStatics : public UBlueprintFunctionLibrary
@@ -602,12 +646,53 @@ class UGameplayStatics : public UBlueprintFunctionLibrary
 public:
 	static UAudioComponent* SpawnSound2D(const UObject*, USoundBase*, float = 1.f, float = 1.f, float = 0.f, USoundConcurrency* = nullptr, bool = false, bool = true) { return nullptr; }
 	static UAudioComponent* SpawnSoundAtLocation(const UObject*, USoundBase*, FVector, FRotator = FRotator::ZeroRotator, float = 1.f, float = 1.f, float = 0.f, USoundAttenuation* = nullptr, USoundConcurrency* = nullptr, bool = true) { return nullptr; }
+	static APlayerCameraManager* GetPlayerCameraManager(const UObject*, int32) { return nullptr; }
 	static UAudioComponent* SpawnSoundAttached(USoundBase*, USceneComponent*, FName = FName(), FVector = FVector(), EAttachLocation::Type = EAttachLocation::KeepRelativeOffset, bool = false, float = 1.f, float = 1.f, float = 0.f, USoundAttenuation* = nullptr, USoundConcurrency* = nullptr, bool = true) { return nullptr; }
 };
 
 // ── 加载 ──
-struct FStreamableHandle { void ReleaseHandle() {} };
+struct FStreamableHandle { void ReleaseHandle() {} bool IsLoadingInProgress() const { return false; } };
 struct FStreamableManager { TSharedPtr<FStreamableHandle> RequestAsyncLoad(const TArray<FSoftObjectPath>&) { return TSharedPtr<FStreamableHandle>(); } };
+struct FFileHelper { static bool LoadFileToArray(TArray<uint8>&, const TCHAR*, uint32 = 0) { return false; } };
+struct FAssetRegistryModule { static void AssetCreated(UObject*) {} };
+
+// ── 反射（UObject/UnrealType.h）──
+enum EPropertyFlags : uint64 { CPF_None = 0, CPF_Parm = 0x80, CPF_OutParm = 0x100, CPF_ReturnParm = 0x400 };
+class FField { public: virtual ~FField() {} };
+class FProperty : public FField
+{
+public:
+	bool HasAnyPropertyFlags(EPropertyFlags) const { return false; }
+	template <typename T> T* ContainerPtrToValuePtr(UObject* C, int32 = 0) const { return (T*)C; }
+	template <typename T> T* ContainerPtrToValuePtr(void* C, int32 = 0) const { return (T*)C; }
+};
+template <typename T> class TFakeNumericProperty : public FProperty { public: void SetPropertyValue_InContainer(void*, const T&, int32 = 0) const {} };
+class FIntProperty : public TFakeNumericProperty<int32> {};
+class FFloatProperty : public TFakeNumericProperty<float> {};
+class FBoolProperty : public FProperty { public: void SetPropertyValue_InContainer(void*, bool, int32 = 0) const {} };
+class FObjectPropertyBase : public FProperty { public: void SetObjectPropertyValue_InContainer(void*, UObject*, int32 = 0) const {} };
+class FArrayProperty : public FProperty { public: FProperty* Inner = nullptr; };
+class FStructProperty : public FProperty { public: TObjectPtr<UScriptStruct> Struct; };
+template <typename T> T* FindFProperty(const UStruct*, FName) { return nullptr; }
+template <typename T> T* CastField(FField* F) { return dynamic_cast<T*>(F); }
+class FScriptArrayHelper
+{
+public:
+	FScriptArrayHelper(const FArrayProperty*, const void*) {}
+	void Resize(int32) {}
+	uint8* GetRawPtr(int32 = 0) { return nullptr; }
+};
+template <typename T>
+class TFieldIterator
+{
+public:
+	explicit TFieldIterator(const UStruct*) {}
+	explicit operator bool() const { return false; }
+	TFieldIterator& operator++() { return *this; }
+	T* operator*() const { return nullptr; }
+	T* operator->() const { return nullptr; }
+};
+
 struct FPackageName { static bool DoesPackageExist(const FString&, FString* = nullptr, bool = true) { return true; } };
 
 // ── 自动化测试 ──

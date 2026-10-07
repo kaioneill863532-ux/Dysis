@@ -193,6 +193,7 @@ private:
 	void UpdateRoofSteps(float Dt);
 	void UpdateIris(float Dt);
 	void UpdateGate();
+	void UpdateIndoor(float Dt, bool bSnap);
 	void UpdateAmbience(float Dt);
 	void UpdateTitles();
 	void UpdateUI();

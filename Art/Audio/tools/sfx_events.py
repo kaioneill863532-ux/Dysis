@@ -17,6 +17,7 @@
 #   cd                    同一项两次之间最短间隔（秒）
 #   maxn                  同时最多几个在响
 #   loop                  循环（由导入脚本把 SoundWave 设成 Looping）
+#   rev                   送进殿内卷积混响的量（1 = 和试听页“殿内混响”开着时一样；0 = 不加）
 
 M = 100.0  # 1 米 = 100 厘米
 
@@ -43,7 +44,7 @@ EVENTS = [
     dict(key="Player.Land.Light", label="落地·光路/月石", files=r"SFX_Land_Light_\d+", cat="Player", d2=True, maxn=1, cd=0.15),
     dict(key="Player.Land.Bronze", label="落地·青铜", files=r"SFX_Land_Bronze_\d+", cat="Player", d2=True, maxn=1, cd=0.15),
     dict(key="Player.Fall.Start", label="掉落开始", files=r"SFX_Fall_Start", cat="Player", d2=True, maxn=1, cd=1.0),
-    dict(key="Player.Fall.Loop", label="掉落中（循环）", files=r"SFX_Fall_Loop", cat="Player", d2=True, loop=True, maxn=1),
+    dict(key="Player.Fall.Loop", label="掉落中（循环）", files=r"SFX_Fall_Loop", cat="Player", d2=True, loop=True, maxn=1, rev=0.3),
     dict(key="Player.Respawn.Day", label="回到落脚点·白天", files=r"SFX_Respawn_Day", cat="Player", d2=True, maxn=1, cd=0.5),
     dict(key="Player.Respawn.Night", label="回到落脚点·夜里", files=r"SFX_Respawn_Night", cat="Player", d2=True, maxn=1, cd=0.5),
 
@@ -55,15 +56,15 @@ EVENTS = [
     dict(key="Moon.Wall.Vanish", label="大块月石隐去（月亮浮雕、月之龛、双子墙）", files=r"SFX_Moonstone_Wall_Vanish", cat="Story", inner=4*M, falloff=35*M, maxn=2),
 
     # ── 环境循环 ──
-    dict(key="Amb.Waterfall.Near", label="瀑布·近（循环）", files=r"SFX_Waterfall_Near_Loop", cat="Ambience", inner=6*M, falloff=19*M, loop=True, maxn=1),
-    dict(key="Amb.Waterfall.Far", label="瀑布·远（循环）", files=r"SFX_Waterfall_Far_Loop", cat="Ambience", inner=15*M, falloff=45*M, loop=True, maxn=1),
-    dict(key="Amb.Sea.Close", label="海浪·近（循环，殿外低处）", files=r"SFX_Sea_Waves_Close_Loop", cat="Ambience", d2=True, loop=True, maxn=1),
-    dict(key="Amb.Sea.Far", label="海浪·远（循环，一直在）", files=r"SFX_Sea_Waves_Far_Loop", cat="Ambience", d2=True, loop=True, maxn=1),
-    dict(key="Amb.RoofWind", label="海风（循环，越高越响）", files=r"SFX_Roof_Wind_Loop", cat="Ambience", d2=True, loop=True, maxn=1),
-    dict(key="Amb.RoomTone", label="殿内空间底噪（循环）", files=r"SFX_Interior_RoomTone_Loop", cat="Ambience", d2=True, loop=True, maxn=1),
-    dict(key="Amb.Pool", label="水池水面（循环）", files=r"SFX_Pool_Water_Loop", cat="Ambience", inner=8*M, falloff=12*M, loop=True, maxn=1),
-    dict(key="Amb.DayBirds", label="白天鸟鸣（循环）", files=r"SFX_Day_Birds_Loop", cat="Ambience", d2=True, loop=True, maxn=1),
-    dict(key="Amb.Mist", label="水雾（循环，开闸以后）", files=r"SFX_Mist_Loop", cat="Ambience", inner=10*M, falloff=15*M, loop=True, maxn=1),
+    dict(key="Amb.Waterfall.Near", label="瀑布·近（循环）", files=r"SFX_Waterfall_Near_Loop", cat="Ambience", inner=6*M, falloff=19*M, loop=True, maxn=1, rev=0.5),
+    dict(key="Amb.Waterfall.Far", label="瀑布·远（循环）", files=r"SFX_Waterfall_Far_Loop", cat="Ambience", inner=15*M, falloff=45*M, loop=True, maxn=1, rev=0.5),
+    dict(key="Amb.Sea.Close", label="海浪·近（循环，殿外低处）", files=r"SFX_Sea_Waves_Close_Loop", cat="Ambience", d2=True, loop=True, maxn=1, rev=0.0),
+    dict(key="Amb.Sea.Far", label="海浪·远（循环，一直在）", files=r"SFX_Sea_Waves_Far_Loop", cat="Ambience", d2=True, loop=True, maxn=1, rev=0.0),
+    dict(key="Amb.RoofWind", label="海风（循环，越高越响）", files=r"SFX_Roof_Wind_Loop", cat="Ambience", d2=True, loop=True, maxn=1, rev=0.0),
+    dict(key="Amb.RoomTone", label="殿内空间底噪（循环）", files=r"SFX_Interior_RoomTone_Loop", cat="Ambience", d2=True, loop=True, maxn=1, rev=0.0),
+    dict(key="Amb.Pool", label="水池水面（循环）", files=r"SFX_Pool_Water_Loop", cat="Ambience", inner=8*M, falloff=12*M, loop=True, maxn=1, rev=0.6),
+    dict(key="Amb.DayBirds", label="白天鸟鸣（循环）", files=r"SFX_Day_Birds_Loop", cat="Ambience", d2=True, loop=True, maxn=1, rev=0.0),
+    dict(key="Amb.Mist", label="水雾（循环，开闸以后）", files=r"SFX_Mist_Loop", cat="Ambience", inner=10*M, falloff=15*M, loop=True, maxn=1, rev=0.3),
 
     # ── 机关 ──
     dict(key="Mech.Sluice.Wheel", label="水闸轮转动", files=r"SFX_Sluice_Wheel_Turn", cat="Mechanism", inner=3*M, falloff=30*M, maxn=1),
@@ -124,17 +125,17 @@ EVENTS = [
     dict(key="Story.Selene.SleepTalk", label="塞勒涅梦话", files=r"SFX_Selene_SleepTalk_\d+", cat="Story", inner=3*M, falloff=12*M, maxn=1),
 
     # ── 界面（2D）──
-    dict(key="UI.Hover", label="按钮悬停", files=r"SFX_UI_Hover_\d+", cat="UI", d2=True, maxn=2, cd=0.04),
-    dict(key="UI.Confirm", label="确认", files=r"SFX_UI_Confirm", cat="UI", d2=True, maxn=2),
-    dict(key="UI.Back", label="返回", files=r"SFX_UI_Back", cat="UI", d2=True, maxn=2),
-    dict(key="UI.StartGame", label="开始游戏", files=r"SFX_UI_StartGame", cat="UI", d2=True, maxn=1),
+    dict(key="UI.Hover", label="按钮悬停", files=r"SFX_UI_Hover_\d+", cat="UI", d2=True, maxn=2, cd=0.04, rev=0.0),
+    dict(key="UI.Confirm", label="确认", files=r"SFX_UI_Confirm", cat="UI", d2=True, maxn=2, rev=0.0),
+    dict(key="UI.Back", label="返回", files=r"SFX_UI_Back", cat="UI", d2=True, maxn=2, rev=0.0),
+    dict(key="UI.StartGame", label="开始游戏", files=r"SFX_UI_StartGame", cat="UI", d2=True, maxn=1, rev=0.0),
     dict(key="UI.Title", label="关卡标题（序、日1–5、日落之后、月1–5）", files=r"SFX_Title_\w+", cat="UI", d2=True, norep=False, maxn=1),
-    dict(key="UI.Prompt", label="互动提示出现", files=r"SFX_UI_Prompt_Appear_\d+", cat="UI", d2=True, maxn=1, cd=1.0),
-    dict(key="UI.Text", label="提示文字出现", files=r"SFX_UI_Text_Appear_\d+", cat="UI", d2=True, maxn=1, cd=1.0),
-    dict(key="UI.DialogueNext", label="对话推进（下一句）", files=r"SFX_UI_Dialogue_Next_\d+", cat="UI", d2=True, maxn=1, cd=0.1),
-    dict(key="UI.ShardHover.Sun", label="界面·碰到日之碎片", files=r"SFX_UI_Shard_Hover_Sun", cat="UI", d2=True, maxn=1, cd=0.3),
-    dict(key="UI.ShardHover.Moon", label="界面·碰到月之碎片", files=r"SFX_UI_Shard_Hover_Moon", cat="UI", d2=True, maxn=1, cd=0.3),
-    dict(key="UI.ShardHover.Rainbow", label="界面·碰到虹之碎片", files=r"SFX_UI_Shard_Hover_Rainbow", cat="UI", d2=True, maxn=1, cd=0.3),
+    dict(key="UI.Prompt", label="互动提示出现", files=r"SFX_UI_Prompt_Appear_\d+", cat="UI", d2=True, maxn=1, cd=1.0, rev=0.3),
+    dict(key="UI.Text", label="提示文字出现", files=r"SFX_UI_Text_Appear_\d+", cat="UI", d2=True, maxn=1, cd=1.0, rev=0.3),
+    dict(key="UI.DialogueNext", label="对话推进（下一句）", files=r"SFX_UI_Dialogue_Next_\d+", cat="UI", d2=True, maxn=1, cd=0.1, rev=0.3),
+    dict(key="UI.ShardHover.Sun", label="界面·碰到日之碎片", files=r"SFX_UI_Shard_Hover_Sun", cat="UI", d2=True, maxn=1, cd=0.3, rev=0.0),
+    dict(key="UI.ShardHover.Moon", label="界面·碰到月之碎片", files=r"SFX_UI_Shard_Hover_Moon", cat="UI", d2=True, maxn=1, cd=0.3, rev=0.0),
+    dict(key="UI.ShardHover.Rainbow", label="界面·碰到虹之碎片", files=r"SFX_UI_Shard_Hover_Rainbow", cat="UI", d2=True, maxn=1, cd=0.3, rev=0.0),
 ]
 
-DEFAULTS = dict(cat="Mechanism", d2=False, inner=3*M, falloff=30*M, vol=1.0, pitch=1.0, vj=0.0, pj=0.0, norep=True, cd=0.0, maxn=4, loop=False)
+DEFAULTS = dict(cat="Mechanism", d2=False, inner=3*M, falloff=30*M, vol=1.0, pitch=1.0, vj=0.0, pj=0.0, norep=True, cd=0.0, maxn=4, loop=False, rev=1.0)

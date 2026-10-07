@@ -14,7 +14,7 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 cp -r "$SRC"/. "$TMP/src/" 2>/dev/null || { mkdir -p "$TMP/src"; cp -r "$SRC"/. "$TMP/src/"; }
 mkdir -p "$TMP/inc" && cp "$HERE/FakeUE.h" "$TMP/inc/"
-FILES=${@:-Audio/DysisSfxSettings.cpp Audio/DysisSfxDefaults.cpp Audio/DysisSfxSubsystem.cpp Audio/DysisFootstepComponent.cpp Audio/DysisSfxDirector.cpp Audio/DysisSfxTests.cpp UI/DysisHUD.cpp}
+FILES=${@:-Audio/DysisSfxSettings.cpp Audio/DysisSfxDefaults.cpp Audio/DysisSfxSubsystem.cpp Audio/DysisFootstepComponent.cpp Audio/DysisSfxDirector.cpp Audio/DysisSfxTests.cpp Audio/DysisSfxReverb.cpp UI/DysisHUD.cpp}
 python3 - "$TMP/src" "$TMP/inc" $FILES <<'PY'
 import os, re, sys
 src, inc, files = sys.argv[1], sys.argv[2], sys.argv[3:]
@@ -40,7 +40,7 @@ PY
 rc=0
 for f in $FILES; do
   out=$(clang++ -std=c++20 -fsyntax-only -isystem "$TMP/inc" -I "$TMP/src" -Wall -Wextra -Wshadow -Wfloat-conversion \
-        -Wimplicit-float-conversion -Wno-implicit-int-float-conversion -Wshorten-64-to-32 -Wsign-compare \
+        -Wimplicit-float-conversion -Wno-implicit-int-float-conversion -Wshorten-64-to-32 -Wsign-compare -Wunreachable-code-loop-increment \
         -Wno-unused-parameter -Wno-unused-private-field -Wno-missing-field-initializers -Werror "$TMP/src/$f" 2>&1) || true
   if [ -n "$out" ]; then echo "✗ $f"; echo "$out" | grep -E "error|warning" | sed "s|$TMP/src/||" | head -30; rc=1; else echo "✓ $f"; fi
 done

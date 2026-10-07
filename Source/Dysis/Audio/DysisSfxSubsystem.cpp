@@ -1,6 +1,8 @@
 ﻿// 狄西斯的日落回廊 · 音效播放子系统
 #include "Audio/DysisSfxSubsystem.h"
 
+#include "AudioDevice.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/AudioComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -9,6 +11,7 @@
 #include "Misc/PackageName.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundBase.h"
+#include "Sound/SoundSubmix.h"
 
 namespace
 {
@@ -47,6 +50,8 @@ void UDysisSfxSubsystem::Deinitialize()
 	Pending.Reset();
 	if (PreloadHandle.IsValid()) PreloadHandle->ReleaseHandle();
 	PreloadHandle.Reset();
+	if (ReverbLoadHandle.IsValid()) ReverbLoadHandle->ReleaseHandle();
+	ReverbLoadHandle.Reset();
 	Super::Deinitialize();
 }
 
@@ -70,6 +75,12 @@ void UDysisSfxSubsystem::StartPreload()
 				Paths.AddUnique(P);
 			}
 		}
+	}
+	// 殿内混响单独先载（几个小资产，开局很快就好，不用等 265 个声音）。
+	const FSoftObjectPath& ReverbPath = S->ReverbSubmix.ToSoftObjectPath();
+	if (ReverbPath.IsValid() && FPackageName::DoesPackageExist(ReverbPath.GetLongPackageName()))
+	{
+		ReverbLoadHandle = Streamable.RequestAsyncLoad(TArray<FSoftObjectPath>{ ReverbPath });
 	}
 	if (Paths.Num() > 0)
 	{
@@ -221,7 +232,14 @@ UAudioComponent* UDysisSfxSubsystem::PlayInternal(FName Key, const FVector* Loca
 	}
 
 	State.LastPlayTime = T;
-	if (Comp) State.Active.Add(Comp);
+	if (Comp)
+	{
+		State.Active.Add(Comp);
+		// 混响：试听按殿内算（在哪儿都听得到这一项的混响）；跟着组件走的按组件现在的位置算远近。
+		const FVector AttachedAt = AttachTo ? AttachTo->GetComponentLocation() : FVector::ZeroVector;
+		const FVector* Where = b2D ? nullptr : (AttachTo ? &AttachedAt : Location);
+		ApplyReverb(Comp, *Event, Where, bAudition ? 1.0f : ReverbIndoor);
+	}
 	DebugPrint(FString::Printf(TEXT("♪ %s  %s  #%d  音量 %.2f 快慢 %.2f%s"), *Key.ToString(), *Event->Label, State.LastIndex + 1, Volume, Pitch,
 		b2D ? TEXT("  2D") : TEXT("")));
 	return Comp;
@@ -355,6 +373,77 @@ bool UDysisSfxSubsystem::IsLoopActive(FName LoopId) const
 	return L && !L->bStopping && L->Comp.IsValid() && L->Comp->IsPlaying();
 }
 
+// ───────────────────────── 混响 ─────────────────────────
+
+USoundSubmixBase* UDysisSfxSubsystem::GetReverbSubmix()
+{
+	if (ReverbSubmix) return ReverbSubmix;
+	if (bReverbTried) return nullptr;
+
+	const UDysisSfxSettings* S = UDysisSfxSettings::Get();
+	USoundSubmixBase* Submix = S->ReverbSubmix.Get();   // 开局预载完就已经在内存里
+	if (!Submix)
+	{
+		if (ReverbLoadHandle.IsValid() && ReverbLoadHandle->IsLoadingInProgress()) return nullptr;   // 还在载：下次再试
+		bReverbTried = true;
+		const FSoftObjectPath& P = S->ReverbSubmix.ToSoftObjectPath();
+		if (P.IsValid() && FPackageName::DoesPackageExist(P.GetLongPackageName()))
+		{
+			Submix = S->ReverbSubmix.LoadSynchronous();
+		}
+		if (!Submix)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("DysisSfx: 殿内混响还没生成（%s）——声音照常播，只是不带混响；跑一次 Art/Audio/ue_import_sfx.py 就有了"),
+				*P.ToString());
+			return nullptr;
+		}
+	}
+	bReverbTried = true;
+	ReverbSubmix = Submix;
+
+	// 接进这个世界的音频设备（已经接过的会被忽略/刷新）。
+	if (UWorld* World = GetWorld())
+	{
+		if (FAudioDevice* Device = World->GetAudioDeviceRaw())
+		{
+			Device->RegisterSoundSubmix(Submix, true);
+		}
+	}
+	UE_LOG(LogTemp, Display, TEXT("DysisSfx: 殿内混响就绪（%s）"), *Submix->GetPathName());
+	return ReverbSubmix;
+}
+
+float UDysisSfxSubsystem::ReverbSendFor(const FDysisSfxEvent& Event, const FVector* Location, float Indoor01) const
+{
+	const UDysisSfxSettings* S = UDysisSfxSettings::Get();
+	const float Room = FMath::Lerp(S->OutdoorReverbAmount, S->ReverbAmount, FMath::Clamp(Indoor01, 0.0f, 1.0f));
+	float Send = FMath::Max(Event.ReverbSend, 0.0f) * FMath::Max(Room, 0.0f);
+	if (Send <= 0.0f) return 0.0f;
+
+	// 远处的声音多带一点混响：干声随距离变小，混响在殿里到处差不多一样响。
+	if (Location && !Event.b2D && S->ReverbDistanceBoost > 0.0f)
+	{
+		if (const APlayerCameraManager* Cam = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0))
+		{
+			const float Dist = static_cast<float>(FVector::Dist(Cam->GetCameraLocation(), *Location));
+			const float Far = FMath::Clamp((Dist - Event.InnerRadiusCm) / FMath::Max(Event.FalloffDistanceCm, 1.0f), 0.0f, 1.0f);
+			Send *= 1.0f + S->ReverbDistanceBoost * Far;
+		}
+	}
+	return FMath::Min(Send, 4.0f);
+}
+
+void UDysisSfxSubsystem::ApplyReverb(UAudioComponent* Comp, const FDysisSfxEvent& Event, const FVector* Location, float Indoor01)
+{
+	if (!Comp) return;
+	const float Send = ReverbSendFor(Event, Location, Indoor01);
+	if (Send <= 0.0f) return;
+	if (USoundSubmixBase* Submix = GetReverbSubmix())
+	{
+		Comp->SetSubmixSend(Submix, Send);
+	}
+}
+
 // ───────────────────────── Tick ─────────────────────────
 
 void UDysisSfxSubsystem::Tick(float DeltaTime)
@@ -402,6 +491,21 @@ void UDysisSfxSubsystem::Tick(float DeltaTime)
 		const float Base = (E && E->bEnabled) ? BaseVolume(*E) : 0.0f;
 		C->SetVolumeMultiplier(FMath::Max(Base * L.Scale, 0.0001f));
 		C->SetPitchMultiplier(FMath::Clamp((E ? E->Pitch : 1.0f) * L.PitchScale, 0.1f, 4.0f));
+
+		// 混响跟着殿内外、远近、滑块变（变化够大才重发）。
+		if (E)
+		{
+			const FVector Here = C->GetComponentLocation();
+			const float Send = ReverbSendFor(*E, E->b2D ? nullptr : &Here, ReverbIndoor);
+			if (FMath::Abs(Send - L.LastSend) > 0.01f)
+			{
+				if (USoundSubmixBase* Submix = GetReverbSubmix())
+				{
+					C->SetSubmixSend(Submix, Send);
+					L.LastSend = Send;
+				}
+			}
+		}
 	}
 	for (const FName& Id : Dead)
 	{
@@ -534,8 +638,8 @@ namespace DysisSfxConsole
 		for (const FDysisSfxEvent& E : S->Events)
 		{
 			if (!Filter.IsEmpty() && !E.Key.ToString().Contains(Filter) && !E.Label.Contains(Filter)) continue;
-			UE_LOG(LogTemp, Display, TEXT("%-28s %-30s 音量 %.2f 快慢 %.2f %s %d 个文件%s"), *E.Key.ToString(), *E.Label, E.Volume, E.Pitch,
-				E.b2D ? TEXT("2D") : TEXT("3D"), E.Sounds.Num(), E.bEnabled ? TEXT("") : TEXT("（关）"));
+			UE_LOG(LogTemp, Display, TEXT("%-28s %-30s 音量 %.2f 快慢 %.2f 混响 %.2f %s %d 个文件%s"), *E.Key.ToString(), *E.Label, E.Volume, E.Pitch,
+				E.ReverbSend, E.b2D ? TEXT("2D") : TEXT("3D"), E.Sounds.Num(), E.bEnabled ? TEXT("") : TEXT("（关）"));
 		}
 	}
 
@@ -560,6 +664,26 @@ namespace DysisSfxConsole
 			return;
 		}
 		UE_LOG(LogTemp, Warning, TEXT("没有 %s 这一项"), *Args[0]);
+	}
+
+	static void Reverb(const TArray<FString>& Args, UWorld* World)
+	{
+		UDysisSfxSettings* S = UDysisSfxSettings::GetMutable();
+		if (Args.Num() == 1)
+		{
+			S->ReverbAmount = FMath::Clamp(FCString::Atof(*Args[0]), 0.0f, 3.0f);
+		}
+		else if (Args.Num() >= 2)
+		{
+			FDysisSfxEvent* E = FindMutable(S, Args[0]);
+			if (!E) { UE_LOG(LogTemp, Warning, TEXT("没有 %s 这一项"), *Args[0]); return; }
+			E->ReverbSend = FMath::Clamp(FCString::Atof(*Args[1]), 0.0f, 3.0f);
+			UE_LOG(LogTemp, Display, TEXT("%s 混响 = %.2f"), *Args[0], E->ReverbSend);
+		}
+		UDysisSfxSubsystem* Sfx = UDysisSfxSubsystem::Get(World);
+		const bool bReady = Sfx && Sfx->GetReverbSubmix();
+		UE_LOG(LogTemp, Display, TEXT("殿内混响 %.2f，殿外混响 %.2f，现在殿内程度 %.2f，混响 Submix %s"), S->ReverbAmount, S->OutdoorReverbAmount,
+			Sfx ? Sfx->GetReverbEnvironment() : 0.0f, bReady ? TEXT("就绪") : (Sfx ? TEXT("没有（跑一次 ue_import_sfx.py）") : TEXT("（要在 PIE 里看）")));
 	}
 
 	static void Enable(const TArray<FString>& Args, UWorld*)
@@ -607,6 +731,7 @@ namespace DysisSfxConsole
 	static FAutoConsoleCommandWithWorldAndArgs CmdList(TEXT("Dysis.Sfx.List"), TEXT("Dysis.Sfx.List [过滤]  列出所有音效项"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&List));
 	static FAutoConsoleCommandWithWorldAndArgs CmdVolume(TEXT("Dysis.Sfx.Volume"), TEXT("Dysis.Sfx.Volume <事件名|分类|Master> 0.8"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Volume));
 	static FAutoConsoleCommandWithWorldAndArgs CmdPitch(TEXT("Dysis.Sfx.Pitch"), TEXT("Dysis.Sfx.Pitch <事件名> 1.1  改快慢"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Pitch));
+	static FAutoConsoleCommandWithWorldAndArgs CmdReverb(TEXT("Dysis.Sfx.Reverb"), TEXT("Dysis.Sfx.Reverb [事件名] [0.8]  殿内混响：看状态 / 改总量 / 改单项"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Reverb));
 	static FAutoConsoleCommandWithWorldAndArgs CmdEnable(TEXT("Dysis.Sfx.Enable"), TEXT("Dysis.Sfx.Enable <事件名> 0|1"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Enable));
 	static FAutoConsoleCommandWithWorldAndArgs CmdDebug(TEXT("Dysis.Sfx.Debug"), TEXT("Dysis.Sfx.Debug [0|1]  屏幕上显示每次播了哪一项"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Debug));
 	static FAutoConsoleCommandWithWorldAndArgs CmdCheck(TEXT("Dysis.Sfx.Check"), TEXT("检查每个声音文件都导入了"), FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Check));

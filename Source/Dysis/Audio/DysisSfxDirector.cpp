@@ -457,9 +457,11 @@ void ADysisSfxDirector::Tick(float DeltaTime)
 	if (GetWorld()->GetTimeSeconds() - StartTime < 1.0)
 	{
 		SyncAll();
+		UpdateIndoor(DeltaTime, true);
 		if (bAmbience) UpdateAmbience(DeltaTime);
 		return;
 	}
+	UpdateIndoor(DeltaTime, false);
 
 	if (bMechanisms)
 	{
@@ -981,6 +983,27 @@ void ADysisSfxDirector::UpdateProximity(float Dt)
 	}
 }
 
+void ADysisSfxDirector::UpdateIndoor(float Dt, bool bSnap)
+{
+	const APawn* Pawn = GetPlayerPawn();
+	if (!Pawn) return;
+	const UDysisSfxSettings* Cfg = UDysisSfxSettings::Get();
+	const UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>();
+	const FString Zone = Time ? (Time->GetZoneOverride().IsEmpty() ? Time->Zone : Time->GetZoneOverride()) : FString();
+
+	// 殿内外：殿外的区域名或屋顶以上 = 殿外。开局第一秒直接到位，之后进出殿平滑过渡。
+	bool bIndoor = !Zone.IsEmpty() && PlayerFoot().Z < Cfg->RoofHeightCm;
+	for (const FString& Z : Cfg->OutdoorZones)
+	{
+		if (Zone.Equals(Z, ESearchCase::IgnoreCase)) { bIndoor = false; break; }
+	}
+	const float Want = bIndoor ? 1.0f : 0.0f;
+	Indoor = bSnap ? Want : FMath::FInterpConstantTo(Indoor, Want, Dt, 1.0f / FMath::Max(Cfg->IndoorBlendSeconds, 0.05f));
+
+	// 殿内混响跟着走（播放子系统按这个给每个声音送混响）。
+	if (UDysisSfxSubsystem* S = Sfx.Get()) S->SetReverbEnvironment(Indoor);
+}
+
 void ADysisSfxDirector::UpdateAmbience(float Dt)
 {
 	UDysisSfxSubsystem* S = Sfx.Get();
@@ -993,13 +1016,7 @@ void ADysisSfxDirector::UpdateAmbience(float Dt)
 	const FVector Foot = PlayerFoot();
 	const double Now = GetWorld()->GetTimeSeconds();
 
-	// 殿内外：殿外的区域名或屋顶以上 = 殿外。
-	bool bIndoor = !Zone.IsEmpty() && Foot.Z < Cfg->RoofHeightCm;
-	for (const FString& Z : Cfg->OutdoorZones)
-	{
-		if (Zone.Equals(Z, ESearchCase::IgnoreCase)) { bIndoor = false; break; }
-	}
-	Indoor = FMath::FInterpConstantTo(Indoor, bIndoor ? 1.0f : 0.0f, Dt, 1.0f / Cfg->IndoorBlendSeconds);
+	// 殿内程度 Indoor 由 UpdateIndoor 每帧算好。
 	DayAmount = FMath::FInterpConstantTo(DayAmount, bNight ? 0.0f : 1.0f, Dt, 1.0f / Cfg->BirdsNightFadeSeconds);
 	const FVector Here = Pawn->GetActorLocation();
 

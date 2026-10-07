@@ -9,6 +9,18 @@
 #include "DysisSfxSettings.generated.h"
 
 class USoundBase;
+class USoundSubmixBase;
+
+/** 殿内卷积混响的资产位置（ue_import_sfx.py 调 BuildTempleReverb 生成）。 */
+namespace DysisSfxReverb
+{
+	inline constexpr const TCHAR* Folder = TEXT("/Game/Dysis/Audio/Reverb");
+	inline constexpr const TCHAR* ImpulseResponseName = TEXT("IR_Temple_Rotunda");
+	inline constexpr const TCHAR* PresetName = TEXT("SubmixFX_TempleReverb");
+	inline constexpr const TCHAR* SubmixName = TEXT("Submix_TempleReverb");
+	/** 试听页“殿内混响”开着时湿声的增益（index.html：wet.gain = 0.42），烘进冲激响应里。 */
+	inline constexpr float PreviewWetGain = 0.42f;
+}
 
 /** 分类：每类有一个总音量滑块。 */
 UENUM(BlueprintType)
@@ -95,6 +107,10 @@ struct DYSIS_API FDysisSfxEvent
 	/** 同一项同时最多几个在响（多了就停掉最早的）。 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dysis|Sfx", meta = (DisplayName = "同时最多几个", ClampMin = "1", UIMax = "8"))
 	int32 MaxInstances = 4;
+
+	/** 送进殿内卷积混响的量（1 = 和试听页“殿内混响”开着时一样；0 = 不加混响）。只在殿内生效，殿外按“殿外混响”。 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dysis|Sfx", meta = (DisplayName = "混响多少", ClampMin = "0.0", ClampMax = "3.0", UIMin = "0.0", UIMax = "2.0"))
+	float ReverbSend = 1.0f;
 
 	/** 循环素材（只读说明：循环由代码开关，导入脚本已把这些 SoundWave 设成 Looping）。 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sfx", meta = (DisplayName = "循环"))
@@ -229,6 +245,24 @@ public:
 	/** 瀑布流着的时候，离瀑布多近的石面算湿石（厘米）。 */
 	UPROPERTY(config, EditAnywhere, Category = "脚步", meta = (DisplayName = "湿石：离瀑布多近（厘米）", ClampMin = "0.0"))
 	float WetStoneRadiusCm = 700.0f;
+
+	// ───────── 混响 ─────────
+
+	/** 殿内的卷积混响（圆殿的冲激响应，和试听页同一份）。导入脚本会生成它；空 = 不加混响。改了要重开 PIE。 */
+	UPROPERTY(config, EditAnywhere, Category = "混响", meta = (DisplayName = "混响 Submix"))
+	TSoftObjectPtr<USoundSubmixBase> ReverbSubmix;
+
+	/** 殿内混响的总量（1 = 和试听页一样；乘在每一项的“混响多少”上）。进出殿时按“进出殿的过渡”平滑变化。 */
+	UPROPERTY(config, EditAnywhere, Category = "混响", meta = (DisplayName = "殿内混响", ClampMin = "0.0", ClampMax = "3.0", UIMin = "0.0", UIMax = "2.0"))
+	float ReverbAmount = 1.0f;
+
+	/** 殿外（岛上、屋顶）的混响量。默认 0：殿外是开阔的海边。 */
+	UPROPERTY(config, EditAnywhere, Category = "混响", meta = (DisplayName = "殿外混响", ClampMin = "0.0", ClampMax = "3.0", UIMin = "0.0", UIMax = "2.0"))
+	float OutdoorReverbAmount = 0.0f;
+
+	/** 远处的声音多带一点混响（石殿里远处传来的声音，混响比例更大）：在衰减距离的尽头，混响 × (1 + 这个值)。 */
+	UPROPERTY(config, EditAnywhere, Category = "混响", meta = (DisplayName = "远处多带的混响", ClampMin = "0.0", ClampMax = "3.0"))
+	float ReverbDistanceBoost = 1.0f;
 
 	// ───────── 环境 ─────────
 
