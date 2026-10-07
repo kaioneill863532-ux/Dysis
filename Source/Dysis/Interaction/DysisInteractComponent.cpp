@@ -28,11 +28,17 @@ bool UDysisInteractComponent::CanInteractNow(AActor*& OutTarget) const
 	OutTarget = nullptr;
 	FHitResult Hit;
 	if (!TraceFromCamera(Hit)) return false;
+	// 命中物本身或它的挂接父链上任何一环实现 IDysisInteractable 都算命中——
+	// 机关网格（拉杆臂/龛盖/石板）按施工图挂在玩法 Actor 下，射线打到的是网格 Actor，交互接口在父级。
 	AActor* HitActor = Hit.GetActor();
-	if (HitActor && HitActor->GetClass()->ImplementsInterface(UDysisInteractable::StaticClass()))
+	for (int32 Guard = 0; HitActor && Guard < 8; ++Guard)
 	{
-		OutTarget = HitActor;
-		return true;
+		if (HitActor->GetClass()->ImplementsInterface(UDysisInteractable::StaticClass()))
+		{
+			OutTarget = HitActor;
+			return true;
+		}
+		HitActor = HitActor->GetAttachParentActor();
 	}
 	return false;
 }

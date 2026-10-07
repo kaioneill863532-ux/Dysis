@@ -61,19 +61,17 @@ void ADysisBeamActor::BeginPlay()
 {
 	Super::BeginPlay();
 	// §6 序·登殿开场引导光：光从神殿里伸到岛上——玩家"在小岛上往神殿迈一步"顺着光走上台地。
-	// 默认参数：窗=门廊台阶上方（az 180° 西、r 15m、y 3m——门廊台阶上），朝西射向小岛。
+	// 关卡按施工图光路表摆（窗心 23.2°/31.8/-0.8，岛面 -12.0），这里不覆盖任何已设参数；
 	// 时间冻结在 beam:isle（H_I=13:29），光方向不随 H 变。
 	if (bPrologueBeam)
 	{
 		BeamZone = TEXT("beam:isle");   // 时间系统踩上即 H=H_I（SkyLibrary 第 106 行）
 		if (WindowCm.IsZero())
 		{
-			// 施工图：门廊在 az≈180°（西面），台阶顶 y≈3m，半径 15m（殿心到门廊口）。
-			WindowCm = UDysisOpticsLibrary::AzRyToCm(180.0, 15.0, 3.0);
+			// 未在关卡里填时才用代码默认（PIE 手搓测试用）。
+			WindowCm = UDysisOpticsLibrary::AzRyToCm(23.2, 31.8, -0.8);
+			FallbackFloorY = -12.0;
 		}
-		// 开场光走的是"下表面"（从门廊往小岛方向下坡——太阳低角度从西射入）。
-		// FallbackFloorY 设为小岛地面 0m。
-		FallbackFloorY = 0.0;
 	}
 	// 打区域 Tag：时间组件踩到本 Actor 会读 Tag "DysisZone=beam:b1"，和墙体 Tag 同一套机制。
 	if (!BeamZone.IsNone())
@@ -161,10 +159,12 @@ void ADysisBeamActor::UpdateFor(double H)
 	const double MistGate = (bSomeoneStanding || bGrace) ? MistThresholdStanding : MistThreshold;
 	// 圆眼光柱方向朝上（走的是上表面）——坡度取正向、光长也要够。
 	const bool bSlopeOK = bOculusBeam ? (SlopeDeg >= 45.0 && SlopeDeg <= 90.0) : (SlopeDeg <= Limit);
+	// §4① 照亮门槛：窗光按窗洞采样；镜光按规格书"镜面照亮一半以上"用三相像的镜面采样（9 点 ≥50%）。
+	const double Illumination = (bFromMirror && MirrorSource) ? MirrorSource->GetMirrorIllumination() : WindowIllumination;
 	bWalkable = bHit
 	         && bSlopeOK
 	         && LenCm >= MinLengthCm                                          // §4② 够长
-	         && WindowIllumination >= WindowIlluminationThreshold             // §4① 窗照亮
+	         && Illumination >= (bFromMirror ? 0.5 : WindowIlluminationThreshold)   // §4① 照亮
 	         && MistLevel >= float(MistGate);                                 // §4④ 雾覆盖
 
 	SetActorLocation(WindowCm);
@@ -270,20 +270,22 @@ double ADysisBeamActor::SampleWindowIllumination(const FVector& SunDir) const
 	if (!GetWorld()) return 1.0;   // 无 World（离线判定）退化为全亮
 
 	// §4① 规格书原话"在窗的内墙面洞口上取样，朝太阳方向打射线"：
-	// 在窗截面（BoxExtent 的 YZ 平面，以 WindowCm 为中心）取 3×3 = 9 个均匀采样点，
-	// 每个点沿太阳方向（+SunDir）打 trace——打不到东西=阳光直射到这个点=被照亮。
+	// 窗洞 = 窗台（WindowCm.Z）上方的方洞（施工图：方洞高 = 截面高，拱在其上），
+	// 所以采样网格中心取窗台上方 BoxExtentCm.Z 处（网格铺满整个方洞），
+	// 并向边缘内缩 25%——贴着窗框的采样点会被框"擦边"挡住，把照亮比例压到阈值以下。
 	// 返回被照亮的采样点比例（0–1），bWalkable 判 >= WindowIlluminationThreshold（30%）。
 	constexpr int32 GridN = 3;
+	constexpr double Inset = 0.75;   // 采样范围 = ±0.75 × 半截面（防窗框擦边）
 	int32 LitCount = 0;
+	const double HoleCenterZ = WindowCm.Z + BoxExtentCm.Z;   // 方洞竖向中心（窗台之上）
 	for (int32 iy = 0; iy < GridN; ++iy)
 	{
 		for (int32 iz = 0; iz < GridN; ++iz)
 		{
-			// 采样点：窗截面 YZ 上均匀分布（-1..1 映射到 -BoxExtent..+BoxExtent）。
-			const double FY = (double(iy) / double(GridN - 1)) * 2.0 - 1.0;
-			const double FZ = (double(iz) / double(GridN - 1)) * 2.0 - 1.0;
-			// 采样点世界坐标：窗心 + YZ 平面偏移（X 方向不动——采样在窗面上）。
-			const FVector SamplePoint = WindowCm + FVector(0, FY * BoxExtentCm.Y, FZ * BoxExtentCm.Z);
+			const double FY = ((double(iy) / double(GridN - 1)) * 2.0 - 1.0) * Inset;
+			const double FZ = ((double(iz) / double(GridN - 1)) * 2.0 - 1.0) * Inset;
+			// 采样点世界坐标：窗洞内 YZ 平面均匀分布（X 方向不动——采样在窗面上）。
+			const FVector SamplePoint = FVector(WindowCm.X, WindowCm.Y + FY * BoxExtentCm.Y, HoleCenterZ + FZ * BoxExtentCm.Z);
 			FHitResult SampleHit;
 			FCollisionQueryParams SampleParams(TEXT("DysisWindowSample"), false, this);
 			// 从采样点朝太阳方向打 50m——打不到任何东西 = 太阳照到了这个点。

@@ -13,7 +13,11 @@ UE 5.8 里“日月在天上的固定轨道”和“时间由玩家站的位置�
 | `Source/Dysis/Player/DysisCharacter.h/.cpp`、`DysisGameMode.h/.cpp` | 测试用的第一人称玩家（WASD、鼠标、空格跳、Shift 跑）和 GameMode。组员有自己的 Character 就不用它，把 `UDysisTimeComponent` 加过去即可 |
 | `Content/Dysis/Maps/Dysis_Temple` | 神殿关卡：建筑、区域 Tag、DysisSky、SkyAtmosphere、SkyLight、HeightFog、PlayerStart，GameMode = DysisGameMode；**玩法 Actor 48 个**（大纲 `Dysis_Gameplay` 文件夹：光柱×8、水面/月光大道、屋顶踏步、拉杆/石板、机关驱动×21、三龛、金苹果/接光、BGM、开场导演——由 `Art/Models/temple-v0.12/ue_import_gameplay.py` 摆放，幂等可重跑） |
 | `Content/Dysis/Sky/M_DysisMoonDisc` | 月亮圆盘材质（无光照、半透明，标量参数 Opacity） |
-| `Content/Dysis/Audio/M_*_Long/Full.uasset` | BGM 两首（SoundWave，`ue_import_gameplay.py` 从同目录 .wav 导入）；音乐管理器在关卡里找 `DysisMusic` |
+| `Content/Dysis/Audio/Music/M_*.uasset` ×4 | BGM（SoundWave，**循环已开**，统一挂音量组 `SC_Dysis_Music`；官方脚本 `bgm及导入代码/DysisMusic/ue_import_music.py` 已跑过，核对报告在 `Saved/Dysis_Music_Import.txt`）；管理器在关卡里找 `DysisMusic`（已指向 Music/ 的 Long/Full 两首） |
+| `Content/Dysis/UI/Menu/` ×7 | 主菜单按钮图（开始游戏/设置/退出游戏/返回游戏/返回主界面/两个选择标）；`DysisHUD` 主菜单直接引用 |
+| `Content/Dysis/UI/InGame/` ×9 | 游戏内 UI 图（文本框/反馈与提示/收藏品树枝/三种碎片/Dysis/Iris/设置）——对话底图、通知底图、碎片收集栏 |
+| `Content/Dysis/UI/Portraits/` ×4 | 对话立绘（赫利俄斯/狄西斯/塞勒涅/伊莉丝）——按台词行首人名自动挂出 |
+| `Content/Dysis/UI/References/Mockups/` ×8 | 示意图（主界面/设置/局内两款/四角色），美术参考不进游戏画面（设置页 v1 拿设置示意图占位） |
 | `Content/Dysis/UI/Fonts/SourceHanSerifSC-*.uasset` | 思源宋体 FontFace（Regular/Bold，`tools/import_fonts.py` 导入）；`DysisHUD` BeginPlay 自动加载 Regular 画全部 UI 文字，缺资产退回引擎默认字体 |
 
 `Source/Dysis/Dysis.Build.cs` 里加了 `PublicIncludePaths.Add(ModuleDirectory);`，子文件夹按 `"Sky/xxx.h"` 引用。
@@ -45,6 +49,9 @@ UE 5.8 里“日月在天上的固定轨道”和“时间由玩家站的位置�
 
 **`ADysisSkyActor`**：`SetTime(H)`、`IsSunMain()`、`GetMainLightRotation()`、`GetSunDir()`、`GetMoonDir()`、`GetAltitudes()`、`GetMoonDiscOpacity()`；
 `PreviewH` 在编辑器里直接拖就能看某个时刻的天；`SunLuxPerGreyboxUnit`、`MoonLuxPerGreyboxUnit`、颜色是给美术按 UE 曝光调的（切换时机和方向是写死的规则）。
+
+**`ADysisHUD`（PIE 里你会看到的）**：开局主菜单（↑↓ 选、Enter 确认：开始游戏/设置/退出；设置页 Backspace 返回，菜单开着开场对话不开始）；
+游戏内：交互提示、对话框（文本框图+按行首人名挂立绘）、通知（反馈与提示图）、右上角碎片收集（拿到哪颗亮哪颗）、F3 调试面板。字体思源宋体，缺资产逐处退回默认不崩。
 
 **控制台（PIE 里）**：`Dysis.Go <X> <Y> <Z> [night]` 把脚底传送到 UE 厘米坐标，站稳后打印区域、H、钟点、主光、Pitch/Yaw；`Dysis.Where` 打印当前状态。
 

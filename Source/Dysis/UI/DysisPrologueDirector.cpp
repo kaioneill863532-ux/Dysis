@@ -1,6 +1,8 @@
 ﻿#include "DysisPrologueDirector.h"
 #include "DysisDialogueComponent.h"
 #include "DysisCopy.h"
+#include "DysisHUD.h"
+#include "GameFramework/PlayerController.h"
 #include "Sky/DysisSkyLibrary.h"
 
 ADysisPrologueDirector::ADysisPrologueDirector()
@@ -32,6 +34,15 @@ void ADysisPrologueDirector::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	if (bStarted || Countdown < 0.0f) { SetActorTickEnabled(false); return; }
+	// 主菜单开着不倒计时（玩家点"开始游戏"后 2 秒内开播，对话不会被菜单吃掉）。
+	if (GetWorld())
+		if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			if (const ADysisHUD* HUD = Cast<ADysisHUD>(PC->GetHUD()))
+				if (HUD->IsMenuOpen())
+				{
+					Countdown = FMath::Max(Countdown, StartDelaySeconds);   // 关菜单后重新给足延迟
+					return;
+				}
 	Countdown -= DeltaTime;
 	if (Countdown <= 0.0f && Dialogue)
 	{

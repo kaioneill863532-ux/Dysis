@@ -8,12 +8,26 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
 
 ADysisLeverActor::ADysisLeverActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;   // 只在扳动动画期间 Tick（§18.1 tick 纪律）
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+
+	// 占位把手：水闸这类没有现成网格的拉杆要"看得见、打得中"（交互=相机射线打本 Actor）。
+	// 有美术网格的拉杆（日2 A/B）臂网格挂在下、先被打中，由 InteractComponent 沿挂接链找到本 Actor。
+	Handle = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Handle"));
+	Handle->SetupAttachment(RootComponent);
+	Handle->SetMobility(EComponentMobility::Movable);
+	Handle->SetCollisionProfileName(TEXT("BlockAll"));
+	Handle->SetCastShadow(false);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (Cube.Succeeded()) Handle->SetStaticMesh(Cube.Object);
+	Handle->SetRelativeScale3D(FVector(0.14, 0.14, 0.9));   // 14×14×90 cm 竖把手，灰盒可见即可
 }
 
 void ADysisLeverActor::BeginPlay()
@@ -23,6 +37,14 @@ void ADysisLeverActor::BeginPlay()
 	bPulled = bStartPulled;
 	CurrentAngleRad = bPulled ? SwingAngleRad : -SwingAngleRad;
 	SetActorRotation(BaseQuat * FQuat(SwingAxis.GetSafeNormal(), CurrentAngleRad));
+	// 关卡里已经挂了美术臂网格（日2 A/B）时，占位把手让位——只留美术网格。
+	TArray<AActor*> Attached;
+	GetAttachedActors(Attached);
+	if (Attached.Num() > 0 && Handle)
+	{
+		Handle->SetVisibility(false);
+		Handle->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
 }
 
 void ADysisLeverActor::Interact(APawn* Player, bool bFromFront)

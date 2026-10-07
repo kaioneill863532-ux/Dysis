@@ -63,6 +63,10 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	/** 占位把手（水闸这类无美术网格的拉杆用：看得见、射线打得中）。挂了美术臂时 BeginPlay 自动隐藏。 */
+	UPROPERTY(VisibleAnywhere, Category = "Dysis|Mech")
+	TObjectPtr<class UStaticMeshComponent> Handle;
+
 private:
 	bool bPulled = false;
 	float CurrentAngleRad = 0.0f;    // 拉下方向为正
