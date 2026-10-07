@@ -14,6 +14,7 @@ UE 5.8 里“日月在天上的固定轨道”和“时间由玩家站的位置�
 | `Content/Dysis/Maps/Dysis_Temple` | 神殿关卡：建筑、区域 Tag、DysisSky、SkyAtmosphere、SkyLight、HeightFog、PlayerStart，GameMode = DysisGameMode；**玩法 Actor 48 个**（大纲 `Dysis_Gameplay` 文件夹：光柱×8、水面/月光大道、屋顶踏步、拉杆/石板、机关驱动×21、三龛、金苹果/接光、BGM、开场导演——由 `Art/Models/temple-v0.12/ue_import_gameplay.py` 摆放，幂等可重跑） |
 | `Content/Dysis/Sky/M_DysisMoonDisc` | 月亮圆盘材质（无光照、半透明，标量参数 Opacity） |
 | `Content/Dysis/Audio/M_*_Long/Full.uasset` | BGM 两首（SoundWave，`ue_import_gameplay.py` 从同目录 .wav 导入）；音乐管理器在关卡里找 `DysisMusic` |
+| `Content/Dysis/UI/Fonts/SourceHanSerifSC-*.uasset` | 思源宋体 FontFace（Regular/Bold，`tools/import_fonts.py` 导入）；`DysisHUD` BeginPlay 自动加载 Regular 画全部 UI 文字，缺资产退回引擎默认字体 |
 | `Source/Dysis/Audio/DysisSfx*`、`Art/Audio/` | 音效：265 个 WAV 由 `Art/Audio/ue_import_sfx.py` 导入到 `Content/Dysis/Audio/SFX/` 并在关卡里摆好总调度 `DysisSfx`；触发条件、调节（Project Settings → Game → Dysis 音效）、测试见 [Art/Audio/README.md](../Art/Audio/README.md) |
 
 `Source/Dysis/Dysis.Build.cs` 里加了 `PublicIncludePaths.Add(ModuleDirectory);`，子文件夹按 `"Sky/xxx.h"` 引用。
