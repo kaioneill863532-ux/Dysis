@@ -18,6 +18,7 @@ public class Dysis : ModuleRules
 		{
 			"LevelSequence",
 			"MovieScene",
+			"DeveloperSettings",   // 音效设置页（Audio/DysisSfxSettings：Project Settings → Game → Dysis 音效）
 		});
 
 		// Uncomment if you are using Slate UI

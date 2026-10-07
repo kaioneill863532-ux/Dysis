@@ -8,6 +8,8 @@
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
 
+FDysisNotificationShown ADysisHUD::OnNotificationShown;
+
 ADysisHUD::ADysisHUD()
 {
 	PrimaryActorTick.bCanEverTick = false;   // DrawHUD 每帧由引擎调，不需要自己的 Tick
@@ -30,6 +32,7 @@ void ADysisHUD::ShowNotification(const FText& Text, float DurationSeconds)
 	NotificationText = Text.ToString();
 	NotificationTimer = DurationSeconds;
 	NotificationDuration = DurationSeconds;
+	OnNotificationShown.Broadcast(Text);
 }
 
 void ADysisHUD::Notify(UWorld* World, const TCHAR* Text, float Duration)
