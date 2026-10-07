@@ -246,7 +246,7 @@ private:
 
 	bool bPromptShown = false;
 	TWeakObjectPtr<AActor> PromptTarget;
-	float UIPollTimer = 0.0f;
+	double NextUIPollAt = 0.0;
 	int32 LastDialogueLine = -1;
 
 	TArray<bool> RiseFired;

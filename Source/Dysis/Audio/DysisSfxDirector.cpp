@@ -1109,9 +1109,9 @@ void ADysisSfxDirector::UpdateTitles()
 void ADysisSfxDirector::UpdateUI()
 {
 	UDysisSfxSubsystem* S = Sfx.Get();
-	UIPollTimer -= GetWorld()->GetDeltaSeconds();
-	if (UIPollTimer > 0.0f) return;
-	UIPollTimer = 0.1f;
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now < NextUIPollAt) return;
+	NextUIPollAt = Now + 0.1;   // 互动提示要打一条射线：10 Hz 足够
 
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
