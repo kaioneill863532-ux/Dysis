@@ -58,6 +58,8 @@ private:
 	void RunOn();
 	void RunOff();
 	void TryInteractPressed();
+	void JumpPressed();
+	bool UiBlocksInput() const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> Mapping;

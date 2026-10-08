@@ -76,7 +76,7 @@ public:
 	float SunLuxPerGreyboxUnit = 3.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
-	float MoonLuxPerGreyboxUnit = 1.0f;
+	float MoonLuxPerGreyboxUnit = 3.0f;
 
 	/** 月亮圆盘离天空中心多远（厘米）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")

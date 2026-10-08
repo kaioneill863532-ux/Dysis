@@ -1,73 +1,239 @@
-﻿// 日落回廊 · HUD 实现：素材图（Menu/InGame/Portraits）+ 思源宋体；缺资产逐处退回纯色/默认字体。
-#include "DysisHUD.h"
+﻿#include "DysisHUD.h"
+#include "DysisCopy.h"
 #include "DysisDialogueComponent.h"
 #include "Interaction/DysisInteractComponent.h"
 #include "Mechanisms/DysisInteractable.h"
-#include "Sky/DysisTimeComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Kismet/KismetSystemLibrary.h"
-#include "Engine/Canvas.h"
-#include "Engine/Engine.h"
-#include "Engine/FontFace.h"
-#include "Engine/Texture2D.h"
-#include "Fonts/SlateFontInfo.h"
-#include "GameFramework/PlayerController.h"
-#include "GameFramework/PlayerInput.h"
 #include "Save/DysisSaveGame.h"
 #include "Save/DysisSaveSubsystem.h"
+#include "Sky/DysisSkyLibrary.h"
+#include "Sky/DysisTimeComponent.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "CanvasItem.h"
+#include "Engine/Canvas.h"
+#include "Engine/Font.h"
+#include "Engine/FontFace.h"
+#include "Engine/GameInstance.h"
+#include "Engine/Texture2D.h"
+#include "Fonts/CompositeFont.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Misc/App.h"
+#include "Misc/Paths.h"
+#include "Rendering/SlateRenderer.h"
+#include "Styling/CoreStyle.h"
 
 FDysisNotificationShown ADysisHUD::OnNotificationShown;
+FDysisHudEvent ADysisHUD::OnGameStarted;
+
+namespace
+{
+	// ───── 局内界面：元素在示意图（6544×3746）里的位置和大小，图像匹配量出来的 ─────
+	constexpr float MockW = 6544.0f, MockH = 3746.0f;
+	struct FBox4 { float X, Y, W, H; };
+	constexpr FBox4 ClockBox   = { 198.0f, 83.0f, 493.0f, 485.0f };        // 左上：钟表图标（= 设置）
+	constexpr FBox4 VineBox    = { 4442.0f, 55.0f, 2102.0f, 458.0f };      // 右上：树枝
+	constexpr FBox4 SunBox     = { 4678.0f, 186.0f, 349.0f, 348.0f };      // 树枝上挂的三片碎片
+	constexpr FBox4 RainbowBox = { 5307.0f, 158.0f, 556.0f, 484.0f };
+	constexpr FBox4 MoonBox    = { 6003.0f, 175.0f, 481.0f, 424.0f };
+	constexpr FBox4 HintBox    = { 1024.0f, 538.0f, 4155.0f, 477.0f };     // 中上：提示条（面板在图里 x 13–4130、y 63–410）
+	constexpr FBox4 TextBox    = { 0.0f, 2515.0f, 6544.0f, 1231.0f };      // 底部：文本框（主面板 y 290–1130，名牌 x 4270–5830、y 20–365）
+	// 立绘都是右下对齐；这里是原图大小
+	struct FPortrait { const TCHAR* Key; const TCHAR* Path; float W, H; };
+	const FPortrait PortraitDysis  = { TEXT("PorDysis"),  TEXT("/Game/Dysis/UI/Portraits/Dysis.Dysis"),   1606.0f, 2376.0f };
+	const FPortrait PortraitIris   = { TEXT("PorIris"),   TEXT("/Game/Dysis/UI/Portraits/Iris.Iris"),     2395.0f, 2540.0f };
+	const FPortrait PortraitSelene = { TEXT("PorSelene"), TEXT("/Game/Dysis/UI/Portraits/Selene.Selene"), 1937.0f, 2380.0f };
+	const FPortrait PortraitHelios = { TEXT("PorHelios"), TEXT("/Game/Dysis/UI/Portraits/Helios.Helios"), 2280.0f, 2493.0f };
+
+	// ───── 主界面 / 设置页：按钮图都是 1920×1080 的整屏图层，内容已经摆在该在的地方 ─────
+	constexpr float MenuW = 1920.0f, MenuH = 1080.0f;
+	constexpr FBox4 LogoBox = { 1092.0f, 31.0f, 1126.0f, 668.0f };         // logo（透明底 1455×863）在主界面示意图里的位置
+	constexpr float MainRowY[2] = { 556.0f, 654.0f };                      // “开始游戏”“退出游戏”两行的点击范围（顶）
+	constexpr float MainRowX = 1200.0f, MainRowW = 450.0f, MainRowH = 78.0f, MainRowStep = 98.0f;
+	constexpr float SetRowY[2] = { 562.0f, 678.0f };                       // “回到游戏”“回到主界面”
+	constexpr float SetRowX = 700.0f, SetRowW = 520.0f, SetRowH = 86.0f, SetRowStep = 116.0f;
+
+	const FLinearColor Cream(0.96f, 0.90f, 0.76f, 1.0f);
+
+	const FPortrait* PortraitFor(const FString& Speaker)
+	{
+		if (Speaker.Contains(TEXT("狄西斯"))) return &PortraitDysis;
+		if (Speaker.Contains(TEXT("伊莉丝")) || Speaker.Contains(TEXT("伊里斯"))) return &PortraitIris;
+		if (Speaker.Contains(TEXT("塞勒涅"))) return &PortraitSelene;
+		if (Speaker.Contains(TEXT("赫利俄斯"))) return &PortraitHelios;
+		return nullptr;
+	}
+
+	float Approach(float V, float Target, float Rate, float Dt)
+	{
+		return V < Target ? FMath::Min(Target, V + Rate * Dt) : FMath::Max(Target, V - Rate * Dt);
+	}
+
+	// 控制台：Dysis.Start——跳过主界面直接进游戏（测试用）。
+	FAutoConsoleCommandWithWorld GDysisStart(
+		TEXT("Dysis.Start"),
+		TEXT("跳过主界面，直接开始游戏"),
+		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+		{
+			if (ADysisHUD* H = ADysisHUD::Get(World)) H->StartGame(true);
+		}));
+}
 
 ADysisHUD::ADysisHUD()
 {
-	PrimaryActorTick.bCanEverTick = false;   // DrawHUD 每帧由引擎调，不需要自己的 Tick
+	PrimaryActorTick.bCanEverTick = false;
+}
+
+ADysisHUD* ADysisHUD::Get(const UObject* WorldContext)
+{
+	const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+	APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	return PC ? Cast<ADysisHUD>(PC->GetHUD()) : nullptr;
 }
 
 void ADysisHUD::BeginPlay()
 {
 	Super::BeginPlay();
-	// 思源宋体（tools/import_fonts.py 导入的 FontFace）。资产不在（旧分支/被删）时静默退回默认字体。
-	if (!FontFace)
-	{
-		FontFace = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/SourceHanSerifSC-Regular.SourceHanSerifSC-Regular"));
-	}
-}
-
-// ───────────────────────── 基础绘制 ─────────────────────────
-
-void ADysisHUD::DrawUIText(const FString& Text, const FLinearColor& Color, float X, float Y, float SizePx, bool bShadow)
-{
-	if (!Canvas || Text.IsEmpty()) return;
+	if (!FontFace) FontFace = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/SourceHanSerifSC-Regular.SourceHanSerifSC-Regular"));
+	if (!FontFaceBold) FontFaceBold = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/SourceHanSerifSC-Bold.SourceHanSerifSC-Bold"));
+	const FString EngineCjkFont = FPaths::EngineContentDir() / TEXT("Slate/Fonts/DroidSansFallback.ttf");
 	if (FontFace)
 	{
-		FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), FSlateFontInfo(FontFace, FMath::Max(4.0f, SizePx)), Color);
-		if (bShadow) Item.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), FVector2D(1.5f, 1.5f));
-		Canvas->DrawItem(Item);
+		// FontFace 不能直接当“字体对象”交给 Slate（那样画不出字）：要包成一个复合字体。
+		CompositeFont = MakeShared<FStandaloneCompositeFont>();
+		FTypefaceEntry Regular(TEXT("Regular"));
+		Regular.Font = FFontData(FontFace);
+		CompositeFont->DefaultTypeface.Fonts.Add(Regular);
+		FTypefaceEntry Bold(TEXT("Bold"));
+		Bold.Font = FFontData(FontFaceBold ? FontFaceBold.Get() : FontFace.Get());
+		CompositeFont->DefaultTypeface.Fonts.Add(Bold);
+		// 字体文件读不出来（比如文件不完整）时量出来的行高是 0：字会画歪，干脆整套换成引擎自带的中文字体。
+		if (FSlateApplication::IsInitialized()
+			&& FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->GetMaxCharacterHeight(FSlateFontInfo(CompositeFont, 24.0f, TEXT("Regular"))) <= 0)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("DysisHUD：UI 字体 %s 读不出来（字体文件可能不完整），改用引擎自带的中文字体。"), *FontFace->GetPathName());
+			CompositeFont = MakeShared<FStandaloneCompositeFont>();
+			CompositeFont->DefaultTypeface.AppendFont(TEXT("Regular"), EngineCjkFont, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+			CompositeFont->DefaultTypeface.AppendFont(TEXT("Bold"), EngineCjkFont, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
+		}
+		// 兜底：主字体里没有的字改用引擎自带的中文字体，至少看得见。
+		CompositeFont->FallbackTypeface.Typeface.AppendFont(TEXT("Regular"), EngineCjkFont, EFontHinting::Default, EFontLoadingPolicy::LazyLoad);
 	}
-	else
-	{
-		DrawText(Text, Color, X, Y, nullptr, SizePx / 18.0f, bShadow);
-	}
+	// UE 5.8：FCanvasTextItem 只给 Slate 字体、不给 UFont 的话，引擎当成“没有字”直接不画。
+	// 所以带一个空的“运行时字体”过这道检查；真正用的字体还是上面的 Slate 字体。
+	CanvasFont = NewObject<UFont>(this);
+	CanvasFont->FontCacheType = EFontCacheType::Runtime;
+	Screen = bStartInMainMenu ? EDysisScreen::MainMenu : EDysisScreen::Playing;
+	bScreenInputApplied = false;
 }
 
-void ADysisHUD::DrawUIImage(UTexture2D* Tex, float X, float Y, float W, float H, FLinearColor Tint)
-{
-	if (!Tex || !Canvas) return;
-	DrawTexture(Tex, X, Y, W, H, 0.0f, 0.0f, float(Tex->GetSizeX()), float(Tex->GetSizeY()), Tint);
-}
+// ───────────────────────── 画图、画字 ─────────────────────────
 
 UTexture2D* ADysisHUD::UITex(FName Key, const TCHAR* Path)
 {
-	if (TObjectPtr<UTexture2D>* Found = TexCache.Find(Key))
-	{
-		return Found->Get();
-	}
+	if (TObjectPtr<UTexture2D>* Found = TexCache.Find(Key)) return Found->Get();
 	UTexture2D* Tex = LoadObject<UTexture2D>(nullptr, Path);
-	TexCache.Add(Key, Tex);   // 空也记（缺资产别每帧打 LoadObject）
+	TexCache.Add(Key, Tex);   // 空也记（缺资产别每帧去找）
 	return Tex;
 }
 
-// ───────────────────────── 通知 ─────────────────────────
+void ADysisHUD::DrawUIImage(UTexture2D* Tex, float X, float Y, float W, float H, const FLinearColor& Tint)
+{
+	if (!Tex || !Canvas || Tint.A <= 0.002f) return;
+	DrawTexture(Tex, X, Y, W, H, 0.0f, 0.0f, 1.0f, 1.0f, Tint);   // 贴图坐标是 0–1 的比例
+}
+
+FSlateFontInfo ADysisHUD::MakeFont(float Px, bool bBold) const
+{
+	const float CanvasPx = Px * (Canvas ? Canvas->SizeY / 1080.0f : 1.0f);
+	const float Points = FMath::Max(4.0f, CanvasPx * 72.0f / 96.0f);   // Slate 的字号是磅
+	if (CompositeFont.IsValid()) return FSlateFontInfo(CompositeFont, Points, bBold ? TEXT("Bold") : TEXT("Regular"));
+	return FCoreStyle::GetDefaultFontStyle(bBold ? "Bold" : "Regular", Points);
+}
+
+FVector2D ADysisHUD::MeasureText(const FString& Text, const FSlateFontInfo& Font) const
+{
+	if (!FSlateApplication::IsInitialized() || Text.IsEmpty()) return FVector2D::ZeroVector;
+	const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+	const auto Size = Measure->Measure(Text, Font);
+	return FVector2D(Size.X, Size.Y);
+}
+
+void ADysisHUD::DrawUIText(const FString& Text, const FLinearColor& Color, float X, float Y, float Px, float AlignX, bool bBold, bool bShadow)
+{
+	if (!Canvas || Text.IsEmpty() || Color.A <= 0.002f) return;
+	const FSlateFontInfo Font = MakeFont(Px, bBold);
+	if (AlignX != 0.0f) X -= float(MeasureText(Text, Font).X) * AlignX;
+	FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), Font, Color);
+	Item.Font = CanvasFont;
+	if (bShadow) Item.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Color.A), FVector2D(1.5f, 1.5f));
+	Canvas->DrawItem(Item);
+}
+
+TArray<FString> ADysisHUD::WrapText(const FString& Text, const FSlateFontInfo& Font, float MaxWidth) const
+{
+	TArray<FString> Lines;
+	FString Line;
+	for (int32 i = 0; i < Text.Len(); ++i)
+	{
+		const TCHAR Ch = Text[i];
+		if (Ch == TEXT('\n')) { Lines.Add(Line); Line.Reset(); continue; }
+		Line.AppendChar(Ch);
+		if (MeasureText(Line, Font).X > MaxWidth && Line.Len() > 1)
+		{
+			// 标点不放在行首：超宽的这个字如果是标点，就让它留在这一行
+			const bool bPunct = FString(TEXT("，。、；：？！”’）》…—")).Contains(FString::Chr(Ch));
+			if (bPunct) { Lines.Add(Line); Line.Reset(); }
+			else { Line.LeftChopInline(1); Lines.Add(Line); Line = FString::Chr(Ch); }
+		}
+	}
+	if (!Line.IsEmpty()) Lines.Add(Line);
+	return Lines;
+}
+
+int32 ADysisHUD::DrawUIParagraph(const FString& Text, const FLinearColor& Color, float X, float Y, float Px, float MaxWidth, float AlignX, float LineGap)
+{
+	const FSlateFontInfo Font = MakeFont(Px);
+	const TArray<FString> Lines = WrapText(Text, Font, MaxWidth);
+	const float LineH = Px * (Canvas->SizeY / 1080.0f) * LineGap;
+	for (int32 i = 0; i < Lines.Num(); ++i) DrawUIText(Lines[i], Color, X, Y + i * LineH, Px, AlignX);
+	return Lines.Num();
+}
+
+bool ADysisHUD::MouseIn(float X, float Y, float W, float H) const
+{
+	return bMouseValid && MousePos.X >= X && MousePos.X <= X + W && MousePos.Y >= Y && MousePos.Y <= Y + H;
+}
+
+// ───────────────────────── 提示条、标题、黑场 ─────────────────────────
+
+void ADysisHUD::ShowNotification(const FText& Text, float DurationSeconds)
+{
+	NotificationText = Text.ToString();
+	NotificationTimer = FMath::Max(0.5f, DurationSeconds);
+	OnNotificationShown.Broadcast(Text);
+}
+
+void ADysisHUD::Notify(UWorld* World, const TCHAR* Text, float Duration)
+{
+	if (ADysisHUD* H = Get(World)) H->ShowNotification(FText::FromString(Text), Duration);
+}
+
+void ADysisHUD::ShowTitle(const FString& Main, const FString& Sub, float HoldSeconds)
+{
+	TitleMain = Main; TitleSub = Sub; TitleHold = HoldSeconds; TitleT = 0.0f;
+}
+
+void ADysisHUD::FadeTo(float TargetAlpha, float Seconds)
+{
+	FadeTarget = FMath::Clamp(TargetAlpha, 0.0f, 1.0f);
+	FadeRate = Seconds > KINDA_SMALL_NUMBER ? 1.0f / Seconds : 1000.0f;
+}
 
 UDysisInteractComponent* ADysisHUD::ResolveInteract()
 {
@@ -81,299 +247,323 @@ UDysisInteractComponent* ADysisHUD::ResolveInteract()
 	return Interact;
 }
 
-void ADysisHUD::ShowNotification(const FText& Text, float DurationSeconds)
+// ───────────────────────── 切换界面 ─────────────────────────
+
+void ADysisHUD::ApplyInputForScreen()
 {
-	NotificationText = Text.ToString();
-	NotificationTimer = DurationSeconds;
-	NotificationDuration = DurationSeconds;
-	OnNotificationShown.Broadcast(Text);
-}
-
-void ADysisHUD::Notify(UWorld* World, const TCHAR* Text, float Duration)
-{
-	if (!World) return;
-	if (APlayerController* PC = World->GetFirstPlayerController())
-		if (ADysisHUD* HUD = Cast<ADysisHUD>(PC->GetHUD()))
-			HUD->ShowNotification(FText::FromString(Text), Duration);
-}
-
-void ADysisHUD::DrawNotification()
-{
-	if (NotificationTimer <= 0.0f || !Canvas || NotificationText.IsEmpty()) return;
-
-	// 通知：反馈与提示图打底，文字画图上——文案表所有非对话文本的显示口。
-	const float Alpha = (NotificationTimer > NotificationDuration - 0.5f)
-		? (NotificationDuration - NotificationTimer) / 0.5f   // 前 0.5s 淡入
-		: (NotificationTimer < 1.0f ? NotificationTimer / 1.0f : 1.0f);  // 后 1s 淡出
-
-	const float BoxH = 52.0f;
-	const float BoxW = FMath::Max(NotificationText.Len() * 24.0f + 80.0f, 320.0f);
-	const float X = (Canvas->SizeX - BoxW) * 0.5f;
-	const float Y = Canvas->SizeY - 160.0f;
-
-	if (UTexture2D* Notify = UITex("Notify", TEXT("/Game/Dysis/UI/InGame/Notify.Notify")))
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC || (bScreenInputApplied && InputAppliedFor == Screen)) return;
+	bScreenInputApplied = true; InputAppliedFor = Screen;
+	const bool bUi = Screen != EDysisScreen::Playing;
+	PC->bShowMouseCursor = bUi;
+	PC->ResetIgnoreMoveInput(); PC->ResetIgnoreLookInput();
+	if (bUi)
 	{
-		DrawUIImage(Notify, X, Y, BoxW, BoxH, FLinearColor(1, 1, 1, Alpha));
+		PC->SetIgnoreMoveInput(true); PC->SetIgnoreLookInput(true);
+		FInputModeGameAndUI Mode;
+		Mode.SetHideCursorDuringCapture(false);
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PC->SetInputMode(Mode);
 	}
 	else
 	{
-		DrawRect(FLinearColor(0, 0, 0.05f, Alpha * 0.5f), X, Y, BoxW, BoxH);
+		PC->SetInputMode(FInputModeGameOnly());
 	}
-	DrawUIText(NotificationText, FLinearColor(0.95f, 0.92f, 0.85f, Alpha), Canvas->SizeX * 0.5f - NotificationText.Len() * 11.0f, Y + 14.0f, 22.0f);
 }
 
-// ───────────────────────── 对话 ─────────────────────────
-
-void ADysisHUD::DrawDialogue()
+void ADysisHUD::HoldMenuView(float RealDt)
 {
-	if (!ActiveDialogue || !ActiveDialogue->IsPlaying() || !Canvas) return;
-	const int32 Idx = ActiveDialogue->CurrentLine;
-	if (!ActiveDialogue->Lines.IsValidIndex(Idx)) return;
-
-	const FString Line = ActiveDialogue->Lines[Idx].ToString();
-	const float BoxH = 130.0f;
-	const float BoxW = FMath::Min(Canvas->SizeX - 120.0f, 1180.0f);
-	const float BoxX = (Canvas->SizeX - BoxW) * 0.5f;
-	const float BoxY = Canvas->SizeY - BoxH - 40.0f;
-
-	// 立绘：行首人名 → Portraits/{Helios,Dysis,Selene,Iris}.png（对话框左侧，半身）。
-	FName PortraitKey = NAME_None;
-	const TCHAR* PortraitPath = nullptr;
-	if (Line.StartsWith(TEXT("赫利俄斯")))      { PortraitKey = "Helios"; PortraitPath = TEXT("/Game/Dysis/UI/Portraits/Helios.Helios"); }
-	else if (Line.StartsWith(TEXT("狄西斯")))   { PortraitKey = "Dysis";  PortraitPath = TEXT("/Game/Dysis/UI/Portraits/Dysis.Dysis"); }
-	else if (Line.StartsWith(TEXT("塞勒涅")))   { PortraitKey = "Selene"; PortraitPath = TEXT("/Game/Dysis/UI/Portraits/Selene.Selene"); }
-	else if (Line.StartsWith(TEXT("伊莉丝")))   { PortraitKey = "Iris";   PortraitPath = TEXT("/Game/Dysis/UI/Portraits/Iris.Iris"); }
-	if (PortraitPath)
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC || !GetWorld()) return;
+	if (!MenuCamera)
 	{
-		const float PortraitH = 300.0f;
-		if (UTexture2D* P = UITex(PortraitKey, PortraitPath))
-		{
-			const float PW = float(P->GetSizeX()) / float(P->GetSizeY()) * PortraitH;
-			DrawUIImage(P, BoxX - PW * 0.72f, Canvas->SizeY - PortraitH - 8.0f, PW, PortraitH, FLinearColor(1, 1, 1, 0.94f));
-		}
+		FActorSpawnParameters Params;
+		Params.ObjectFlags |= RF_Transient;
+		MenuCamera = GetWorld()->SpawnActor<ACameraActor>(MenuCameraLocation, MenuCameraRotation, Params);
+		if (MenuCamera && MenuCamera->GetCameraComponent()) MenuCamera->GetCameraComponent()->bConstrainAspectRatio = false;
 	}
+	if (MenuCamera && PC->GetViewTarget() != MenuCamera) PC->SetViewTarget(MenuCamera);
 
-	// 文本框：文本框图打底（缺图退深色条），台词 + 句点进度 + [E] 提示。
-	if (UTexture2D* Box = UITex("TextBox", TEXT("/Game/Dysis/UI/InGame/TextBox.TextBox")))
+	// 主界面的天自己往前走（H 每 360 是一天）；太阳落山以后走快一点
+	const float SunAlt = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(float(UDysisSkyLibrary::DysisSunDir(MenuTimeH + MenuTurn).Z), -1.0f, 1.0f)));
+	const float Rate = MenuDaySeconds > KINDA_SMALL_NUMBER ? 360.0f / MenuDaySeconds : 0.0f;
+	MenuTurn = FMath::Fmod(MenuTurn + Rate * (SunAlt < -1.0f ? MenuNightSpeed : 1.0f) * RealDt, 360.0f);
+	if (APawn* Pawn = PC->GetPawn())
+		if (UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>())
+			Time->SetForcedTime(MenuTimeH + MenuTurn);
+
+	// 固定曝光：自动曝光会把月夜提亮得和白天一样，主界面上就看不出昼夜了
+	if (UCameraComponent* Cam = MenuCamera ? MenuCamera->GetCameraComponent() : nullptr)
 	{
-		DrawUIImage(Box, BoxX, BoxY, BoxW, BoxH, FLinearColor(1, 1, 1, 0.9f));
+		const float DuskT = FMath::Clamp((SunAlt - 1.5f) / (-9.0f - 1.5f), 0.0f, 1.0f);
+		const float Dusk = DuskT * DuskT * (3.0f - 2.0f * DuskT);   // 灰盒的 smoothstep(1.5, -9, alt)
+		FPostProcessSettings& PP = Cam->PostProcessSettings;
+		PP.bOverride_AutoExposureMethod = true;
+		PP.AutoExposureMethod = AEM_Manual;
+		PP.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
+		PP.AutoExposureApplyPhysicalCameraExposure = false;
+		PP.bOverride_AutoExposureBias = true;
+		PP.AutoExposureBias = MenuExposureBias + MenuNightExposureBoost * Dusk;
 	}
-	else
-	{
-		DrawRect(FLinearColor(0, 0, 0.04f, 0.62f), BoxX, BoxY, BoxW, BoxH);
-	}
-	DrawUIText(Line, FLinearColor(0.95f, 0.94f, 0.9f, 0.97f), BoxX + 36.0f, BoxY + 26.0f, 26.0f);
-	FString Dots;
-	for (int32 i = 0; i < ActiveDialogue->Lines.Num(); ++i) Dots += (i == Idx ? TEXT("●") : TEXT("○"));
-	DrawUIText(Dots, FLinearColor(0.75f, 0.78f, 0.92f, 0.85f), BoxX + 36.0f, BoxY + BoxH - 30.0f, 16.0f);
-	DrawUIText(TEXT("[E] 下一句"), FLinearColor(0.72f, 0.74f, 0.82f, 0.85f), BoxX + BoxW - 140.0f, BoxY + BoxH - 34.0f, 18.0f);
 }
 
-// ───────────────────────── 主菜单 ─────────────────────────
-
-namespace
+void ADysisHUD::StartGame(bool bInstant)
 {
-	// 菜单项文案（与 使用UI/主界面与设置 的按钮图一一对应；图在 → 画图，图缺 → 画字）。
-	struct FMenuItem { const TCHAR* Label; const TCHAR* TexPath; };
-	const FMenuItem GMenuItems[] = {
-		{ TEXT("开始游戏"), TEXT("/Game/Dysis/UI/Menu/StartGame.StartGame") },
-		{ TEXT("设 置"),    TEXT("/Game/Dysis/UI/Menu/Settings.Settings") },
-		{ TEXT("退出游戏"), TEXT("/Game/Dysis/UI/Menu/QuitGame.QuitGame") },
-	};
-}
-
-void ADysisHUD::DrawMenu()
-{
-	if (!Canvas) return;
-	const float W = Canvas->SizeX;
-	const float H = Canvas->SizeY;
-
-	// 底：深夜蓝（正式版换主界面背景图/3D 场景）。
-	DrawRect(FLinearColor(0.015f, 0.02f, 0.055f, 0.985f), 0, 0, W, H);
-	DrawRect(FLinearColor(0.35f, 0.22f, 0.08f, 0.25f), 0, H * 0.12f, W, 3.0f);   // 标题下的金线
-	DrawRect(FLinearColor(0.35f, 0.22f, 0.08f, 0.25f), 0, H * 0.12f + 1.0f, W * 0.35f, 1.0f);
-
-	DrawUIText(TEXT("狄西斯的日落回廊"), FLinearColor(0.93f, 0.87f, 0.72f, 1.0f), W * 0.5f - 8.0f * 28.0f, H * 0.13f, 56.0f);
-	DrawUIText(TEXT("DYSIS AND THE CELESTIAL CLOISTER"), FLinearColor(0.55f, 0.52f, 0.45f, 0.9f), W * 0.5f - 32.0f * 4.5f, H * 0.13f + 72.0f, 18.0f);
-
-	if (bSettingsOpen)
+	if (Screen != EDysisScreen::MainMenu || StartPhase != 0) return;
+	if (bInstant)
 	{
-		// 设置页 v1：设置示意图占位（美术出正式设置页后换）；返回主界面按钮 + 设置选择标。
-		if (UTexture2D* S = UITex("SettingsMock", TEXT("/Game/Dysis/UI/References/Mockups/Settings.Settings")))
-		{
-			const float SW = W * 0.72f;
-			const float SH = SW / FMath::Max(1.0f, float(S->GetSizeX()) / float(S->GetSizeY()));
-			DrawUIImage(S, (W - SW) * 0.5f, (H - SH) * 0.42f, SW, SH, FLinearColor(1, 1, 1, 0.96f));
-		}
-		else
-		{
-			DrawUIText(TEXT("设 置"), FLinearColor(0.9f, 0.87f, 0.8f, 1.0f), W * 0.5f - 3.0f * 18.0f, H * 0.3f, 36.0f);
-		}
-		// 返回主界面（按钮图；缺图退文字）。Enter 或 Backspace 都能返回。
-		if (UTexture2D* Back = UITex("BackToMenu", TEXT("/Game/Dysis/UI/Menu/BackToMenu.BackToMenu")))
-		{
-			const float BH = 56.0f;
-			const float BW = BH * FMath::Max(0.5f, float(Back->GetSizeX()) / FMath::Max(1, Back->GetSizeY()));
-			const float BX = W * 0.5f - BW * 0.5f;
-			DrawUIImage(Back, BX, H * 0.86f, BW, BH, FLinearColor(1, 1, 1, 1));
-			if (UTexture2D* SelS = UITex("SelectorSettings", TEXT("/Game/Dysis/UI/Menu/SelectorSettings.SelectorSettings")))
-			{
-				DrawUIImage(SelS, BX - 58.0f, H * 0.86f + BH * 0.5f - 22.0f, 44.0f, 44.0f, FLinearColor(1, 1, 1, 1));
-			}
-		}
-		else
-		{
-			DrawUIText(TEXT("[Backspace] 返回主菜单"), FLinearColor(0.6f, 0.6f, 0.65f, 0.9f), W * 0.5f - 8.0f * 9.0f, H * 0.88f, 18.0f);
-		}
+		StartPhase = 1; FadeAlpha = 1.0f; FadeTarget = 1.0f;   // 下一帧走完切换
 		return;
 	}
-
-	// 三个菜单项：有按钮图画图（选中放大 + 选择标），缺图画字。
-	const float ItemY0 = H * 0.42f;
-	const float ItemGap = 92.0f;
-	for (int32 i = 0; i < 3; ++i)
-	{
-		const bool bSel = (i == MenuIndex);
-		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Menu%d"), i)), GMenuItems[i].TexPath);
-		float ItemW = 260.0f, ItemH = 64.0f;
-		if (Tex)
-		{
-			const float Ratio = float(Tex->GetSizeX()) / FMath::Max(1, Tex->GetSizeY());
-			ItemH = bSel ? 72.0f : 60.0f;
-			ItemW = ItemH * Ratio;
-		}
-		const float IX = W * 0.5f - ItemW * 0.5f;
-		const float IY = ItemY0 + i * ItemGap;
-		if (Tex)
-		{
-			DrawUIImage(Tex, IX, IY, ItemW, ItemH, bSel ? FLinearColor(1, 1, 1, 1) : FLinearColor(0.62f, 0.62f, 0.62f, 0.9f));
-		}
-		else
-		{
-			const FString Label = GMenuItems[i].Label;
-			DrawUIText(Label, bSel ? FLinearColor(0.95f, 0.85f, 0.6f, 1.0f) : FLinearColor(0.6f, 0.6f, 0.62f, 0.9f),
-				W * 0.5f - Label.Len() * 16.0f, IY, 32.0f);
-		}
-		if (bSel)
-		{
-			if (UTexture2D* Sel = UITex("SelectorMain", TEXT("/Game/Dysis/UI/Menu/SelectorMain.SelectorMain")))
-			{
-				DrawUIImage(Sel, IX - 64.0f, IY + ItemH * 0.5f - 24.0f, 48.0f, 48.0f, FLinearColor(1, 1, 1, 1));
-			}
-			else
-			{
-				DrawRect(FLinearColor(0.85f, 0.7f, 0.35f, 0.95f), IX - 40.0f, IY + ItemH * 0.5f - 2.0f, 18.0f, 4.0f);
-			}
-		}
-	}
-
-	DrawUIText(TEXT("[↑↓] 选择    [Enter] 确认"), FLinearColor(0.5f, 0.5f, 0.55f, 0.85f), W * 0.5f - 9.0f * 10.0f, H * 0.86f, 20.0f);
+	StartPhase = 1;
+	FadeTo(1.0f, 0.4f);
 }
 
-// ───────────────────────── 碎片收集（右上角）─────────────────────────
+void ADysisHUD::OpenSettings()
+{
+	if (Screen != EDysisScreen::Playing) return;
+	Screen = EDysisScreen::Settings; SettingsIndex = 0; SelectorX = 0.0f;
+	UGameplayStatics::SetGamePaused(this, true);
+}
+
+void ADysisHUD::CloseSettings()
+{
+	if (Screen != EDysisScreen::Settings) return;
+	Screen = EDysisScreen::Playing;
+	UGameplayStatics::SetGamePaused(this, false);
+}
+
+void ADysisHUD::ReturnToMainMenu()
+{
+	UGameplayStatics::SetGamePaused(this, false);
+	UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(this, true)));
+}
+
+// ───────────────────────── 主界面 ─────────────────────────
+
+void ADysisHUD::DrawMainMenu(float RealDt)
+{
+	APlayerController* PC = GetOwningPlayerController();
+	const float S = Canvas->SizeY / MenuH;
+	const float OX = Canvas->SizeX - MenuW * S;   // 内容靠右：比 16:9 宽的时候右边对齐
+	auto Layer = [&](UTexture2D* T, float DY, float A) { DrawUIImage(T, OX, DY * S, MenuW * S, MenuH * S, FLinearColor(1, 1, 1, A)); };
+
+	UTexture2D* Logo = UITex("Logo", TEXT("/Game/Dysis/UI/Menu/Logo.Logo"));
+	UTexture2D* Start = UITex("StartGame", TEXT("/Game/Dysis/UI/Menu/StartGame.StartGame"));
+	UTexture2D* Quit = UITex("QuitGame", TEXT("/Game/Dysis/UI/Menu/QuitGame.QuitGame"));
+	UTexture2D* Selector = UITex("SelectorMain", TEXT("/Game/Dysis/UI/Menu/SelectorMain.SelectorMain"));
+
+	// 输入：上下键 / W S 换行，回车 / 空格 / E 确认；鼠标移上去选中，点一下确认
+	const bool bBusy = StartPhase != 0;
+	bool bConfirm = false;
+	if (PC && !bBusy)
+	{
+		if (PC->WasInputKeyJustPressed(EKeys::Up) || PC->WasInputKeyJustPressed(EKeys::W) || PC->WasInputKeyJustPressed(EKeys::Down) || PC->WasInputKeyJustPressed(EKeys::S))
+			MenuIndex = 1 - MenuIndex;
+		for (int32 i = 0; i < 2; ++i)
+			if (MouseIn(OX + MainRowX * S, MainRowY[i] * S, MainRowW * S, MainRowH * S)) { MenuIndex = i; if (bClick) bConfirm = true; }
+		if (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::E)) bConfirm = true;
+	}
+
+	if (Logo) DrawUIImage(Logo, OX + LogoBox.X * S, LogoBox.Y * S, LogoBox.W * S, LogoBox.H * S);
+	else DrawUIText(TEXT("狄西斯的日落回廊"), Cream, OX + 1430.0f * S, 300.0f * S, 56.0f, 0.5f, true);
+
+	SelectorX = Approach(SelectorX, MenuIndex * MainRowStep, 900.0f, RealDt);
+	if (Start && Quit)
+	{
+		Layer(Start, 0.0f, MenuIndex == 0 ? 1.0f : 0.72f);
+		Layer(Quit, 0.0f, MenuIndex == 1 ? 1.0f : 0.72f);
+		Layer(Selector, SelectorX, 1.0f);
+	}
+	else
+	{
+		DrawUIText(TEXT("开始游戏"), MenuIndex == 0 ? Cream : Cream.CopyWithNewOpacity(0.6f), OX + 1430.0f * S, 575.0f * S, 34.0f, 0.5f);
+		DrawUIText(TEXT("退出游戏"), MenuIndex == 1 ? Cream : Cream.CopyWithNewOpacity(0.6f), OX + 1430.0f * S, 673.0f * S, 34.0f, 0.5f);
+	}
+
+	if (bConfirm)
+	{
+		if (MenuIndex == 0) StartGame(false);
+		else if (PC) UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
+	}
+}
+
+// ───────────────────────── 设置页（游戏里按 P / Esc） ─────────────────────────
+
+void ADysisHUD::DrawSettings(float RealDt)
+{
+	APlayerController* PC = GetOwningPlayerController();
+	const float S = Canvas->SizeY / MenuH;
+	const float OX = (Canvas->SizeX - MenuW * S) * 0.5f;   // 内容居中
+	DrawRect(FLinearColor(0.05f, 0.02f, 0.01f, 0.55f), 0, 0, Canvas->SizeX, Canvas->SizeY);
+	auto Layer = [&](UTexture2D* T, float DY, float A) { DrawUIImage(T, OX, DY * S, MenuW * S, MenuH * S, FLinearColor(1, 1, 1, A)); };
+
+	UTexture2D* Title = UITex("Settings", TEXT("/Game/Dysis/UI/Menu/Settings.Settings"));
+	UTexture2D* Resume = UITex("BackToGame", TEXT("/Game/Dysis/UI/Menu/BackToGame.BackToGame"));
+	UTexture2D* ToMenu = UITex("BackToMenu", TEXT("/Game/Dysis/UI/Menu/BackToMenu.BackToMenu"));
+	UTexture2D* Selector = UITex("SelectorSettings", TEXT("/Game/Dysis/UI/Menu/SelectorSettings.SelectorSettings"));
+
+	bool bConfirm = false, bResume = false;
+	if (PC)
+	{
+		if (PC->WasInputKeyJustPressed(EKeys::Up) || PC->WasInputKeyJustPressed(EKeys::W) || PC->WasInputKeyJustPressed(EKeys::Down) || PC->WasInputKeyJustPressed(EKeys::S))
+			SettingsIndex = 1 - SettingsIndex;
+		for (int32 i = 0; i < 2; ++i)
+			if (MouseIn(OX + SetRowX * S, SetRowY[i] * S, SetRowW * S, SetRowH * S)) { SettingsIndex = i; if (bClick) bConfirm = true; }
+		if (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::E)) bConfirm = true;
+		if (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Escape) || PC->WasInputKeyJustPressed(EKeys::BackSpace)) bResume = true;
+	}
+
+	SelectorX = Approach(SelectorX, SettingsIndex * SetRowStep, 1000.0f, RealDt);
+	if (Title && Resume && ToMenu)
+	{
+		Layer(Title, 0.0f, 1.0f);
+		Layer(Resume, 0.0f, SettingsIndex == 0 ? 1.0f : 0.72f);
+		Layer(ToMenu, 0.0f, SettingsIndex == 1 ? 1.0f : 0.72f);
+		Layer(Selector, SelectorX, 1.0f);
+	}
+	else
+	{
+		DrawUIText(TEXT("SETTING"), Cream, Canvas->SizeX * 0.5f, 360.0f * S, 72.0f, 0.5f);
+		DrawUIText(TEXT("回到游戏"), SettingsIndex == 0 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, 585.0f * S, 36.0f, 0.5f);
+		DrawUIText(TEXT("回到主界面"), SettingsIndex == 1 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, 700.0f * S, 36.0f, 0.5f);
+	}
+
+	if (bResume || (bConfirm && SettingsIndex == 0)) CloseSettings();
+	else if (bConfirm && SettingsIndex == 1) ReturnToMainMenu();
+}
+
+// ───────────────────────── 局内 ─────────────────────────
 
 void ADysisHUD::DrawShards()
 {
-	if (!Canvas || !GetWorld()) return;
-	UDysisSaveSubsystem* Save = GetWorld()->GetGameInstance()
-		? GetWorld()->GetGameInstance()->GetSubsystem<UDysisSaveSubsystem>()
-		: nullptr;
-	if (!Save || !Save->GetCurrent()) return;
-
-	struct FShard { EDysisNiche Niche; const TCHAR* TexPath; };
-	const FShard Shards[] = {
-		{ EDysisNiche::Sun,     TEXT("/Game/Dysis/UI/InGame/SunShard.SunShard") },
-		{ EDysisNiche::Rainbow, TEXT("/Game/Dysis/UI/InGame/RainbowShard.RainbowShard") },
-		{ EDysisNiche::Moon,    TEXT("/Game/Dysis/UI/InGame/MoonShard.MoonShard") },
+	const float S = Canvas->SizeX / MockW;
+	DrawUIImage(UITex("Vine", TEXT("/Game/Dysis/UI/InGame/Vine.Vine")), VineBox.X * S, VineBox.Y * S, VineBox.W * S, VineBox.H * S);
+	const UGameInstance* GI = GetGameInstance();
+	UDysisSaveSubsystem* Save = GI ? GI->GetSubsystem<UDysisSaveSubsystem>() : nullptr;
+	const UDysisSaveGame* Data = Save ? Save->GetCurrent() : nullptr;
+	struct FShard { EDysisNiche Niche; FName Key; const TCHAR* Path; const FBox4* Box; };
+	const FShard Shards[3] = {
+		{ EDysisNiche::Sun,     "SunShard",     TEXT("/Game/Dysis/UI/InGame/SunShard.SunShard"),         &SunBox },
+		{ EDysisNiche::Rainbow, "RainbowShard", TEXT("/Game/Dysis/UI/InGame/RainbowShard.RainbowShard"), &RainbowBox },
+		{ EDysisNiche::Moon,    "MoonShard",    TEXT("/Game/Dysis/UI/InGame/MoonShard.MoonShard"),       &MoonBox },
 	};
-
-	const float IconH = 52.0f;
-	float X = Canvas->SizeX - 60.0f;
-	// 收藏品树枝打底（碎片挂在枝上；缺图就只画碎片）。
-	if (UTexture2D* VineTex = UITex("Vine", TEXT("/Game/Dysis/UI/InGame/Vine.Vine")))
+	for (int32 i = 0; i < 3; ++i)
 	{
-		DrawUIImage(VineTex, Canvas->SizeX - 320.0f, 12.0f, 300.0f, 76.0f, FLinearColor(1, 1, 1, 0.9f));
-	}
-	for (const FShard& S : Shards)
-	{
-		if (!Save->GetCurrent()->HasNiche(S.Niche)) continue;
-		if (UTexture2D* T = UITex(FName(*FString::Printf(TEXT("Shard%d"), int32(S.Niche))), S.TexPath))
-		{
-			const float IW = float(T->GetSizeX()) / FMath::Max(1, T->GetSizeY()) * IconH;
-			X -= IW;
-			DrawUIImage(T, X, 28.0f, IW, IconH, FLinearColor(1, 1, 1, 0.97f));
-			X -= 22.0f;
-		}
+		const FShard& Sh = Shards[i];
+		if ((ShardMask & (1 << i)) || (Data && Data->HasNiche(Sh.Niche)))
+			DrawUIImage(UITex(Sh.Key, Sh.Path), Sh.Box->X * S, Sh.Box->Y * S, Sh.Box->W * S, Sh.Box->H * S);
 	}
 }
 
-// ───────────────────────── 暂停菜单（P 键）─────────────────────────
-
-void ADysisHUD::DrawPause()
+void ADysisHUD::SetShard(int32 Index, bool bHave)
 {
-	if (!Canvas) return;
-	const float W = Canvas->SizeX;
-	const float H = Canvas->SizeY;
-	APlayerController* PC = GetOwningPlayerController();
+	if (Index < 0 || Index > 2) return;
+	if (bHave) ShardMask |= uint8(1 << Index); else ShardMask &= uint8(~(1 << Index));
+}
 
-	DrawRect(FLinearColor(0.0f, 0.0f, 0.03f, 0.62f), 0, 0, W, H);
-	DrawUIText(TEXT("暂 停"), FLinearColor(0.93f, 0.87f, 0.72f, 1.0f), W * 0.5f - 2.0f * 20.0f, H * 0.20f, 40.0f);
-
-	struct FPauseItem { const TCHAR* Label; const TCHAR* TexPath; };
-	const FPauseItem Items[] = {
-		{ TEXT("返回游戏"),   TEXT("/Game/Dysis/UI/Menu/BackToGame.BackToGame") },
-		{ TEXT("设 置"),      TEXT("/Game/Dysis/UI/Menu/Settings.Settings") },
-		{ TEXT("返回主界面"), TEXT("/Game/Dysis/UI/Menu/BackToMenu.BackToMenu") },
-	};
-
-	const bool bE = PC && PC->IsInputKeyDown(EKeys::Enter);
-	const bool bUD = PC && (PC->IsInputKeyDown(EKeys::Up) || PC->IsInputKeyDown(EKeys::Down));
-	const bool bEnterEdge = bE && !bPauseEnterDown;
-	const bool bUDEdge = bUD && !bPauseUpDownDown;
-	if (bUDEdge) PauseIndex = (PauseIndex + (PC->IsInputKeyDown(EKeys::Down) ? 1 : 2)) % 3;
-	if (bEnterEdge)
+void ADysisHUD::DrawHintBar(float Dt)
+{
+	const float S = Canvas->SizeX / MockW;
+	// 内容：有通知显示通知；没有通知、也不在对话里时，显示脚边能互动的东西
+	FString Want;
+	if (NotificationTimer > 0.0f) { Want = NotificationText; NotificationTimer -= Dt; }
+	else if (!(ActiveDialogue && ActiveDialogue->IsPlaying()))
 	{
-		if (PauseIndex == 0)      bPauseOpen = false;                        // 返回游戏
-		else if (PauseIndex == 1) { bPauseOpen = false; bMenuOpen = true; bSettingsOpen = true; }  // 设置（借主菜单的设置页）
-		else                      { bPauseOpen = false; bMenuOpen = true; }  // 返回主界面
-	}
-
-	const float ItemY0 = H * 0.36f;
-	const float ItemGap = 96.0f;
-	for (int32 i = 0; i < 3; ++i)
-	{
-		const bool bSel = (i == PauseIndex);
-		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Pause%d"), i)), Items[i].TexPath);
-		float ItemH = 64.0f, ItemW = 240.0f;
-		if (Tex)
+		if (UDysisInteractComponent* Interact = ResolveInteract())
 		{
-			ItemH = bSel ? 70.0f : 58.0f;
-			ItemW = ItemH * FMath::Max(0.5f, float(Tex->GetSizeX()) / FMath::Max(1, Tex->GetSizeY()));
-		}
-		const float IX = W * 0.5f - ItemW * 0.5f;
-		const float IY = ItemY0 + i * ItemGap;
-		if (Tex)
-		{
-			DrawUIImage(Tex, IX, IY, ItemW, ItemH, bSel ? FLinearColor(1, 1, 1, 1) : FLinearColor(0.6f, 0.6f, 0.6f, 0.9f));
-		}
-		else
-		{
-			const FString Label = Items[i].Label;
-			DrawUIText(Label, bSel ? FLinearColor(0.95f, 0.85f, 0.6f, 1.0f) : FLinearColor(0.6f, 0.6f, 0.62f, 0.9f),
-				W * 0.5f - Label.Len() * 15.0f, IY, 30.0f);
-		}
-		if (bSel && Tex)
-		{
-			if (UTexture2D* Sel = UITex("SelectorMain", TEXT("/Game/Dysis/UI/Menu/SelectorMain.SelectorMain")))
-			{
-				DrawUIImage(Sel, IX - 62.0f, IY + ItemH * 0.5f - 22.0f, 44.0f, 44.0f, FLinearColor(1, 1, 1, 1));
-			}
+			AActor* Target = nullptr;
+			if (Interact->CanInteractNow(Target))
+				if (const IDysisInteractable* I = Cast<IDysisInteractable>(Target))
+				{
+					const FText Prompt = I->GetInteractPrompt();
+					if (!Prompt.IsEmpty()) Want = TEXT("E　") + Prompt.ToString();
+				}
 		}
 	}
+	if (!Want.IsEmpty()) HintShownText = Want;
+	HintAlpha = Approach(HintAlpha, Want.IsEmpty() ? 0.0f : 1.0f, Want.IsEmpty() ? 2.5f : 6.0f, Dt);
+	if (HintAlpha <= 0.01f || HintShownText.IsEmpty()) return;
 
-	DrawUIText(TEXT("[↑↓] 选择   [Enter] 确认   [P] 返回游戏"), FLinearColor(0.55f, 0.55f, 0.6f, 0.85f), W * 0.5f - 12.0f * 9.0f, H * 0.86f, 20.0f);
-	bPauseEnterDown = bE;
-	bPauseUpDownDown = bUD;
+	DrawUIImage(UITex("Notify", TEXT("/Game/Dysis/UI/InGame/Notify.Notify")), HintBox.X * S, HintBox.Y * S, HintBox.W * S, HintBox.H * S, FLinearColor(1, 1, 1, HintAlpha));
+	// 字放在面板正中：最多两行，放不下就把字缩小
+	const float CX = (HintBox.X + 2071.0f) * S, CY = (HintBox.Y + 236.0f) * S, MaxW = 3700.0f * S;
+	float Px = 27.0f;
+	TArray<FString> Lines = WrapText(HintShownText, MakeFont(Px), MaxW);
+	if (Lines.Num() > 2) { Px = 22.0f; Lines = WrapText(HintShownText, MakeFont(Px), MaxW); }
+	const float LineH = Px * (Canvas->SizeY / 1080.0f) * 1.4f;
+	const float Top = CY - Lines.Num() * LineH * 0.5f + LineH * 0.08f;
+	for (int32 i = 0; i < Lines.Num(); ++i) DrawUIText(Lines[i], Cream.CopyWithNewOpacity(HintAlpha), CX, Top + i * LineH, Px, 0.5f);
+}
+
+void ADysisHUD::DrawDialogue()
+{
+	const float S = Canvas->SizeX / MockW;
+	const bool bPlaying = ActiveDialogue && ActiveDialogue->IsPlaying() && ActiveDialogue->Lines.IsValidIndex(ActiveDialogue->CurrentLine);
+	const float RealDt = FMath::Clamp(float(FApp::GetDeltaTime()), 0.0f, 0.1f);
+	DialogueAlpha = Approach(DialogueAlpha, bPlaying ? 1.0f : 0.0f, bPlaying ? 5.0f : 3.0f, RealDt);
+	if (DialogueAlpha <= 0.01f) return;
+
+	// “说话人：台词”拆开；名字写在名牌上，立绘按名字换
+	FString Line = bPlaying ? ActiveDialogue->Lines[ActiveDialogue->CurrentLine].ToString() : FString();
+	FString Speaker = LastSpeaker, Body;
+	if (bPlaying)
+	{
+		if (!Line.Split(TEXT("："), &Speaker, &Body)) { Speaker.Reset(); Body = Line; }
+		LastSpeaker = Speaker;
+	}
+	const FLinearColor White(1, 1, 1, DialogueAlpha);
+	const float BoxY = Canvas->SizeY - (MockH - TextBox.Y) * S;
+	DrawUIImage(UITex("TextBox", TEXT("/Game/Dysis/UI/InGame/TextBox.TextBox")), 0.0f, BoxY, TextBox.W * S, TextBox.H * S, White);
+	if (const FPortrait* P = PortraitFor(Speaker))
+		DrawUIImage(UITex(P->Key, P->Path), Canvas->SizeX - P->W * S, Canvas->SizeY - P->H * S, P->W * S, P->H * S, White);
+	if (!bPlaying) return;
+
+	const FLinearColor Ink = Cream.CopyWithNewOpacity(DialogueAlpha);
+	// 名牌（图里 x 4270–5830、y 20–365）：名字从左边的星芒后面写起
+	if (!Speaker.IsEmpty())
+	{
+		const float NamePx = 34.0f;
+		const float NameH = float(MeasureText(Speaker, MakeFont(NamePx, true)).Y);
+		DrawUIText(Speaker, Ink, 4500.0f * S, BoxY + 192.0f * S - NameH * 0.5f, NamePx, 0.0f, true);
+	}
+	// 正文：主面板里（x 560–4050），最多三行
+	DrawUIParagraph(Body, Ink, 560.0f * S, BoxY + 430.0f * S, 30.0f, 3490.0f * S, 0.0f, 1.5f);
+	DrawUIText(TEXT("E　继续"), Ink.CopyWithNewOpacity(0.55f * DialogueAlpha), 4040.0f * S, BoxY + 1010.0f * S, 20.0f, 1.0f, false, false);
+}
+
+void ADysisHUD::DrawTitle(float Dt)
+{
+	if (TitleT < 0.0f) return;
+	TitleT += Dt;
+	const float In = 0.6f, Out = 1.2f;
+	const float A = TitleT < In ? TitleT / In : TitleT < In + TitleHold ? 1.0f : 1.0f - (TitleT - In - TitleHold) / Out;
+	if (A <= 0.0f) { TitleT = -1.0f; return; }
+	const float CX = Canvas->SizeX * 0.5f, S = Canvas->SizeY / 1080.0f;
+	DrawUIText(TitleMain, Cream.CopyWithNewOpacity(A), CX, 372.0f * S, 68.0f, 0.5f, true);
+	DrawUIText(TitleSub, Cream.CopyWithNewOpacity(A * 0.9f), CX, 470.0f * S, 30.0f, 0.5f);
+}
+
+void ADysisHUD::DrawInGame(float Dt)
+{
+	const float S = Canvas->SizeX / MockW;
+	DrawUIImage(UITex("SettingsInGame", TEXT("/Game/Dysis/UI/InGame/SettingsInGame.SettingsInGame")), ClockBox.X * S, ClockBox.Y * S, ClockBox.W * S, ClockBox.H * S);
+	DrawShards();
+	DrawHintBar(Dt);
+	DrawDialogue();
+}
+
+void ADysisHUD::DrawDebug()
+{
+	const APlayerController* PC = GetOwningPlayerController();
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	const UDysisTimeComponent* Time = Pawn ? Pawn->FindComponentByClass<UDysisTimeComponent>() : nullptr;
+	if (!Time) return;
+	const float Clock = FMath::Fmod(12.0f + Time->H / 15.0f, 24.0f);
+	const FString Info = FString::Printf(TEXT("zone=%s  H=%.2f  %02d:%02d  %s  foot=(%.0f, %.0f, %.0f)"),
+		*Time->Zone, Time->H, int32(Clock), int32(Clock * 60.0f) % 60, Time->bNight ? TEXT("night") : TEXT("day"),
+		Time->FootCm.X, Time->FootCm.Y, Time->FootCm.Z);
+	DrawUIText(Info, FLinearColor(0.4f, 1.0f, 0.4f, 0.95f), 24.0f, Canvas->SizeY - 40.0f, 18.0f);
 }
 
 // ───────────────────────── 每帧 ─────────────────────────
@@ -382,94 +572,58 @@ void ADysisHUD::DrawHUD()
 {
 	Super::DrawHUD();
 	if (!Canvas) return;
-
-	// 主菜单开着：只画菜单（不读游戏内 UI；输入边沿在这里处理）。
 	APlayerController* PC = GetOwningPlayerController();
-	const bool bEnter = PC && PC->IsInputKeyDown(EKeys::Enter);
-	const bool bUpDown = PC && (PC->IsInputKeyDown(EKeys::Up) || PC->IsInputKeyDown(EKeys::Down));
-	const bool bBack = PC && PC->IsInputKeyDown(EKeys::BackSpace);
-	if (bMenuOpen)
+	const float RealDt = FMath::Clamp(float(FApp::GetDeltaTime()), 0.0f, 0.1f);
+	const float Dt = GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.0f;
+
+	bMouseValid = false; bClick = false;
+	if (PC)
 	{
-		const bool bEnterPressed = bEnter && !bEnterWasDown;
-		const bool bUpDownPressed = bUpDown && !bUpDownWasDown;
-		const bool bBackPressed = bBack && !bBackWasDown;
-		if (bSettingsOpen)
+		float MX = 0.0f, MY = 0.0f;
+		if (PC->GetMousePosition(MX, MY)) { bMouseValid = true; MousePos = FVector2D(MX, MY); }
+		bClick = PC->WasInputKeyJustPressed(EKeys::LeftMouseButton);
+		if (PC->WasInputKeyJustPressed(EKeys::F3)) bShowDebug = !bShowDebug;
+	}
+	ApplyInputForScreen();
+
+	switch (Screen)
+	{
+	case EDysisScreen::MainMenu:
+		HoldMenuView(RealDt);
+		DrawMainMenu(RealDt);
+		break;
+	case EDysisScreen::Settings:
+		DrawInGame(0.0f);
+		DrawSettings(RealDt);
+		break;
+	case EDysisScreen::Playing:
+		if (PC && StartPhase == 0 && (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Escape))) { OpenSettings(); break; }
+		DrawInGame(Dt);
+		break;
+	}
+	DrawTitle(Dt);
+
+	// 黑场；“开始游戏”：黑下去 → 画面切回玩家、天放开 → 亮起来
+	FadeAlpha = Approach(FadeAlpha, FadeTarget, FadeRate, RealDt);
+	if (StartPhase == 1 && FadeAlpha >= 0.995f)
+	{
+		Screen = EDysisScreen::Playing;
+		if (PC)
 		{
-			if (bBackPressed || bEnterPressed) bSettingsOpen = false;
-		}
-		else
-		{
-			if (bUpDownPressed) MenuIndex = (MenuIndex + (PC->IsInputKeyDown(EKeys::Down) ? 1 : 2)) % 3;
-			if (bEnterPressed)
+			if (APawn* Pawn = PC->GetPawn())
 			{
-				if (MenuIndex == 0)      bMenuOpen = false;   // 开始游戏（世界本来就在跑，关掉菜单即入局）
-				else if (MenuIndex == 1) bSettingsOpen = true;
-				else if (PC && GetWorld())
-				{
-					UKismetSystemLibrary::QuitGame(GetWorld(), PC, EQuitPreference::Quit, false);
-					return;
-				}
+				PC->SetViewTarget(Pawn);
+				if (UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>()) Time->ClearForcedTime();
 			}
 		}
-		DrawMenu();
-		bEnterWasDown = bEnter;
-		bUpDownWasDown = bUpDown;
-		bBackWasDown = bBack;
-		return;
+		if (MenuCamera) { MenuCamera->Destroy(); MenuCamera = nullptr; }
+		ApplyInputForScreen();
+		OnGameStarted.Broadcast();
+		StartPhase = 2;
+		FadeTo(0.0f, 0.7f);
 	}
-	bEnterWasDown = bEnter;
-	bUpDownWasDown = bUpDown;
-	bBackWasDown = bBack;
+	else if (StartPhase == 2 && FadeAlpha <= 0.005f) StartPhase = 0;
+	if (FadeAlpha > 0.002f) DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, FadeAlpha), 0, 0, Canvas->SizeX, Canvas->SizeY);
 
-	// ── 暂停菜单（P 键切换；开着时不画游戏内 UI）──
-	const bool bPDown = PC && PC->IsInputKeyDown(EKeys::P);
-	if (bPDown && !bPauseWasDown)
-	{
-		bPauseOpen = !bPauseOpen;
-		PauseIndex = 0;
-	}
-	bPauseWasDown = bPDown;
-	if (bPauseOpen)
-	{
-		DrawPause();
-		return;
-	}
-
-	// ── 交互提示：屏幕中心下方（"指尖光点"的文字替身）──
-	if (UDysisInteractComponent* Interact = ResolveInteract())
-	{
-		AActor* Target = nullptr;
-		if (Interact->CanInteractNow(Target))
-		{
-			if (const IDysisInteractable* Interactable = Cast<IDysisInteractable>(Target))
-			{
-				const FText Prompt = Interactable->GetInteractPrompt();
-				if (!Prompt.IsEmpty())
-				{
-					const FString Line = TEXT("[E] ") + Prompt.ToString();
-					DrawUIText(Line, FLinearColor(1.0f, 0.95f, 0.8f, 0.95f), Canvas->SizeX * 0.5f - Line.Len() * 8.5f, Canvas->SizeY * 0.5f + 48.0f, 22.0f);
-				}
-			}
-		}
-	}
-
-	// ── 对白 / 通知 / 碎片 ──
-	DrawDialogue();
-	DrawNotification();
-	if (NotificationTimer > 0.0f) NotificationTimer -= GetWorld() ? GetWorld()->GetDeltaSeconds() : 0.016f;
-	DrawShards();
-
-	// ── 调试面板（Dysis.Where 的屏幕版）──
-	if (bShowDebug && PC)
-	{
-		if (const APawn* Pawn = PC->GetPawn())
-			if (const UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>())
-			{
-				const float Clock = 12.0f + Time->H / 15.0f;
-				const FString Info = FString::Printf(TEXT("zone=%s  H=%.2f  clock=%02d:%02d  %s"),
-					*Time->Zone, Time->H, int32(Clock) % 24, int32(Clock * 60.0f) % 60,
-					Time->bNight ? TEXT("night") : TEXT("day"));
-				DrawUIText(Info, FLinearColor(0.4f, 1.0f, 0.4f, 0.9f), 24.0f, 24.0f, 18.0f);
-			}
-	}
+	if (bShowDebug && Screen == EDysisScreen::Playing) DrawDebug();
 }

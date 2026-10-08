@@ -83,7 +83,7 @@ void ADysisCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	{
 		In->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ADysisCharacter::Move);
 		In->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADysisCharacter::Look);
-		In->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		In->BindAction(JumpAction, ETriggerEvent::Started, this, &ADysisCharacter::JumpPressed);
 		In->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 		In->BindAction(RunAction, ETriggerEvent::Started, this, &ADysisCharacter::RunOn);
 		In->BindAction(RunAction, ETriggerEvent::Completed, this, &ADysisCharacter::RunOff);
@@ -91,8 +91,23 @@ void ADysisCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 	}
 }
 
+bool ADysisCharacter::UiBlocksInput() const
+{
+	// 主界面、设置页开着的时候，回车 / 空格 / E 是给界面用的，不是跳和互动
+	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
+		if (const ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
+			return H->IsMenuOpen() || H->IsSettingsOpen();
+	return false;
+}
+
+void ADysisCharacter::JumpPressed()
+{
+	if (!UiBlocksInput()) Jump();
+}
+
 void ADysisCharacter::TryInteractPressed()
 {
+	if (UiBlocksInput()) return;
 	// 对白播放中，E 键先当"下一句"（演出优先于世界交互——设计：对话是过场）。
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 		if (ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
