@@ -183,7 +183,7 @@ void ADysisHUD::DrawMenu()
 
 	if (bSettingsOpen)
 	{
-		// 设置页 v1：设置示意图占位（美术出正式设置页后换）；Backspace 返回。
+		// 设置页 v1：设置示意图占位（美术出正式设置页后换）；返回主界面按钮 + 设置选择标。
 		if (UTexture2D* S = UITex("SettingsMock", TEXT("/Game/Dysis/UI/References/Mockups/Settings.Settings")))
 		{
 			const float SW = W * 0.72f;
@@ -194,7 +194,22 @@ void ADysisHUD::DrawMenu()
 		{
 			DrawUIText(TEXT("设 置"), FLinearColor(0.9f, 0.87f, 0.8f, 1.0f), W * 0.5f - 3.0f * 18.0f, H * 0.3f, 36.0f);
 		}
-		DrawUIText(TEXT("[Backspace] 返回主菜单"), FLinearColor(0.6f, 0.6f, 0.65f, 0.9f), W * 0.5f - 8.0f * 9.0f, H * 0.88f, 18.0f);
+		// 返回主界面（按钮图；缺图退文字）。Enter 或 Backspace 都能返回。
+		if (UTexture2D* Back = UITex("BackToMenu", TEXT("/Game/Dysis/UI/Menu/BackToMenu.BackToMenu")))
+		{
+			const float BH = 56.0f;
+			const float BW = BH * FMath::Max(0.5f, float(Back->GetSizeX()) / FMath::Max(1, Back->GetSizeY()));
+			const float BX = W * 0.5f - BW * 0.5f;
+			DrawUIImage(Back, BX, H * 0.86f, BW, BH, FLinearColor(1, 1, 1, 1));
+			if (UTexture2D* SelS = UITex("SelectorSettings", TEXT("/Game/Dysis/UI/Menu/SelectorSettings.SelectorSettings")))
+			{
+				DrawUIImage(SelS, BX - 58.0f, H * 0.86f + BH * 0.5f - 22.0f, 44.0f, 44.0f, FLinearColor(1, 1, 1, 1));
+			}
+		}
+		else
+		{
+			DrawUIText(TEXT("[Backspace] 返回主菜单"), FLinearColor(0.6f, 0.6f, 0.65f, 0.9f), W * 0.5f - 8.0f * 9.0f, H * 0.88f, 18.0f);
+		}
 		return;
 	}
 
@@ -259,6 +274,11 @@ void ADysisHUD::DrawShards()
 
 	const float IconH = 52.0f;
 	float X = Canvas->SizeX - 60.0f;
+	// 收藏品树枝打底（碎片挂在枝上；缺图就只画碎片）。
+	if (UTexture2D* VineTex = UITex("Vine", TEXT("/Game/Dysis/UI/InGame/Vine.Vine")))
+	{
+		DrawUIImage(VineTex, Canvas->SizeX - 320.0f, 12.0f, 300.0f, 76.0f, FLinearColor(1, 1, 1, 0.9f));
+	}
 	for (const FShard& S : Shards)
 	{
 		if (!Save->GetCurrent()->HasNiche(S.Niche)) continue;
@@ -266,10 +286,79 @@ void ADysisHUD::DrawShards()
 		{
 			const float IW = float(T->GetSizeX()) / FMath::Max(1, T->GetSizeY()) * IconH;
 			X -= IW;
-			DrawUIImage(T, X, 24.0f, IW, IconH, FLinearColor(1, 1, 1, 0.95f));
-			X -= 18.0f;
+			DrawUIImage(T, X, 28.0f, IW, IconH, FLinearColor(1, 1, 1, 0.97f));
+			X -= 22.0f;
 		}
 	}
+}
+
+// ───────────────────────── 暂停菜单（P 键）─────────────────────────
+
+void ADysisHUD::DrawPause()
+{
+	if (!Canvas) return;
+	const float W = Canvas->SizeX;
+	const float H = Canvas->SizeY;
+	APlayerController* PC = GetOwningPlayerController();
+
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.03f, 0.62f), 0, 0, W, H);
+	DrawUIText(TEXT("暂 停"), FLinearColor(0.93f, 0.87f, 0.72f, 1.0f), W * 0.5f - 2.0f * 20.0f, H * 0.20f, 40.0f);
+
+	struct FPauseItem { const TCHAR* Label; const TCHAR* TexPath; };
+	const FPauseItem Items[] = {
+		{ TEXT("返回游戏"),   TEXT("/Game/Dysis/UI/Menu/BackToGame.BackToGame") },
+		{ TEXT("设 置"),      TEXT("/Game/Dysis/UI/Menu/Settings.Settings") },
+		{ TEXT("返回主界面"), TEXT("/Game/Dysis/UI/Menu/BackToMenu.BackToMenu") },
+	};
+
+	const bool bE = PC && PC->IsInputKeyDown(EKeys::Enter);
+	const bool bUD = PC && (PC->IsInputKeyDown(EKeys::Up) || PC->IsInputKeyDown(EKeys::Down));
+	const bool bEnterEdge = bE && !bPauseEnterDown;
+	const bool bUDEdge = bUD && !bPauseUpDownDown;
+	if (bUDEdge) PauseIndex = (PauseIndex + (PC->IsInputKeyDown(EKeys::Down) ? 1 : 2)) % 3;
+	if (bEnterEdge)
+	{
+		if (PauseIndex == 0)      bPauseOpen = false;                        // 返回游戏
+		else if (PauseIndex == 1) { bPauseOpen = false; bMenuOpen = true; bSettingsOpen = true; }  // 设置（借主菜单的设置页）
+		else                      { bPauseOpen = false; bMenuOpen = true; }  // 返回主界面
+	}
+
+	const float ItemY0 = H * 0.36f;
+	const float ItemGap = 96.0f;
+	for (int32 i = 0; i < 3; ++i)
+	{
+		const bool bSel = (i == PauseIndex);
+		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Pause%d", i))), Items[i].TexPath);
+		float ItemH = 64.0f, ItemW = 240.0f;
+		if (Tex)
+		{
+			ItemH = bSel ? 70.0f : 58.0f;
+			ItemW = ItemH * FMath::Max(0.5f, float(Tex->GetSizeX()) / FMath::Max(1, Tex->GetSizeY()));
+		}
+		const float IX = W * 0.5f - ItemW * 0.5f;
+		const float IY = ItemY0 + i * ItemGap;
+		if (Tex)
+		{
+			DrawUIImage(Tex, IX, IY, ItemW, ItemH, bSel ? FLinearColor(1, 1, 1, 1) : FLinearColor(0.6f, 0.6f, 0.6f, 0.9f));
+		}
+		else
+		{
+			const FString Label = Items[i].Label;
+			DrawUIText(Label, bSel ? FLinearColor(0.95f, 0.85f, 0.6f, 1.0f) : FLinearColor(0.6f, 0.6f, 0.62f, 0.9f),
+				W * 0.5f - Label.Len() * 15.0f, IY, 30.0f);
+		}
+		if (bSel && Tex)
+		{
+			if (UTexture2D* Sel = UITex("SelectorMain", TEXT("/Game/Dysis/UI/Menu/SelectorMain.SelectorMain")))
+			{
+				DrawUIImage(Sel, IX - 62.0f, IY + ItemH * 0.5f - 22.0f, 44.0f, 44.0f, FLinearColor(1, 1, 1, 1));
+			}
+		}
+	}
+
+	DrawUIText(TEXT("[↑↓] 选择   [Enter] 确认   [P] 返回游戏"), FLinearColor(0.55f, 0.55f, 0.6f, 0.85f), W * 0.5f - 12.0f * 9.0f, H * 0.86f, 20.0f);
+	bPauseEnterDown = bE;
+	bPauseUpDownDown = bUD;
 }
 
 // ───────────────────────── 每帧 ─────────────────────────
@@ -291,7 +380,7 @@ void ADysisHUD::DrawHUD()
 		const bool bBackPressed = bBack && !bBackWasDown;
 		if (bSettingsOpen)
 		{
-			if (bBackPressed) bSettingsOpen = false;
+			if (bBackPressed || bEnterPressed) bSettingsOpen = false;
 		}
 		else
 		{
@@ -316,6 +405,20 @@ void ADysisHUD::DrawHUD()
 	bEnterWasDown = bEnter;
 	bUpDownWasDown = bUpDown;
 	bBackWasDown = bBack;
+
+	// ── 暂停菜单（P 键切换；开着时不画游戏内 UI）──
+	const bool bPDown = PC && PC->IsInputKeyDown(EKeys::P);
+	if (bPDown && !bPauseWasDown)
+	{
+		bPauseOpen = !bPauseOpen;
+		PauseIndex = 0;
+	}
+	bPauseWasDown = bPDown;
+	if (bPauseOpen)
+	{
+		DrawPause();
+		return;
+	}
 
 	// ── 交互提示：屏幕中心下方（"指尖光点"的文字替身）──
 	if (UDysisInteractComponent* Interact = ResolveInteract())

@@ -57,6 +57,8 @@ protected:
 	// ── 主菜单（使用UI/主界面与设置 的图）──
 	void DrawMenu();
 	void DrawShards();
+	/** 游戏内暂停菜单（P 键；返回游戏/设置/返回主界面）。 */
+	void DrawPause();
 
 	/** 画一行 UI 文字：有 FontFace 用思源宋体 SizePx 像素，否则退回引擎默认字体近似同大。 */
 	void DrawUIText(const FString& Text, const FLinearColor& Color, float X, float Y, float SizePx, bool bShadow = true);
@@ -82,6 +84,13 @@ private:
 	bool bEnterWasDown = false;
 	bool bUpDownWasDown = false;
 	bool bBackWasDown = false;
+
+	// 暂停菜单状态（P 键切换）
+	bool bPauseOpen = false;
+	int32 PauseIndex = 0;             // 0=返回游戏 1=设置 2=返回主界面
+	bool bPauseWasDown = false;
+	bool bPauseEnterDown = false;
+	bool bPauseUpDownDown = false;
 
 	/** UI 图缓存。 */
 	UPROPERTY(Transient)
