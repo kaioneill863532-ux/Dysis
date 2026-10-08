@@ -151,6 +151,13 @@ void ADysisHUD::DrawUIImage(UTexture2D* Tex, float X, float Y, float W, float H,
 	DrawTexture(Tex, X, Y, W, H, 0.0f, 0.0f, 1.0f, 1.0f, Tint);   // 贴图坐标是 0–1 的比例
 }
 
+void ADysisHUD::DrawUIImageSwung(UTexture2D* Tex, float X, float Y, float W, float H, float AngleDeg, const FVector2D& Pivot, const FLinearColor& Tint)
+{
+	// 绕图上的一点转一个小角度再画（Pivot 是那一点在图里的位置，0–1 的比例）
+	if (!Tex || !Canvas || Tint.A <= 0.002f) return;
+	DrawTexture(Tex, X, Y, W, H, 0.0f, 0.0f, 1.0f, 1.0f, Tint, BLEND_Translucent, 1.0f, false, AngleDeg, Pivot);
+}
+
 FSlateFontInfo ADysisHUD::MakeFont(float Px, bool bBold) const
 {
 	const float CanvasPx = Px * (Canvas ? Canvas->SizeY / 1080.0f : 1.0f);
@@ -164,7 +171,8 @@ FVector2D ADysisHUD::MeasureText(const FString& Text, const FSlateFontInfo& Font
 	if (!FSlateApplication::IsInitialized() || Text.IsEmpty()) return FVector2D::ZeroVector;
 	const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
 	const auto Size = Measure->Measure(Text, Font);
-	return FVector2D(Size.X, Size.Y);
+	// 拉开字距时（FontTracking，几分之几个字宽）每个字后面多留一点。画布画字不认字体自带的字距设置，所以量和画都自己算
+	return FVector2D(Size.X + FontTracking * Font.Size * (96.0f / 72.0f) * Text.Len(), Size.Y);
 }
 
 void ADysisHUD::DrawUIText(const FString& Text, const FLinearColor& Color, float X, float Y, float Px, float AlignX, bool bBold, bool bShadow)
@@ -172,6 +180,24 @@ void ADysisHUD::DrawUIText(const FString& Text, const FLinearColor& Color, float
 	if (!Canvas || Text.IsEmpty() || Color.A <= 0.002f) return;
 	const FSlateFontInfo Font = MakeFont(Px, bBold);
 	if (AlignX != 0.0f) X -= float(MeasureText(Text, Font).X) * AlignX;
+	if (FontTracking > 0.0f)
+	{
+		// 拉开字距：一个字一个字地画，每个字后面多留 FontTracking 个字宽
+		const float Tracking = FontTracking;
+		const float Extra = Tracking * Font.Size * (96.0f / 72.0f);
+		for (int32 i = 0; i < Text.Len(); ++i)
+		{
+			const FString Ch = Text.Mid(i, 1);
+			FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Ch), Font, Color);
+			Item.Font = CanvasFont;
+			if (bShadow) Item.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Color.A), FVector2D(1.5f, 1.5f));
+			Canvas->DrawItem(Item);
+			FontTracking = 0.0f;
+			X += float(MeasureText(Ch, Font).X) + Extra;
+			FontTracking = Tracking;
+		}
+		return;
+	}
 	FCanvasTextItem Item(FVector2D(X, Y), FText::FromString(Text), Font, Color);
 	Item.Font = CanvasFont;
 	if (bShadow) Item.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.55f * Color.A), FVector2D(1.5f, 1.5f));
@@ -229,7 +255,13 @@ void ADysisHUD::Notify(UWorld* World, const TCHAR* Text, float Duration)
 
 void ADysisHUD::ShowTitle(const FString& Main, const FString& Sub, float HoldSeconds)
 {
-	TitleMain = Main; TitleSub = Sub; TitleHold = HoldSeconds; TitleT = 0.0f;
+	TitleMain = Main; TitleSub = Sub; TitleHold = HoldSeconds; TitleT = 0.0f; TitleNumeral = 0;
+}
+
+void ADysisHUD::ShowLevelNumeral(int32 Number, float HoldSeconds)
+{
+	if (Number < 1 || Number > 5) return;
+	TitleMain.Reset(); TitleSub.Reset(); TitleNumeral = Number; TitleHold = HoldSeconds; TitleT = 0.0f;
 }
 
 void ADysisHUD::FadeTo(float TargetAlpha, float Seconds)
@@ -449,17 +481,27 @@ void ADysisHUD::DrawShards()
 	const UGameInstance* GI = GetGameInstance();
 	UDysisSaveSubsystem* Save = GI ? GI->GetSubsystem<UDysisSaveSubsystem>() : nullptr;
 	const UDysisSaveGame* Data = Save ? Save->GetCurrent() : nullptr;
-	struct FShard { EDysisNiche Niche; FName Key; const TCHAR* Path; const FBox4* Box; };
+	// 碎片挂在树枝上轻轻地摆（2026-10-08 用户：像微风吹过，不要僵硬，三片不要一个样；后来又说幅度再大一点、不要有“没摆到头就停住”的感觉）：
+	//   支点 = 挂绳的顶端，也就是它和树枝相交的那一点（Pivot，是那一点在图里的位置）；
+	//   摆法 = 一个完整的来回摆（每一下都摆到头再回来，像钟摆那样两头慢、中间快），
+	//          快慢随着时间略微变一点（Wobble），幅度跟着一阵一阵的“风”在 70%–100% 之间慢慢起伏（Gust）；
+	//          不再叠第二个快的摆——叠了以后有的来回只摆一半就折回去，看着像卡了一下。
+	//   每一片的幅度（度）、快慢、起点都不一样。
+	struct FShard { EDysisNiche Niche; FName Key; const TCHAR* Path; const FBox4* Box; FVector2D Pivot; float Deg, Speed, Gust, Phase; };
 	const FShard Shards[3] = {
-		{ EDysisNiche::Sun,     "SunShard",     TEXT("/Game/Dysis/UI/InGame/SunShard.SunShard"),         &SunBox },
-		{ EDysisNiche::Rainbow, "RainbowShard", TEXT("/Game/Dysis/UI/InGame/RainbowShard.RainbowShard"), &RainbowBox },
-		{ EDysisNiche::Moon,    "MoonShard",    TEXT("/Game/Dysis/UI/InGame/MoonShard.MoonShard"),       &MoonBox },
+		{ EDysisNiche::Sun,     "SunShard",     TEXT("/Game/Dysis/UI/InGame/SunShard.SunShard"),         &SunBox,     FVector2D(0.311, 0.0),   5.4f, 1.52f, 0.31f, 0.0f },
+		{ EDysisNiche::Rainbow, "RainbowShard", TEXT("/Game/Dysis/UI/InGame/RainbowShard.RainbowShard"), &RainbowBox, FVector2D(0.2005, 0.0),  4.0f, 1.21f, 0.24f, 2.1f },
+		{ EDysisNiche::Moon,    "MoonShard",    TEXT("/Game/Dysis/UI/InGame/MoonShard.MoonShard"),       &MoonBox,    FVector2D(0.233, 0.005), 4.7f, 1.38f, 0.37f, 4.4f },
 	};
+	const float T = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f;
 	for (int32 i = 0; i < 3; ++i)
 	{
 		const FShard& Sh = Shards[i];
-		if ((ShardMask & (1 << i)) || (Data && Data->HasNiche(Sh.Niche)))
-			DrawUIImage(UITex(Sh.Key, Sh.Path), Sh.Box->X * S, Sh.Box->Y * S, Sh.Box->W * S, Sh.Box->H * S);
+		if (!((ShardMask & (1 << i)) || (Data && Data->HasNiche(Sh.Niche)))) continue;
+		const float Wind = 0.85f + 0.15f * FMath::Sin(T * Sh.Gust + Sh.Phase * 1.7f);
+		const float Wobble = 0.35f * FMath::Sin(T * 0.23f + Sh.Phase * 0.9f);
+		const float Angle = Sh.Deg * Wind * FMath::Sin(T * Sh.Speed + Sh.Phase + Wobble);
+		DrawUIImageSwung(UITex(Sh.Key, Sh.Path), Sh.Box->X * S, Sh.Box->Y * S, Sh.Box->W * S, Sh.Box->H * S, Angle, Sh.Pivot);
 	}
 }
 
@@ -577,16 +619,22 @@ void ADysisHUD::DrawDialogue()
 	if (!bPlaying) return;
 
 	const FLinearColor Ink = Cream.CopyWithNewOpacity(DialogueAlpha);
-	// 名牌（图里 x 4270–5830、y 20–365）：名字从左边的星芒后面写起
+	// 字的大小、位置、字距照用户给的参考图量的（2026-10-09 的第二版；那张图和示意图一样是 6544×3746 的比例；字体还是界面现有的）。
+	// 这个框是按画面的宽来摆的，字号却是按画面的高算的：画面不是 16:9 时（比如编辑器里的窗口）要折算一下，字和框的比例才不变
+	const float FontK = (Canvas->SizeX / 1920.0f) / (Canvas->SizeY / 1080.0f);
+	// 名牌（图里 x 4270–5830、y 20–365）：名字摆在名牌中间（x 4903），字高的中线在 y 191，字距拉开两成
 	if (!Speaker.IsEmpty())
 	{
-		const float NamePx = 34.0f;
+		const float NamePx = 37.0f * FontK;
+		FontTracking = 0.20f;
 		const float NameH = float(MeasureText(Speaker, MakeFont(NamePx, true)).Y);
-		DrawUIText(Speaker, Ink, 4500.0f * S, BoxY + 192.0f * S - NameH * 0.5f, NamePx, 0.0f, true);
+		DrawUIText(Speaker, Ink, 4903.0f * S, BoxY + 191.0f * S - NameH * 0.5f, NamePx, 0.5f, true);
 	}
-	// 正文：主面板里（x 560–4050），最多三行
-	DrawUIParagraph(Body, Ink, 560.0f * S, BoxY + 430.0f * S, 30.0f, 3490.0f * S, 0.0f, 1.5f);
-	DrawUIText(DysisCopy::DialogueContinue, Ink.CopyWithNewOpacity(0.55f * DialogueAlpha), 3940.0f * S, BoxY + 1010.0f * S, 20.0f, 1.0f, false, false);
+	// 正文：从 x 678 写起，一行 34 个字（写到 x 5200 换行）；第一行的中线在 y 588，行距 202；字距拉开一点
+	const float BodyPx = 35.5f * FontK;
+	FontTracking = 0.075f;
+	DrawUIParagraph(Body, Ink, 678.0f * S, BoxY + 588.0f * S - BodyPx * (Canvas->SizeY / 1080.0f) * 0.72f, BodyPx, 4520.0f * S, 0.0f, 202.0f * S / (BodyPx * (Canvas->SizeY / 1080.0f)));
+	FontTracking = 0.0f;
 }
 
 void ADysisHUD::DrawTitle(float Dt)
@@ -597,24 +645,25 @@ void ADysisHUD::DrawTitle(float Dt)
 	const float A = TitleT < In ? TitleT / In : TitleT < In + TitleHold ? 1.0f : 1.0f - (TitleT - In - TitleHold) / Out;
 	if (A <= 0.0f) { TitleT = -1.0f; return; }
 	const float CX = Canvas->SizeX * 0.5f, S = Canvas->SizeY / 1080.0f;
-	DrawUIText(TitleMain, Cream.CopyWithNewOpacity(A), CX, 372.0f * S, 68.0f, 0.5f, true);
-	// 罗马数字（关卡名）：界面的字体没有衬线，“II”光秃秃两竖像个暂停键，上下各画一道横线才像罗马数字
-	bool bRoman = !TitleMain.IsEmpty();
-	for (const TCHAR Ch : TitleMain) bRoman = bRoman && (Ch == TEXT('I') || Ch == TEXT('V') || Ch == TEXT('X'));
-	if (bRoman)
+	if (TitleNumeral > 0)
 	{
-		const float W = float(MeasureText(TitleMain, MakeFont(68.0f, true)).X) + 30.0f * S, T = 5.0f * S;
-		const FLinearColor Bar = Cream.CopyWithNewOpacity(A);
-		DrawRect(Bar, CX - W * 0.5f, 372.0f * S + RomanBarTop * S, W, T);
-		DrawRect(Bar, CX - W * 0.5f, 372.0f * S + RomanBarBottom * S, W, T);
+		// 关卡名：美术给的罗马数字图。原图是整屏 1920×1080 的透明图，数字在 (960, 460)；导入时只裁了数字周围 256×256 那一块
+		static const TCHAR* const Paths[5] = { TEXT("/Game/Dysis/UI/InGame/LevelI.LevelI"), TEXT("/Game/Dysis/UI/InGame/LevelII.LevelII"), TEXT("/Game/Dysis/UI/InGame/LevelIII.LevelIII"),
+			TEXT("/Game/Dysis/UI/InGame/LevelIV.LevelIV"), TEXT("/Game/Dysis/UI/InGame/LevelV.LevelV") };
+		static const FName Keys[5] = { TEXT("LevelI"), TEXT("LevelII"), TEXT("LevelIII"), TEXT("LevelIV"), TEXT("LevelV") };
+		DrawUIImage(UITex(Keys[TitleNumeral - 1], Paths[TitleNumeral - 1]), CX - 128.0f * S, (460.0f - 128.0f) * S, 256.0f * S, 256.0f * S, FLinearColor(1.0f, 1.0f, 1.0f, A));
+		return;
 	}
+	DrawUIText(TitleMain, Cream.CopyWithNewOpacity(A), CX, 372.0f * S, 68.0f, 0.5f, true);
 	DrawUIText(TitleSub, Cream.CopyWithNewOpacity(A * 0.9f), CX, 470.0f * S, 30.0f, 0.5f);
 }
 
 void ADysisHUD::DrawInGame(float Dt)
 {
 	const float S = Canvas->SizeX / MockW;
-	DrawUIImage(UITex("SettingsInGame", TEXT("/Game/Dysis/UI/InGame/SettingsInGame.SettingsInGame")), ClockBox.X * S, ClockBox.Y * S, ClockBox.W * S, ClockBox.H * S);
+	// 设置的图标（钟表）：像呼吸灯一样很慢地明暗（4.6 秒一个来回，最暗时是 58%），不是闪
+	const float Breath = 0.58f + 0.42f * (0.5f + 0.5f * FMath::Sin((GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0f) * (UE_TWO_PI / 4.6f)));
+	DrawUIImage(UITex("SettingsInGame", TEXT("/Game/Dysis/UI/InGame/SettingsInGame.SettingsInGame")), ClockBox.X * S, ClockBox.Y * S, ClockBox.W * S, ClockBox.H * S, FLinearColor(1.0f, 1.0f, 1.0f, Breath));
 	DrawShards();
 	DrawHintBar(Dt);
 	DrawInteractPrompt(Dt);

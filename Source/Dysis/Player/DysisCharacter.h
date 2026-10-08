@@ -131,7 +131,7 @@ public:
 	/** 过剧情时人定在原地：任何“往哪边走”的输入都不收。 */
 	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
 
-	/** 正在过剧情（对话框开着）：这时候人定在原地，不能走、跳、互动，只能转镜头和单击鼠标翻页。 */
+	/** 正在过剧情（对话框开着）：这时候人和镜头都定住，不能走、跳、互动、转视角，只能单击鼠标翻页。 */
 	UFUNCTION(BlueprintPure, Category = "Dysis|Player")
 	bool InDialogue() const;
 
@@ -194,6 +194,7 @@ private:
 	TObjectPtr<UInputAction> AdvanceAction;
 
 	bool bRunning = false;
+	bool bDialogueLookLocked = false;   // 过剧情时让控制器不收“转镜头”的输入（开始 / 结束各叫一次，成对）
 	bool bStartPitchApplied = false;
 	bool bAvatarShown = true;
 	float CamTun = 0.0f;   // 0 = 在开阔处，1 = 在墙里的楼梯上（镜头收紧）

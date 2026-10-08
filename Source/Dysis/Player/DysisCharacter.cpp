@@ -226,7 +226,7 @@ void ADysisCharacter::TryInteractPressed()
 
 void ADysisCharacter::ToggleViewPressed()
 {
-	if (UiBlocksInput()) return;
+	if (UiBlocksInput() || InDialogue()) return;
 	SetViewMode(ViewMode == EDysisViewMode::FirstPerson ? EDysisViewMode::ThirdPerson : EDysisViewMode::FirstPerson);
 }
 
@@ -252,6 +252,7 @@ void ADysisCharacter::Move(const FInputActionValue& Value)
 
 void ADysisCharacter::Look(const FInputActionValue& Value)
 {
+	if (InDialogue()) return;   // 过剧情时镜头也定住
 	const FVector2D V = Value.Get<FVector2D>();
 	AddControllerYawInput(V.X);
 	AddControllerPitchInput(-V.Y);
@@ -259,7 +260,7 @@ void ADysisCharacter::Look(const FInputActionValue& Value)
 
 void ADysisCharacter::Zoom(const FInputActionValue& Value)
 {
-	if (UiBlocksInput()) return;
+	if (UiBlocksInput() || InDialogue()) return;
 	// 滚轮往前 = 拉近
 	CameraDistance = FMath::Clamp(CameraDistance - Value.Get<float>() * CameraWheelStep, CameraDistanceMin, CameraDistanceMax);
 }
@@ -287,6 +288,13 @@ void ADysisCharacter::SetAvatarShown(bool bShown)
 void ADysisCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// 过剧情时镜头定住：在控制器那一层关掉“转镜头”的输入（鼠标、手柄都算），对话结束再放开
+	if (const bool bTalking = InDialogue(); bTalking != bDialogueLookLocked)
+		if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		{
+			bDialogueLookLocked = bTalking;
+			PC->SetIgnoreLookInput(bTalking);
+		}
 	if (!bStartPitchApplied)
 	{
 		// 开局微微俯视。出生流程的最后引擎会把镜头的俯仰清零，所以等到第一帧再设。

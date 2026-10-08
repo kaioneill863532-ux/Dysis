@@ -29,6 +29,12 @@ ITEMS = [
     ("游戏内UI/Iris.png",             "Portraits", "Iris", 0),
     ("游戏内UI/塞勒涅.png",           "Portraits", "Selene", 0),
     ("游戏内UI/赫利俄斯.png",         "Portraits", "Helios", 0),
+    # 关卡名（罗马数字）：美术给的是整屏 1920×1080 的透明图（数字在 (960, 460)），这里放的是裁出来的数字周围 256×256 那一块
+    ("关卡名/I.png",                  "InGame", "LevelI", 0),
+    ("关卡名/II.png",                 "InGame", "LevelII", 0),
+    ("关卡名/III.png",                "InGame", "LevelIII", 0),
+    ("关卡名/IV.png",                 "InGame", "LevelIV", 0),
+    ("关卡名/V.png",                  "InGame", "LevelV", 0),
 ]
 # 不再用的旧资产（示意图的副本、重复的立绘）
 STALE = [ROOT + "/References", ROOT + "/InGame/Dysis", ROOT + "/InGame/Iris"]

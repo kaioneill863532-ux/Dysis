@@ -352,7 +352,12 @@ void ADysisDirector::UpdateIris(float Dt)
 {
 	UDysisWorldState* State = UDysisWorldState::Get(this);
 	if (!State) return;
-	if (!State->IsIrisDebug())
+	if (bMenuPose)
+	{
+		// 主界面：叶片合着（编辑器里不试玩时看到的就是这个样子：一片片叶片跟着升起的踏步抬高，像一把打开的扇子）
+		State->IrisACm = 40.0f;
+	}
+	else if (!State->IsIrisDebug())
 	{
 		const UDysisTimeComponent* Time = PlayerTime();
 		const FString Zone = Time ? Time->Zone : FString();

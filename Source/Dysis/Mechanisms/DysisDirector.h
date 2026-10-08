@@ -248,6 +248,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DescribeSkyFx() const;
 
+	/** 测试用：脚站在这里时旁边会浮出哪个互动（它的名字；没有就是空）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugPromptAt(FVector FootCm) const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -420,6 +424,9 @@ private:
 	float GoddessLit = 0.0f, GoddessSweep = 0.0f, GoddessDwell = 0.0f, HalfBridgeExt = 0.0f, ShadowOn = 0.0f, FinaleT = 0.0f;
 	bool bGoddessGlint = false, bGoddessHinted = false, bShadowTold = false, bEndingStarted = false, bEndingDone = false;
 	TWeakObjectPtr<AActor> HalfDeck;
+	float BridgeAwayT = 0.0f;                       // 结局时屋顶细桥退走的进度（秒）
+	TArray<TWeakObjectPtr<AActor>> BridgeAway;
+	TArray<FVector> BridgeAwayBase;
 	TWeakObjectPtr<UBoxComponent> HalfFloor;
 	TArray<TWeakObjectPtr<UBoxComponent>> HalfRails;
 	TWeakObjectPtr<class ADysisInvisibleWall> ShadowFloor;

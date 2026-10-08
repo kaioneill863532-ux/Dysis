@@ -36,6 +36,7 @@ namespace
 	constexpr float FinRoofBridgeHalfW = 60.0f;
 	// 水亭浑天仪：中心高 1.8 m，月托在朝着月亮的那一侧
 	const FVector FinArmillary(0.0, 0.0, 180.0);
+	constexpr float FinBridgeAwaySeconds = 4.5f, FinBridgeAwayCm = 780.0f;   // 结局时细桥退走：用多久、退多远（桥长 7 m）
 	constexpr float FinMoonBeadR = 47.84f;
 
 	UStaticMeshComponent* FinMesh(AActor* A) { return A ? A->FindComponentByClass<UStaticMeshComponent>() : nullptr; }
@@ -277,7 +278,7 @@ void ADysisDirector::UpdateShadowBridge(float Dt)
 		{
 			// 没接上是一片暗影；接上了亮成月白色
 			ShadowMID->SetVectorParameterValue(TEXT("Color"), FLinearColor(FMath::Lerp(0.03f, 0.72f, ShadowOn), FMath::Lerp(0.04f, 0.8f, ShadowOn), FMath::Lerp(0.07f, 1.0f, ShadowOn)));
-			ShadowMID->SetScalarParameterValue(TEXT("Opacity"), FMath::Lerp(0.55f, 0.85f, ShadowOn) * DysisGB::Smoothstep(700.0f, 900.0f, Iris));
+			ShadowMID->SetScalarParameterValue(TEXT("Opacity"), FMath::Lerp(0.55f, 0.85f, ShadowOn) * DysisGB::Smoothstep(700.0f, 900.0f, Iris) * (1.0f - DysisGB::Smoothstep(0.0f, 1.0f, BridgeAwayT / FinBridgeAwaySeconds)));
 			ShadowMID->SetScalarParameterValue(TEXT("Glow"), FMath::Lerp(0.0f, 1.2f, ShadowOn));
 		}
 	}
@@ -321,6 +322,29 @@ void ADysisDirector::UpdateFinale(float Dt)
 		EndingDialogue->Lines.SetNum(Num);
 		for (int32 i = 0; i < Num; ++i) EndingDialogue->Lines[i] = FText::FromString(Lines[i]);
 		EndingDialogue->Play();
+	}
+	// 塞勒涅开口以后：屋顶那座细桥（连同桥门）顺着自己的方向慢慢退进环道里，最后收起来——
+	// 从水亭抬头看，圆眼里是一整个圆的夜空（集齐碎片时星座就在这片天上连起来）
+	if (bEndingStarted && BridgeAwayT < FinBridgeAwaySeconds)
+	{
+		if (BridgeAwayT <= 0.0f)
+			for (const TCHAR* Name : { TEXT("SM_RoofBridge"), TEXT("SM_Mech_RoofBridgeDoor_Leaf") })
+				if (AActor* A = Piece(Name))
+				{
+					if (UStaticMeshComponent* C = FinMesh(A)) C->SetMobility(EComponentMobility::Movable);
+					A->SetActorEnableCollision(false);
+					BridgeAway.Add(A);
+					BridgeAwayBase.Add(A->GetActorLocation());
+				}
+		BridgeAwayT = FMath::Min(BridgeAwayT + Dt, FinBridgeAwaySeconds);
+		const float K = DysisGB::Smoothstep(0.0f, 1.0f, BridgeAwayT / FinBridgeAwaySeconds);
+		const FVector Out = (FinRoofBridgeEnd - FinRoofBridgeS).GetSafeNormal2D();
+		for (int32 i = 0; i < BridgeAway.Num(); ++i)
+			if (AActor* A = BridgeAway[i].Get())
+			{
+				A->SetActorLocation(BridgeAwayBase[i] + Out * (FinBridgeAwayCm * K));
+				if (K >= 0.999f) A->SetActorHiddenInGame(true);
+			}
 	}
 	// 三片碎片都集齐了：塞勒涅说到“满天星斗将为你闪烁”那一句时镜头抬起来，天上的星连成双子座和天鹅座（DysisDirectorSky.cpp）
 	if (bEndingStarted && bEndingAll && !bEndingDone && StarShowT < 0.0f && EndingDialogue && FinaleT > 4.2f && (EndingDialogue->CurrentLine >= 1 || !EndingDialogue->IsPlaying()))

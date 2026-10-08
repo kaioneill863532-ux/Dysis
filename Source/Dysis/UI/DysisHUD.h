@@ -81,12 +81,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面")
 	float MenuNightExposureBoost = -1.0f;
 
-	/** 关卡名是罗马数字时，上下那两道横线离这行字顶边多远（按 1080 高的画面算，像素）。 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|HUD")
-	float RomanBarTop = 12.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|HUD")
-	float RomanBarBottom = 74.0f;
 
 	virtual void DrawHUD() override;
 	virtual void BeginPlay() override;
@@ -134,6 +128,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
 	void ShowTitle(const FString& Main, const FString& Sub, float HoldSeconds = 2.4f);
 
+	/** 屏幕中间出一次关卡名：一张罗马数字的图（1–5 = I–V，素材在 /Game/Dysis/UI/InGame/LevelI…LevelV），没有小标题。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
+	void ShowLevelNumeral(int32 Number, float HoldSeconds = 2.4f);
+
 	/** 黑场：在 Seconds 里变到 TargetAlpha（回档、开始游戏用）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
 	void FadeTo(float TargetAlpha, float Seconds);
@@ -171,6 +169,7 @@ protected:
 	UTexture2D* UITex(FName Key, const TCHAR* Path);
 	/** 把一张图整张画到 (X, Y, W, H)。 */
 	void DrawUIImage(UTexture2D* Tex, float X, float Y, float W, float H, const FLinearColor& Tint = FLinearColor::White);
+	void DrawUIImageSwung(UTexture2D* Tex, float X, float Y, float W, float H, float AngleDeg, const FVector2D& Pivot, const FLinearColor& Tint = FLinearColor::White);
 	/** 字体：Px = 设计稿 1080 高时的像素字号，按画布高度缩放。 */
 	FSlateFontInfo MakeFont(float Px, bool bBold = false) const;
 	FVector2D MeasureText(const FString& Text, const FSlateFontInfo& Font) const;
@@ -225,6 +224,8 @@ private:
 
 	// 关卡标题
 	FString TitleMain, TitleSub;
+	int32 TitleNumeral = 0;   // > 0 时标题是一张罗马数字的图，不是字
+	mutable float FontTracking = 0.0f;   // 接下来画的字的字距（几分之几个字宽）；只有对话框用，用完归零
 	float TitleT = -1.0f, TitleHold = 2.4f;
 
 	// 碎片（位：1 太阳、2 彩虹、4 月亮）

@@ -114,9 +114,9 @@ namespace DysisCopy
 	/// 月门
 	inline static const TCHAR* ViewMoonGate =
 		TEXT("一面刻着月轮的石墙，墙后传来隐隐的回音。");
-	/// 卡斯托耳雕像（解谜前）
+	/// 卡斯托耳雕像（解谜前）。开头的“卡斯托尔，”是 2026-10-08 用户让加的（不然玩家不知道他叫什么），写法照用户打的字
 	inline static const TCHAR* ViewCastor =
-		TEXT("双子座中波吕丢刻斯的同伴。咦，波吕丢刻斯去哪里了？");
+		TEXT("卡斯托尔，双子座中波吕丢刻斯的同伴。咦，波吕丢刻斯去哪里了？");
 
 	// ═══════ 解谜后反馈（三相机关月光照到 / 多阶段）═══════
 
@@ -162,7 +162,6 @@ namespace DysisCopy
 	inline static const TCHAR* PromptViewArmillary = TEXT("查看浑天仪");     // 殿顶、水亭
 	inline static const TCHAR* PromptViewWall      = TEXT("查看石墙");       // 藏着波吕丢刻斯的墙 / 月门
 	inline static const TCHAR* PromptViewWaterGate = TEXT("查看水闸");       // 开了以后
-	inline static const TCHAR* DialogueContinue    = TEXT("单击鼠标  继续");  // 对话框右下角
 
 	// ═══════ 机关反馈 ═══════
 

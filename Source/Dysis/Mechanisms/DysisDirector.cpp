@@ -187,6 +187,7 @@ void ADysisDirector::BuildInteracts()
 
 const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
 {
+	if (bEndingStarted) return nullptr;   // 结局的剧情开始以后（对话、星座的那一段）什么都不能互动了
 	const FDysisInteract* Best = nullptr;
 	float BestDist = 1.0e9f;
 	for (const FDysisInteract& I : Interacts)
@@ -198,6 +199,12 @@ const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
 		if (D < I.RadiusCm && D < BestDist) { Best = &I; BestDist = D; }
 	}
 	return Best;
+}
+
+FString ADysisDirector::DebugPromptAt(FVector FootCm) const
+{
+	const FDysisInteract* I = NearestInteract(FootCm);
+	return I ? I->Id.ToString() : FString();
 }
 
 FVector ADysisDirector::InteractAnchor(const FDysisInteract& I) const
@@ -310,12 +317,10 @@ void ADysisDirector::Tick(float DeltaTime)
 
 void ADysisDirector::UpdateLevelTitle()
 {
-	// 灰盒 levelOf：按脚下的区域分段——白天 序、五层，入夜以后再五层；每一段头一次走进去出一次标题
-	static const TCHAR* const Names[11][2] = {
-		// 2026-10-08 用户定：层数用罗马数字，一层 I、二层 II……白天一路往上数（I→V），入夜以后一路往下数（V→I）。上下那两道横线是界面画的（ADysisHUD::DrawTitle）
-		{ TEXT("序"), TEXT("登殿") }, { TEXT("I"), TEXT("午后·开闸") }, { TEXT("II"), TEXT("未时·双窗") }, { TEXT("III"), TEXT("申时·光阶") },
-		{ TEXT("IV"), TEXT("酉时·圆眼") }, { TEXT("V"), TEXT("日落·最后一缕") },
-		{ TEXT("V"), TEXT("月升·回廊") }, { TEXT("IV"), TEXT("初夜·天鹅") }, { TEXT("III"), TEXT("中夜·三相") }, { TEXT("II"), TEXT("夜半·双子") }, { TEXT("I"), TEXT("子夜·瀑布后的女神") } };
+	// 灰盒 levelOf：按脚下的区域分段——白天 序、五层，入夜以后再五层；每一段头一次走进去出一次关卡名。
+	// 2026-10-08 用户定：关卡名是罗马数字的图（美术给的），按楼层——白天一路往上数 I→V，入夜以后一路往下数 V→I；
+	// 不要小标题；岛上那一段（“序”）什么也不出。
+	static const int32 Numerals[11] = { 0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1 };
 	if (!GameStarted()) return;
 	const UDysisTimeComponent* Time = PlayerTime();
 	if (!Time) return;
@@ -340,5 +345,6 @@ void ADysisDirector::UpdateLevelTitle()
 	}
 	if (Lv <= SeenLevel) return;
 	SeenLevel = Lv;
-	if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->ShowTitle(Names[Lv][0], Names[Lv][1], 2.4f);
+	if (Numerals[Lv] > 0)
+		if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->ShowLevelNumeral(Numerals[Lv], 2.4f);
 }
