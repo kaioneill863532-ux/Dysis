@@ -40,7 +40,9 @@ for lab in ("SM_Mech_LeverB_Base", "SM_Mech_LeverB_Arm", "SM_Mech_LeverB_Chain",
             "DysisLeverA", "DysisLeverB", "DysisLeverSluice", "DysisSlider_b2", "DysisSlider_iris", "Mech_Waterfall",
             "DysisRoofSteps", "DysisCatchLight", "DysisGoldenApple",
             "DysisMirrorSource", "Niche_Sun", "Mech_SunNicheLid",
-            "DysisRainbowAlign", "DysisPrism", "Mech_PrismColumn", "Mech_SillLedge", "Niche_Rainbow"):
+            "DysisRainbowAlign", "DysisPrism", "Mech_PrismColumn", "Mech_SillLedge", "Niche_Rainbow",
+            "Mech_SwanDoor", "Mech_SwanGoddess", "Mech_SwanRelief", "Mech_MoonRelief", "Mech_StairSeal_TS", "Mech_StairSeal_TR",
+            "Mech_Win_TS1", "Mech_Win_TS2", "Mech_Win_TS3", "Mech_Win_TR1", "Mech_Win_TR2"):
     a = by_label.get(lab)
     if not a: continue
     for ch in a.get_attached_actors():      # 挂在它下面的模型部件留着

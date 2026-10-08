@@ -154,6 +154,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	void DebugResetRelief();
 
+	// ───── 夜里第一段：天鹅、墙里的两段楼梯、东南墙的月亮浮雕 —— DysisDirectorNight.cpp ─────
+
+	/** 女神像（月光下是黑天鹅）的底座转到第几格（8 格，第 0 格是对的）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	int32 SwanSlot = 3;
+
+	/** 黑天鹅头的影子落进了浮雕的空白：浮雕连同后面的墙沉下去，露出往下的楼梯。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bSwanSolved = false;
+
+	/** 测试用：夜里这一段现在的样子（JSON）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeNight() const;
+
+	/** 测试用：直接把女神像摆到第几格、黑天鹅显出来多少（0–1）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugSetSwan(int32 Slot, float Form);
+
+	/** 测试用：某块月石的每个取样点照没照到（"lit,box,blk,…"；box = 落在镜子照亮的那一块外面，blk = 被挡住）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugMoonstoneLit(FName Id) const;
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -264,6 +286,42 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> PrismSpots;
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> SeleneDialogue;
+
+	// 夜里第一段（灰盒 SWAN / TUNWIN / SEALS / MOONSTONES / MREL）—— DysisDirectorNight.cpp
+	/** 月石：被月光（直射，或经三相像的镜子反射）照着时显形 / 隐去，光离开后慢慢变回去。 */
+	struct FMoonstone
+	{
+		FName Id;
+		TArray<FVector> Samples;                    // 取样点：照到的比例 ≥ Need 才算照着
+		int32 Source = 0;                           // 0 不看光、1 月亮直射、2 镜子反射的月光
+		float Need = 0.999f;
+		bool bOneShot = false, bPerm = false, bDormant = false, bLit = false;
+		float K = 0.0f, LitFrac = 0.0f;
+		bool bHasDoor = false;                      // 人站在门洞里时不会合上
+		float DoorAz = 0.0f, DoorHalfDeg = 3.0f, DoorZ = 0.0f;
+		TArray<TWeakObjectPtr<AActor>> Parts;       // 显形以后才有的（能踩）
+		TArray<TWeakObjectPtr<AActor>> Blocks;      // 显形以后就没了的（平时挡着）
+		const TCHAR* PermCopy = nullptr;            // 头一次照到时的提示
+	};
+	void SetupNight();
+	void AddNightInteracts();
+	void UpdateSwan(float Dt);
+	void UpdateStairs(float Dt);
+	void UpdateMoonstones(float Dt);
+	void SetMoonstoneState(FMoonstone& Ms, float K);
+	bool MoonSampleLit(const FMoonstone& Ms, const FVector& P, const TCHAR** OutWhy = nullptr) const;
+	bool PlayerOnMoonstone(const FMoonstone& Ms) const;
+	FMoonstone* FindMoonstone(FName Id);
+	FVector SwanHeadCm() const;
+	TArray<FMoonstone> Moonstones;
+	float MoonstoneClock = 0.0f;
+	mutable TWeakObjectPtr<class ADysisBeamActor> MoonMirrorBeam;
+	TWeakObjectPtr<AActor> SwanGoddess, SwanBird, SwanRelief, SwanDoor, MoonDisk;
+	float SwanYaw0 = 0.0f, SwanYawNow = 0.0f, SwanLit = 0.0f, SwanForm = 0.0f, SwanMissCm = 900.0f, SwanSolvedT = 0.0f, SwanOpenT = 0.0f;
+	FVector SwanReliefBase = FVector::ZeroVector, SwanDoorBase = FVector::ZeroVector;
+	struct FStairWindow { TWeakObjectPtr<AActor> Actor; FVector Base = FVector::ZeroVector; float Open = 0.0f; bool bGone = false; };
+	struct FStairSet { TArray<FStairWindow> Windows; float T = -1.0f; TWeakObjectPtr<AActor> Seal; FVector SealBase = FVector::ZeroVector; float SealOpen = 0.0f; };
+	FStairSet StairSets[2];                      // 0 = TS（天鹅后面，三层 → 二层），1 = TR（月亮浮雕后面，二层 → 一层）
 
 	TMap<FName, TWeakObjectPtr<AActor>> Pieces;
 	TArray<FDysisInteract> Interacts;

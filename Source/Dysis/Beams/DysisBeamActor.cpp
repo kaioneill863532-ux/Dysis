@@ -96,6 +96,7 @@ ADysisBeamActor::ADysisBeamActor()
 	EndCapStart->SetCollisionEnabled(ECollisionEnabled::NoCollision);   // 默认关——镜光才有
 	EndCapStart->SetCastShadow(false);
 	if (Cube.Succeeded()) EndCapStart->SetStaticMesh(Cube.Object);
+	EndCapStart->SetHiddenInGame(true);   // 只是碰撞用的盒子，游戏里不该看见（以前没藏，每束光的位置上都有一个灰方块）
 
 	EndCapEnd = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("EndCapEnd"));
 	EndCapEnd->SetupAttachment(RootComponent);
@@ -103,6 +104,7 @@ ADysisBeamActor::ADysisBeamActor()
 	EndCapEnd->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	EndCapEnd->SetCastShadow(false);
 	if (Cube.Succeeded()) EndCapEnd->SetStaticMesh(Cube.Object);
+	EndCapEnd->SetHiddenInGame(true);
 }
 
 void ADysisBeamActor::BeginPlay()
@@ -606,8 +608,9 @@ void ADysisBeamActor::UpdateGreyboxMirror(double H)
 	FDysisMirrorState& M = State->Mirror;
 	const bool bMoon = GreyboxMirror == 2;
 	const int32 Form = bMoon ? 2 : 1;
-	if (!bMoon) M.bHasLitBox = false;
-	if (M.Form != Form || M.W3[Form] < 0.95f) { Done(); return; }
+	// 镜面上被照亮的那一块是日光、月光两束共用的一个量：各管各的那一相，不去清别人的
+	if (M.Form != Form || M.W3[Form] < 0.95f) { if (M.LitBoxForm == Form) M.bHasLitBox = false; Done(); return; }
+	M.bHasLitBox = false; M.LitBoxForm = Form;
 	const FVector LightDir = bMoon ? UDysisSkyLibrary::DysisMoonDir(float(H)) : UDysisSkyLibrary::DysisSunDir(float(H));
 
 	// 镜面上哪一块被照着（6 × 4 取样）

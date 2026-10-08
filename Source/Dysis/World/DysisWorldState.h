@@ -20,6 +20,7 @@ struct FDysisMirrorState
 	float W3[3] = { 1.0f, 0.0f, 0.0f };        // 三相各占多少（暗、日、月），慢慢过渡
 	bool bHasLitBox = false;                   // 镜面上被照亮的那一块（0–1）：U0、U1、V0、V1
 	float LitBox[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+	int32 LitBoxForm = 0;                      // 这一块是哪一相的光照出来的（1 日、2 月）
 	FVector ReflectDir = FVector::ForwardVector;   // 反射出去的方向（有光时）
 	TArray<TWeakObjectPtr<AActor>> Self;       // 雕像、镜子自己：算它被没被照到时不算挡光
 };
