@@ -102,7 +102,7 @@ mel.connect_material_expressions(data, "", vi, "")
 line, glow, opac = scalar(mat, "Line", 0.0, -1250, 400), scalar(mat, "Glow", 3.0, -1250, 500), scalar(mat, "Opacity", 1.0, -1250, 600)
 c = custom(mat, """
 float2 q = UV * 2.0 - 1.0;
-float dotA = saturate(1.0 - length(q)); dotA *= dotA;
+float dotA = saturate((1.0 - length(q)) * 2.2); dotA = dotA * dotA * (3.0 - 2.0 * dotA);   // 中间一小块是满亮的，边上淡出去（太小的亮点在画面上会被抹淡）
 float lineA = saturate(1.0 - abs(q.y)); lineA *= lineA * saturate((1.0 - abs(q.x)) * 14.0);
 float a = lerp(dotA, lineA, Line);
 a *= saturate(-CV.z * 30.0);
