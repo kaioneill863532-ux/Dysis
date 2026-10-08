@@ -13,6 +13,8 @@ class UDysisDialogueComponent;
 class UFontFace;
 class UTexture2D;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FDysisNotificationShown, const FText& /*Text*/);
+
 UCLASS()
 class DYSIS_API ADysisHUD : public AHUD
 {
@@ -48,6 +50,9 @@ public:
 
 	/** 静态快捷方式：找 HUD → ShowNotification（任何 Actor 调用一行即可）。 */
 	static void Notify(UWorld* World, const TCHAR* Text, float Duration = 4.0f);
+
+	/** 有通知显示出来时广播（音效“提示文字出现”挂在这：Audio/DysisSfxDirector）。 */
+	static FDysisNotificationShown OnNotificationShown;
 
 protected:
 	UDysisInteractComponent* ResolveInteract();
