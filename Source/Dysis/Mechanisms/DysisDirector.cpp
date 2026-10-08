@@ -110,6 +110,7 @@ void ADysisDirector::BeginPlay()
 	SetupMirror();
 	SetupRainbow();
 	SetupNight();
+	SetupTwins();
 	BuildInteracts();
 }
 
@@ -169,6 +170,7 @@ void ADysisDirector::BuildInteracts()
 	AddMirrorInteracts();
 	AddRainbowInteracts();
 	AddNightInteracts();
+	AddTwinsInteracts();
 }
 
 const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
@@ -270,6 +272,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateIrisRelief(DeltaTime);
 	UpdateSwan(DeltaTime);
 	UpdateMoonstones(DeltaTime);
+	UpdateTwins(DeltaTime);
 	UpdateStairs(DeltaTime);
 	UpdateCatch(DeltaTime);
 }

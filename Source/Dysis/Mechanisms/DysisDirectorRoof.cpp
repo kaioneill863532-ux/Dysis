@@ -104,6 +104,7 @@ void ADysisDirector::SetupRoof()
 		case RoofUp:
 			P.Tread = Piece(*FString::Printf(TEXT("SM_Mech_RoofSteps_Up%02d"), S.K));
 			P.Shaft = Piece(*FString::Printf(TEXT("SM_Mech_RoofSteps_Up%02d_Shaft"), S.K));
+			P.Curb = Piece(*FString::Printf(TEXT("SM_Mech_RoofSteps_Up%02d_Curb"), S.K));
 			P.Blade = Piece(*FString::Printf(TEXT("SM_Mech_IrisBlades_Up%02d"), S.K));
 			if (S.K == 16) TopPieceIndex = RoofPieces.Num();
 			break;
@@ -111,6 +112,7 @@ void ADysisDirector::SetupRoof()
 			if (!bSliver)
 			{
 				P.Tread = Piece(*FString::Printf(TEXT("SM_Mech_RoofSteps_Dn%02d"), S.K));
+				P.Curb = Piece(*FString::Printf(TEXT("SM_Mech_RoofSteps_Dn%02d_Curb"), S.K));
 				P.Blade = Piece(*FString::Printf(TEXT("SM_Mech_IrisBlades_Dn%02d"), S.K));
 			}
 			break;
@@ -121,6 +123,18 @@ void ADysisDirector::SetupRoof()
 		if (AActor* T = P.Tread.Get()) { P.TreadBase = T->GetActorLocation(); RoofMakeMovable(T); }
 		else if (S.Kind == RoofUp || (S.Kind == RoofDn && !bSliver)) UE_LOG(LogTemp, Warning, TEXT("Dysis 屋顶：找不到踏步部件（kind %d，第 %d 级）"), S.Kind, S.K);
 		RoofMakeMovable(P.Shaft.Get());
+		if (AActor* Cb = P.Curb.Get())
+		{
+			// 内沿的铜边：灰盒里只挡镜头（不挡光、不挡人），跟着踏步一起升降
+			P.CurbBase = Cb->GetActorLocation();
+			RoofMakeMovable(Cb);
+			if (UStaticMeshComponent* C = Cb->FindComponentByClass<UStaticMeshComponent>())
+			{
+				C->bUseDefaultCollision = false;
+				C->SetCollisionResponseToAllChannels(ECR_Ignore);
+				C->SetCollisionResponseToChannel(ECC_Camera, ECR_Block);
+			}
+		}
 		if (AActor* B = P.Blade.Get()) { P.BladeYaw = B->GetActorRotation().Yaw; RoofMakeMovable(B); }
 
 		// 看不见的墙：内侧一道（细桥那一段让开）、外侧一道、有的逆时针那头还有个挡头
@@ -184,6 +198,11 @@ void ADysisDirector::PlaceRoofPiece(FRoofPiece& P)
 		// 升起来的踏步：模型摆在升到头的位置；夜里的楼梯：模型摆在环道面上
 		const float BaseZ = S.Kind == RoofUp ? RoofRingZ + S.ZEnd : RoofRingZ;
 		T->SetActorLocation(P.TreadBase + FVector(0.0, 0.0, P.Z - BaseZ));
+	}
+	if (AActor* Cb = P.Curb.Get())
+	{
+		const float BaseZ = S.Kind == RoofUp ? RoofRingZ + S.ZEnd : RoofRingZ;
+		Cb->SetActorLocation(P.CurbBase + FVector(0.0, 0.0, P.Z - BaseZ));
 	}
 	if (AActor* Sh = P.Shaft.Get())
 	{

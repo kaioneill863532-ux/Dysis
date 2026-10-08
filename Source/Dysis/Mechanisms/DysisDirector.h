@@ -176,6 +176,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DebugMoonstoneLit(FName Id) const;
 
+	// ───── 夜里第二段：月之龛、双子、月桥 —— DysisDirectorTwins.cpp ─────
+
+	/** 双子并肩站在月光里了：月桥出现。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bTwinsJoined = false;
+
+	/** 拿到了月亮碎片。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bMoonShard = false;
+
+	/** 测试用：双子和月桥现在的样子（JSON）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeTwins() const;
+
+	/** 测试用：站在这里的一尊像（脚的位置，厘米）被月亮直射照着多少（腰、胸、头三个点）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	float DebugStatueMoonLit(FVector FootCm) const;
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -204,6 +222,8 @@ private:
 		float Z = 0.0f;                              // 踏面现在的高度（厘米）
 		TWeakObjectPtr<AActor> Tread, Shaft, Blade;
 		FVector TreadBase = FVector::ZeroVector;     // 关卡里摆的位置（升起来的踏步摆的是升到头的样子）
+		TWeakObjectPtr<AActor> Curb;                 // 踏步内沿的一道铜边：跟着踏步走，只挡镜头
+		FVector CurbBase = FVector::ZeroVector;
 		float BladeYaw = 0.0f;
 		TArray<FRoofWall> Walls;                     // 看不见的墙（跟着踏面走），人不会掉进光圈、也走不出屋顶
 	};
@@ -322,6 +342,19 @@ private:
 	struct FStairWindow { TWeakObjectPtr<AActor> Actor; FVector Base = FVector::ZeroVector; float Open = 0.0f; bool bGone = false; };
 	struct FStairSet { TArray<FStairWindow> Windows; float T = -1.0f; TWeakObjectPtr<AActor> Seal; FVector SealBase = FVector::ZeroVector; float SealOpen = 0.0f; };
 	FStairSet StairSets[2];                      // 0 = TS（天鹅后面，三层 → 二层），1 = TR（月亮浮雕后面，二层 → 一层）
+
+	// 夜里第二段（灰盒 MSHRINE / TWN / MOONBRIDGE）—— DysisDirectorTwins.cpp
+	void SetupTwins();
+	void AddTwinsInteracts();
+	void UpdateTwins(float Dt);
+	float StatueMoonLit(const FVector& FootCm) const;
+	int32 TwinState = 0;                         // 0 藏在墙里、1 墙透开了（在龛里）、2 正在拉出来、3 出来了（可以推）、4 并肩了
+	float TwinT = 0.0f, PolluxAz = 0.0f, PolluxLit = 0.0f, CastorLit = 0.0f, TwinLitClock = 0.0f;
+	bool bShrineTold = false;
+	TWeakObjectPtr<AActor> Pollux, Castor, TwinChain, MoonDeck, MoonShrineShard;
+	float PolluxYaw0 = 0.0f;
+	TWeakObjectPtr<UBoxComponent> PolluxBlock, ChainBlock;
+	TArray<TWeakObjectPtr<UBoxComponent>> MoonRails;
 
 	TMap<FName, TWeakObjectPtr<AActor>> Pieces;
 	TArray<FDysisInteract> Interacts;
