@@ -81,6 +81,12 @@ private:
 	TWeakObjectPtr<UDysisTimeComponent> CachedTime;
 	bool bZoneFromSurface = false;
 
+	// ── 光带着人走（窗光，灰盒 carry）──
+	void ApplyGreyboxCarry();
+	bool bCarryValid = false;
+	double CarryA = 0.0, CarryS = 0.0;   // 人在光上的位置：横向 0–1、沿光多少厘米
+	int32 CarrySerial = 0;               // 记这个位置时光的形状是第几版
+
 	// ── 落脚点和回档 ──
 	FVector LastSafeFootholdCm = FVector::ZeroVector;   // 上一个落脚点（脚底的位置）
 	bool bHasFoothold = false;

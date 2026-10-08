@@ -113,6 +113,31 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Beam")
 	float StandingGraceSeconds = 0.14f;
 
+	// ───── 窗光：完全照灰盒 v0.12 的算法（computeWindowBeam / setBeamFrame / beamIsWalkable） ─────
+
+	/** 灰盒里这束光的名字：isle（开场的光）/ b1 / b2 / iris / c / h1 / h2 / h3。
+	 *  填了（或者区域名是 beam:这些名字）就按灰盒算：窗的位置大小内置，被照亮的那一块窗、四个角各自照多远、
+	 *  能踩的面（光的下表面）、够不够长、坡度、雾，都和灰盒一致。空着的（镜光、圆眼光）先走旧算法。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Beam")
+	FName GreyboxId;
+
+	/** 是不是按灰盒算的窗光。 */
+	bool IsGreybox() const { return GreyboxIndex >= 0; }
+
+	/** 能踩的面上的坐标：A = 横向（0–1，从 b0 到 b1），S = 沿光走了多远（厘米）。灰盒 beamLocal / beamWorld。 */
+	void WorldToStrip(const FVector& PointCm, double& OutA, double& OutS) const;
+	FVector StripToWorld(double A, double S) const;
+
+	/** 光路两侧是深渊时有一道看不见的护栏（灰盒 beamRail）：脚的位置越过了边就拉回来。返回有没有动过。 */
+	bool ClampToRail(FVector& InOutFootCm) const;
+
+	/** 这束光的形状每重算一次加一（移动组件靠它知道“光挪了，人要跟着挪”）。 */
+	int32 GetFrameSerial() const { return FrameSerial; }
+
+	/** 测试用：把时刻摆到 H，立刻重算，返回这束光的状态（JSON，单位厘米，和 Tools/greybox/golden/greybox_beams.json 对得上）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Beam")
+	FString DebugSolve(float H);
+
 	// ───── 运行时 ─────
 
 	/** 按时刻 H 摆光（方向、长度、可见性、碰撞开关）。Tick 自动调（H 取关卡里第一个 DysisSky），也可外部显式调。 */
@@ -164,6 +189,35 @@ private:
 
 	/** 把玩家时间组件挂成本 Actor 的 Tick 前置（先算 H 再摆光）；Pawn 晚生成时在 Tick 里重试。 */
 	void TryAddTimePrerequisite();
+
+	// ── 窗光（灰盒算法）──
+	void UpdateGreybox(double H);
+	/** 灰盒 setBeamFrame：四个角、沿光的方向、从哪开始能踩。 */
+	void SetGreyboxFrame(const FVector Corners[4], const FVector& L, double StartOff, double WalkFrom, bool bHasMinZ, double MinZ);
+	void ApplyIsleGrow();
+	bool ComputeGreyboxWalkable() const;
+	void ApplyGreyboxComponents();
+	/** 从 Start 朝 Dir 打一条光线，返回被挡住的距离（厘米）；没挡住返回 −1。 */
+	double CastLight(const FVector& Start, const FVector& Dir, double Far) const;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UMaterialInstanceDynamic> VisualMID;
+
+	int32 GreyboxIndex = -1;       // 内置窗表里的下标；−1 = 不是灰盒窗光
+	int32 FrameSerial = 0;
+	double LastSolvedH = 1.0e9;
+	double SolveClock = 0.0;       // 离上次重算过了多久（机关挪动时没有 H 变化，也要定时重算）
+	// 灰盒 beam 对象上的那些量（厘米）
+	bool bFrameValid = false;
+	bool bClean = false;
+	double Lit = 0.0;
+	double Need = 0.0;
+	FVector FrameO = FVector::ZeroVector, FrameU = FVector::ZeroVector, FrameV = FVector::ZeroVector, FrameL = FVector::ForwardVector;
+	double FrameC[4] = { 0, 0, 0, 0 };
+	double FrameCFull[4] = { 0, 0, 0, 0 };
+	double FrameEdge[7] = { 0, 0, 0, 0, 0, 0, 0 };
+	FVector FrameB0 = FVector::ZeroVector, FrameB1 = FVector::ZeroVector, FrameFar = FVector::ZeroVector;
+	double FrameS0 = 0.0, FrameS1 = 0.0;
 
 	bool bWalkable = false;
 	bool bSomeoneStanding = false;

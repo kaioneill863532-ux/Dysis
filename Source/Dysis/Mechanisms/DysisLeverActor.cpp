@@ -1,4 +1,5 @@
 ﻿#include "DysisLeverActor.h"
+#include "World/DysisWorldState.h"
 #include "Save/DysisSaveSubsystem.h"
 #include "Surfaces/DysisMoonSurface.h"
 #include "Sky/DysisMPCComponent.h"
@@ -52,6 +53,9 @@ void ADysisLeverActor::Interact(APawn* Player, bool bFromFront)
 	bPulled = !bPulled;
 	OnToggled.Broadcast(bPulled);
 	SetActorTickEnabled(true);
+	// 水闸：开了瀑布流、雾升起来，光才显形、才能踩（全殿共用的状态在 UDysisWorldState）
+	if (!SluiceName.IsNone())
+		if (UDysisWorldState* State = UDysisWorldState::Get(this)) State->SetSluiceOpen(bPulled);
 	// 水闸语义（存档四口③④）：拉下 = 闸开——写进存档（只进不退），过节点写自动档（原子+备份）。
 	if (bPulled && GetWorld() && GetWorld()->GetGameInstance())
 	{

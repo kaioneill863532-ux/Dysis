@@ -26,6 +26,7 @@ void UDysisCharacterMovement::PinToBeam(ADysisBeamActor* Beam)
 	if (!Beam) return;
 	if (ADysisBeamActor* Old = StandingBeam.Get()) Old->NotifyStanding(false);
 	StandingBeam = Beam;
+	bCarryValid = false;
 	BeamPin = Beam->WorldToParam(FootCm());
 	PrePinFootCm = FootCm();   // §4 规格书"光被挡住时人退回原位"——记下站上光那一刻的位置
 	Beam->NotifyStanding(true);          // 站上：坡度放宽到 38°、雾淡也不消失（灰盒"已站上"锁存）
@@ -35,6 +36,7 @@ void UDysisCharacterMovement::UnpinBeam()
 {
 	if (ADysisBeamActor* Old = StandingBeam.Get()) Old->NotifyStanding(false);
 	StandingBeam = nullptr;
+	bCarryValid = false;
 }
 
 void UDysisCharacterMovement::RetreatFromBeam()
@@ -64,10 +66,29 @@ void UDysisCharacterMovement::TickComponent(float DeltaTime, ELevelTick TickType
 		if (RespawnTimer <= 0.0f) FinishRespawn();
 		return;
 	}
+	ApplyGreyboxCarry();   // 光挪了，人先跟着挪，再处理这一帧的走动
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (Velocity.Z < -MaxFallSpeedCm) Velocity.Z = -MaxFallSpeedCm;
 	HandleDysisFloors(DeltaTime);
 	UpdateRespawn(DeltaTime);
+}
+
+void UDysisCharacterMovement::ApplyGreyboxCarry()
+{
+	// 灰盒 applyCarry：人站在光上时记着自己在光上的位置（横向 A、沿光 S）；时间一变光就挪了，人挪到新的同一个位置上。
+	ADysisBeamActor* Beam = StandingBeam.Get();
+	if (!Beam || !Beam->IsGreybox() || !bCarryValid || !IsMovingOnGround() || !UpdatedComponent) return;
+	if (Beam->GetFrameSerial() == CarrySerial || !Beam->IsWalkableNow()) return;
+	CarrySerial = Beam->GetFrameSerial();
+	const FVector Delta = Beam->StripToWorld(CarryA, CarryS) - FootCm();
+	if (Delta.SizeSquared() < 0.01) return;
+	const FVector Before = UpdatedComponent->GetComponentLocation();
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+	// 光摆进了墙里、人跟不过去（水平差 5 cm 以上）：这一帧不挪
+	const FVector Now = UpdatedComponent->GetComponentLocation();
+	if (FVector::Dist2D(Now, Before + Delta) > 5.0)
+		UpdatedComponent->SetWorldLocation(Before, false, nullptr, ETeleportType::TeleportPhysics);
 }
 
 UDysisTimeComponent* UDysisCharacterMovement::ResolveTime()
@@ -134,7 +155,8 @@ void UDysisCharacterMovement::HandleDysisFloors(float DeltaTime)
 			// 如果 beam 已不可走（不是走出了光，是光本身塌了），退回原位而不是掉落。
 			if (ADysisBeamActor* Pinned = StandingBeam.Get())
 			{
-				if (!Pinned->IsWalkableNow())
+				// 窗光照灰盒：光没了就是没了，人掉下去（掉得深会回落脚点）。旧算法的镜光、圆眼光还是退回原位。
+				if (!Pinned->IsWalkableNow() && !Pinned->IsGreybox())
 					RetreatFromBeam();   // 光塌了 → 退回站上光之前的位置
 				else
 					UnpinBeam();       // 光还好，只是走出了范围 → 正常解钉
@@ -150,7 +172,24 @@ void UDysisCharacterMovement::HandleDysisFloors(float DeltaTime)
 
 	// ③ 携带：钉着且在地上 → 按参数反算新世界位（灰盒"光路会带着人走"）。beam 在本帧晚些时候（PostPhysics）
 	//    才按新 H 重摆，所以这里用的是上一帧摆好的变换——脚位与参数取自同一变换，几何自洽。
-	if (ADysisBeamActor* Beam = StandingBeam.Get())
+	if (ADysisBeamActor* Beam = StandingBeam.Get(); Beam && Beam->IsGreybox())
+	{
+		if (IsMovingOnGround())
+		{
+			// 护栏：两侧是深渊时往边上走会顺着光滑过去，而不是掉下去（灰盒 beamRail）
+			FVector Foot = FootCm();
+			if (Beam->ClampToRail(Foot))
+			{
+				FHitResult Hit;
+				SafeMoveUpdatedComponent(Foot - FootCm(), UpdatedComponent->GetComponentQuat(), true, Hit);
+			}
+			// 记下人在光上的位置，下一帧光挪了好跟着挪
+			Beam->WorldToStrip(FootCm(), CarryA, CarryS);
+			CarrySerial = Beam->GetFrameSerial();
+			bCarryValid = true;
+		}
+	}
+	else if (Beam)
 	{
 		if (IsMovingOnGround())
 		{

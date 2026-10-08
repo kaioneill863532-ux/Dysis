@@ -1,0 +1,78 @@
+﻿// 日落回廊 · 全殿共用的状态（灰盒里的 MIST、FLOW、ISLE_GROW 这几个全局量）：
+//   水闸开没开、中庭的雾升到哪了、开场那束光伸到哪了。光路能不能踩要问这里“这一点有没有雾”。
+// 一个世界一份（世界子系统），每帧自己更新。数值照灰盒 v0.12（updateNymph、updateIsleGrow、mistAt、shadowY）。
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Subsystems/WorldSubsystem.h"
+#include "DysisWorldState.generated.h"
+
+UCLASS()
+class DYSIS_API UDysisWorldState : public UTickableWorldSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	static UDysisWorldState* Get(const UObject* WorldContext);
+
+	// ───── 水闸、雾 ─────
+
+	/** 水闸开着：瀑布流、雾往上升。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	bool bSluiceOpen = false;
+
+	/** 雾的浓度 0–1（开闸后每秒 +0.1，关闸后每秒 −0.2）。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	float MistAmt = 0.0f;
+
+	/** 雾升到的高度（厘米；开闸后从水面起每秒升 3 m）。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	float MistFrontCm = -100.0f;
+
+	/** 瀑布的水量 0–1。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	float FlowK = 0.0f;
+
+	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
+	void SetSluiceOpen(bool bOpen);
+
+	/** 这一点的雾有多浓（≥ 0.85 算“在雾里”）：中庭里的雾，加上海峡上一直有的水沫。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|World")
+	float MistAt(FVector PointCm) const;
+
+	// ───── 开场的光 ─────
+
+	/** 人在岛上往神殿迈出一步（0.8 m）以后，光开始从殿里伸出来。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	bool bIsleGrowStarted = false;
+
+	/** 伸出来的进度 0–1（3 秒伸到岛上，到 1 才能踩）。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	float IsleGrowK = 0.0f;
+
+	// ───── 别的 ─────
+
+	/** 入夜了没有（接住最后一缕光以后）。 */
+	bool IsNight() const;
+
+	/** 远处岩岛的影子爬到多高（厘米）：太阳沉到它的山脊后面时，这个高度以下照不到太阳。 */
+	static double ShadowZ(const FVector& SunDir);
+
+	// ───── 测试用：把状态直接摆成某个样子（之后不再自动更新，直到 DebugRelease） ─────
+	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
+	void DebugSetMist(float Amt, float FrontCm);
+
+	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
+	void DebugSetIsleGrow(bool bStarted, float K);
+
+	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
+	void DebugRelease();
+
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
+
+private:
+	bool bDebugMist = false;
+	bool bDebugGrow = false;
+};
