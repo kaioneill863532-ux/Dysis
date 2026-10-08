@@ -24,14 +24,29 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float BeamCoyoteSeconds = 0.14f;
 
-	/** §7 一次掉下超过这个高度（厘米）→ 回上一个安全落脚点（灰盒 6.5 m = 650 cm）。 */
+	/** 一次掉下超过这个高度（厘米），落地时回上一个落脚点（灰盒 6.5 m）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Movement")
 	float FallRespawnThresholdCm = 650.0f;
 
-	/** §7 水面高度（厘米）：掉落中脚下 Z < 此值且无虚拟面 → 立即回档（"掉进水池、海里就回到上一个安全落脚点"）。
-	 *  默认 -45 = 水庭水面 y=-0.45m；海面在此以下（-16m），同一个门就够。 */
+	/** 最快下落速度（厘米 / 秒；灰盒 30 m/s）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Movement")
-	float WaterLevelCm = -45.0f;
+	float MaxFallSpeedCm = 3000.0f;
+
+	/** 回落脚点时画面黑下去 / 亮起来各用多久（秒；灰盒 0.38）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Movement")
+	float RespawnFadeSeconds = 0.38f;
+
+	/** 回上一个落脚点（R 键，或者掉得太深、掉进水里海里时自动触发）：画面黑一下，人回去。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Movement")
+	void RespawnNow();
+
+	/** 正在回落脚点的黑场里（这期间人不动）。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Movement")
+	bool IsRespawning() const { return bRespawning; }
+
+	/** 一共回过几次落脚点（测试用）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Movement")
+	int32 RespawnCount = 0;
 
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
@@ -47,12 +62,13 @@ protected:
 	 *  beam 变不可走（IsWalkableNow()=false）时传送回去。 */
 	void RetreatFromBeam();
 
-	/** §7 记录安全落脚点（在稳固地面上站稳时调）；光上/月石/桥上不记（规格书 §7 原话）。 */
-	void RecordFoothold();
-	/** §7 掉落超限 → 传送回上一个安全落脚点。 */
-	void RespawnAtFoothold();
-
 private:
+	/** 落脚点和回档（灰盒 updatePlayer 的后半段 + respawn）。 */
+	void UpdateRespawn(float DeltaTime);
+	/** 脚下这块地能不能记成落脚点：光上、月石上、几座桥上不记。 */
+	bool IsOnSafeGround();
+	void FinishRespawn();
+
 	/** 本帧 Super 之后处理：①地面是虚拟面且不亮 → Falling；②虚拟面回写；③光路钉人携带；④回档。 */
 	void HandleDysisFloors(float DeltaTime);
 
@@ -65,9 +81,12 @@ private:
 	TWeakObjectPtr<UDysisTimeComponent> CachedTime;
 	bool bZoneFromSurface = false;
 
-	// ── §7 回档 ──
-	FVector LastSafeFootholdCm = FVector::ZeroVector;   // 上一个安全落脚点
-	float FallStartZ = 0.0f;                             // 本次掉落的起始 Z
-	bool bFalling = false;                               // 是否在掉落中
-	int32 FramesOnGround = 0;                            // 稳固落地帧计数（≥3 帧才记落脚点）
+	// ── 落脚点和回档 ──
+	FVector LastSafeFootholdCm = FVector::ZeroVector;   // 上一个落脚点（脚底的位置）
+	bool bHasFoothold = false;
+	float SafeSeconds = 0.0f;                            // 站在地上累计的时间（灰盒 safeT：每满 0.4 s 记一次落脚点）
+	bool bAirborne = false;                              // 离了地（跳起或踏空）
+	float FallFromZ = 0.0f;                              // 离地那一刻脚的高度
+	bool bRespawning = false;
+	float RespawnTimer = 0.0f;
 };

@@ -1,4 +1,5 @@
 ﻿#include "DysisCharacterMovement.h"
+#include "DysisGreybox.h"
 #include "Optics/DysisVirtualSurface.h"
 #include "Sky/DysisTimeComponent.h"
 #include "UI/DysisCopy.h"
@@ -54,8 +55,19 @@ void UDysisCharacterMovement::RetreatFromBeam()
 
 void UDysisCharacterMovement::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+	if (bRespawning)
+	{
+		// 回落脚点的黑场里人不动（灰盒：respawning 期间不跑 updatePlayer）
+		ConsumeInputVector();
+		Velocity = FVector::ZeroVector;
+		RespawnTimer -= DeltaTime;
+		if (RespawnTimer <= 0.0f) FinishRespawn();
+		return;
+	}
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (Velocity.Z < -MaxFallSpeedCm) Velocity.Z = -MaxFallSpeedCm;
 	HandleDysisFloors(DeltaTime);
+	UpdateRespawn(DeltaTime);
 }
 
 UDysisTimeComponent* UDysisCharacterMovement::ResolveTime()
@@ -154,61 +166,80 @@ void UDysisCharacterMovement::HandleDysisFloors(float DeltaTime)
 			}
 		}
 	}
+}
 
-	// ④ §7 回档：掉落超限 / 掉水 → 回上一个安全落脚点；稳固落地时记录新落脚点。
+// ───────────────────────── 落脚点和回档（灰盒 updatePlayer 后半段 + respawn） ─────────────────────────
+
+bool UDysisCharacterMovement::IsOnSafeGround()
+{
+	// 在光上、月石上和几座桥上不记落脚点
+	if (StandingBeam.IsValid() || StandingSurface.IsValid()) return false;
+	if (Cast<ADysisBeamActor>(CurrentFloor.HitResult.GetActor())) return false;
+	if (UDysisTimeComponent* Time = ResolveTime())
+	{
+		const FString& Zone = Time->Zone;
+		if (Zone.StartsWith(TEXT("beam:")) || Zone.StartsWith(TEXT("ms:"))
+			|| Zone == TEXT("shadowbr") || Zone == TEXT("gbridge") || Zone == TEXT("rbridge") || Zone == TEXT("ledge"))
+			return false;
+	}
+	return true;
+}
+
+void UDysisCharacterMovement::UpdateRespawn(float DeltaTime)
+{
+	if (!CharacterOwner || bRespawning) return;
+	const FVector Foot = FootCm();
+	if (!bHasFoothold) { LastSafeFootholdCm = Foot; bHasFoothold = true; }   // 开局站的地方先当落脚点
+
 	if (IsMovingOnGround())
 	{
-		if (bFalling)
+		if (bAirborne)
 		{
-			// 落地了：掉落距离超限 → 回档；否则重置状态开始记新落脚点。
-			const float FallDist = FallStartZ - FootCm().Z;
-			if (FallDist > FallRespawnThresholdCm)
-			{
-				RespawnAtFoothold();
-			}
-			bFalling = false;
+			// 落地：这一次掉了多高
+			bAirborne = false;
+			if (FallFromZ - Foot.Z > FallRespawnThresholdCm) { RespawnNow(); return; }
 		}
-		// 稳固地面（非光/月石/桥——规格书 §7"在光上、月石上和几座桥上不记落脚点"）。
-		const bool bOnSolidGround = !StandingBeam.IsValid() && !StandingSurface.IsValid();
-		if (bOnSolidGround)
-		{
-			++FramesOnGround;
-			if (FramesOnGround >= 3) RecordFoothold();   // 站稳 3 帧才记（防走过时闪记）
-		}
+		SafeSeconds += DeltaTime;
+		if (SafeSeconds > 0.4f && IsOnSafeGround()) { LastSafeFootholdCm = Foot; SafeSeconds = 0.0f; }
 	}
-	else if (IsFalling())
+	else if (!bAirborne)
 	{
-		if (!bFalling) { bFalling = true; FallStartZ = FootCm().Z; }
+		bAirborne = true;
+		FallFromZ = Foot.Z;
+	}
 
-		// §7 掉水检测（规格书原话"掉进水池、海里就回到上一个安全落脚点"）：
-		// 掉落中脚下 Z 低于水面线 且 不在任何虚拟面上（踏片/大道/光柱）→ 立即回档。
-		if (FootCm().Z < WaterLevelCm && !StandingSurface.IsValid() && !StandingBeam.IsValid())
-		{
-			RespawnAtFoothold();
-			bFalling = false;
-		}
-	}
-	else
-	{
-		FramesOnGround = 0;
-	}
+	// 掉进水池（或瀑布那一段的水里）、掉进海里
+	const float R = DysisGB::ROf(Foot);
+	const bool bOverWater = R < DysisGB::R_POOL || (R < DysisGB::R_IN && DysisGB::InArc(DysisGB::AzOf(Foot), DysisGB::SEAM0, DysisGB::SEAM1));
+	if ((bOverWater && Foot.Z < DysisGB::WATER_Z - 50.0f) || Foot.Z < DysisGB::SEA_Z + 150.0f) RespawnNow();
 }
 
-void UDysisCharacterMovement::RecordFoothold()
+void UDysisCharacterMovement::RespawnNow()
 {
-	LastSafeFootholdCm = FootCm();
+	if (bRespawning || !bHasFoothold || !CharacterOwner) return;
+	bRespawning = true;
+	RespawnTimer = RespawnFadeSeconds;
+	Velocity = FVector::ZeroVector;
+	if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->FadeTo(1.0f, RespawnFadeSeconds * 0.9f);
 }
 
-void UDysisCharacterMovement::RespawnAtFoothold()
+void UDysisCharacterMovement::FinishRespawn()
 {
-	if (LastSafeFootholdCm.IsZero()) return;
-	if (ACharacter* C = CharacterOwner)
+	bRespawning = false;
+	++RespawnCount;
+	ACharacter* C = CharacterOwner;
+	if (!C) return;
+	UnpinBeam();
+	const float HalfHeight = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	C->SetActorLocation(LastSafeFootholdCm + FVector(0, 0, HalfHeight + 2.0), false, nullptr, ETeleportType::TeleportPhysics);
+	Velocity = FVector::ZeroVector;
+	SetMovementMode(MOVE_Falling);   // 落 2 厘米站稳
+	bAirborne = false;
+	FallFromZ = LastSafeFootholdCm.Z;
+	SafeSeconds = 0.0f;
+	if (ADysisHUD* Hud = ADysisHUD::Get(this))
 	{
-		const float HalfHeight = C->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-		C->SetActorLocation(LastSafeFootholdCm + FVector(0, 0, HalfHeight + 2.0), false, nullptr, ETeleportType::TeleportPhysics);
-		SetMovementMode(MOVE_Falling);
-		Velocity = FVector::ZeroVector;
-		// 文案表·游戏提示：坠落后回档 → "作为十二时辰之一，狄西斯轻松回到了上一个落脚点……"
-		ADysisHUD::Notify(GetWorld(), DysisCopy::RespawnHint, 5.0f);
+		Hud->FadeTo(0.0f, RespawnFadeSeconds);
+		Hud->ShowNotification(FText::FromString(DysisCopy::RespawnHint), 5.0f);
 	}
 }

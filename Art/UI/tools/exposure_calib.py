@@ -79,6 +79,6 @@ class R:
         for f in glob.glob(SAVED + "SaveGames/Dysis*.sav") + glob.glob(SAVED + "SaveGames/Dysis*.bak"):
             try: os.remove(f)
             except Exception: pass
-        say("DONE")
+        say("DONE"); s.g = None; import gc; gc.collect()   # 放掉对 PIE 里那些对象的引用
 if os.path.exists(OUT): os.remove(OUT)
 _ex = R(); _ex.h = unreal.register_slate_post_tick_callback(_ex.tick)

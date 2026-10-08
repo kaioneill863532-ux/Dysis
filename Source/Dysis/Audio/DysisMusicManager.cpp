@@ -1,4 +1,4 @@
-// 狄西斯的日落回廊 · 背景音乐管理器（来自美术/音频侧 zip 包 2026-10-06）
+﻿// 狄西斯的日落回廊 · 背景音乐管理器（来自美术/音频侧 zip 包 2026-10-06）
 #include "DysisMusicManager.h"
 
 #include "Components/AudioComponent.h"
