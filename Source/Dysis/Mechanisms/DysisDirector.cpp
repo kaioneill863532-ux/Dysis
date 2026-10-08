@@ -281,6 +281,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateLevelTitle();
 	UpdateStairs(DeltaTime);
 	UpdateCatch(DeltaTime);
+	UpdateSfx();
 }
 
 // ───────────────────────── 关卡标题 ─────────────────────────

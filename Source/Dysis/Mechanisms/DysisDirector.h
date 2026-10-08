@@ -402,6 +402,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> EndingDialogue;
 
+	/** 机关的音效 —— DysisDirectorSfx.cpp：每帧看一遍各个机关的状态，哪个变了就在它那里放对应的一次性音效
+	 *  （音效表在 Audio/DysisSfxDefaults.cpp；脚步、环境声、界面声还是 ADysisSfxDirector 管）。 */
+	void UpdateSfx();
+	bool SfxRose(FName Key, float Now, float Threshold);
+	bool SfxFell(FName Key, float Now, float Threshold);
+	bool SfxChanged(FName Key, float Now);
+	void Sfx(const TCHAR* Event, const FVector& At) const;
+	FVector PieceLoc(FName Label, const FVector& Fallback) const;
+	TMap<FName, float> SfxPrev;
+
 	/** 关卡标题（灰盒 LEVELS / updateLevel）：头一次走进某一段，屏幕中间出一次标题。 */
 	void UpdateLevelTitle();
 	int32 SeenLevel = -1;

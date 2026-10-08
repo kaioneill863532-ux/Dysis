@@ -56,6 +56,7 @@ def main():
     for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DysisPrologueDirector): a.destroy_actor()
     for m in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DysisMusicManager): m.stop_music(0.0)
     pc.get_hud().start_game(True)
+    if os.path.exists(SAVED + "sfx_debug.flag"): unreal.SystemLibrary.execute_console_command(w, "Dysis.Sfx.Debug 1")   # 想看这次试玩放了哪些音效：先建一个空文件 Saved/sfx_debug.flag
     yield from wait(90)
     director = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DysisDirector)[0]
     beams = {str(b.get_editor_property("greybox_id")): b for b in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DysisBeamActor)}
