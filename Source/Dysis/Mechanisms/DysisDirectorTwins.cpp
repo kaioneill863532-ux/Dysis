@@ -51,6 +51,7 @@ namespace
 		Box->SetCanEverAffectNavigation(false);
 		Box->SetHiddenInGame(true);
 		Box->SetBoxExtent(FVector(FVector::Dist(A, B) * 0.5 + 1.5, HalfW, 2.0));
+		Box->ComponentTags.Add(TEXT("DysisOneWay"));
 		Box->RegisterComponent();
 		Owner->AddInstanceComponent(Box);
 		Box->SetWorldLocationAndRotation((A + B) * 0.5 - Rot.GetUpVector() * 2.0, Rot);

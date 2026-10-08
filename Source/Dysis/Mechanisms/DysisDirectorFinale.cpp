@@ -68,6 +68,7 @@ void ADysisDirector::SetupFinale()
 		Box->SetCanEverAffectNavigation(false);
 		Box->SetHiddenInGame(true);
 		Box->SetBoxExtent(FVector(FVector::Dist(A, B) * 0.5, FinHalfW, 2.0));
+		Box->ComponentTags.Add(TEXT("DysisOneWay"));
 		Box->RegisterComponent();
 		Deck->AddInstanceComponent(Box);
 		Box->SetWorldLocationAndRotation((A + B) * 0.5 - Rot.GetUpVector() * 2.0, Rot);
@@ -112,7 +113,7 @@ void ADysisDirector::SetupFinale()
 			Floor->Group = TEXT("ShadowBridge");
 			Floor->Tags.Add(TEXT("DysisZone=shadowbr"));
 			Floor->FinishSpawning(FTransform::Identity);
-			if (Floor->Box) { Floor->Box->SetMobility(EComponentMobility::Movable); Floor->Box->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
+			if (Floor->Box) { Floor->Box->SetMobility(EComponentMobility::Movable); Floor->Box->SetCollisionEnabled(ECollisionEnabled::NoCollision); Floor->Box->ComponentTags.Add(TEXT("DysisOneWay")); }
 			ShadowFloor = Floor;
 		}
 

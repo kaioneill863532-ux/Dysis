@@ -185,6 +185,7 @@ void ADysisDirector::SetupRainbow()
 			Box->SetCanEverAffectNavigation(false);
 			Box->SetHiddenInGame(true);
 			Box->SetBoxExtent(FVector(FVector::Dist(P0, P1) * 0.5 + 0.5, RbwWidth * 0.5, 2.0));
+			Box->ComponentTags.Add(TEXT("DysisOneWay"));
 			Box->RegisterComponent();
 			Br->AddInstanceComponent(Box);
 			Box->SetWorldLocationAndRotation((P0 + P1) * 0.5 - Rot.GetUpVector() * 2.0, Rot);

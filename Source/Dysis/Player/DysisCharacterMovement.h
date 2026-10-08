@@ -87,6 +87,15 @@ private:
 	double CarryA = 0.0, CarryS = 0.0;   // 人在光上的位置：横向 0–1、沿光多少厘米
 	int32 CarrySerial = 0;               // 记这个位置时光的形状是第几版
 
+	// ── 光做的路只托脚、不挡头 ──
+	/** 灰盒里光路、虹桥、月桥、影桥这些“能踩的面”只在脚踩上去时才算数，从下面、从旁边都能穿过去
+	 *  （比如沿光阶往上走时，头顶横着一束镜光）。UE 里它们是实心的薄板，所以每帧看一遍：
+	 *  脚比板面低 0.5 m 以上（迈不上去）的那些板，这一会儿不挡人。带 Tag “DysisOneWay” 的组件都算。 */
+	void UpdateOneWayFloors(float DeltaTime);
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> OneWayFloors;
+	TSet<TWeakObjectPtr<UPrimitiveComponent>> OneWayIgnored;
+	float OneWayClock = 0.0f;
+
 	// ── 镜光上不碰头 ──
 	/** 镜光通到日之龛石台的最后几米从四层楼板底下贴着过去。灰盒里人走路没有头顶碰撞，
 	 *  这里人站在镜光上时也不让那块楼板挡着；落到别的地面上以后恢复。 */

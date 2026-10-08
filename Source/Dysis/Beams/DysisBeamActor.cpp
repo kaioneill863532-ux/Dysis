@@ -82,6 +82,7 @@ ADysisBeamActor::ADysisBeamActor()
 	if (Cube.Succeeded()) Visual->SetStaticMesh(Cube.Object);
 
 	Collision = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Collision"));
+	Collision->ComponentTags.Add(TEXT("DysisOneWay"));   // 光只托脚、不挡头（见 UDysisCharacterMovement::UpdateOneWayFloors）
 	Collision->SetupAttachment(RootComponent);
 	Collision->SetMobility(EComponentMobility::Movable);
 	Collision->SetCollisionProfileName(TEXT("BlockAll"));   // 地板判定走 Pawn 通道扫胶囊，BlockAll 已挡

@@ -65,8 +65,9 @@ def main():
     d = fin()
     check(not d["goddess"] and d["halfExt"] == 0 and not d["halfOn"] and not d["placed"], "开局：女神没亮，半桥还没有")
     director.debug_set_night(True); director.debug_set_mirror_slot(1); director.debug_show_moon_bridge()
+    yield from wait(120)     # 等月桥显形、能踩了再站上去（不然会从还没成形的桥上掉下去，回一次落脚点）
     go(PTS[40], 10.0)
-    yield from wait(360)
+    yield from wait(300)
 
     # ── A 月桥上一步步往下走 ──
     fl = {f["step"]: f for f in G["flow"]}

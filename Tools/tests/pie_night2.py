@@ -141,7 +141,7 @@ def main():
     yield from wait(60)
     d = tw(); exp = fl["push"]
     check(d["joined"] and abs(d["polluxAz"] - TW["endAz"]) < 0.01 and d["lit"] > 0.99 and d["litC"] > 0.99 and abs(took - exp["seconds"]) < 1.0 and behind,
-          "顺时针一路推回卡斯托耳身边：用了 %.1f 秒（灰盒 %.1f 秒），停在方位 %.1f°，两尊像都在月光里，并肩了；%s" % (took, exp["seconds"], d["polluxAz"], state()[:30]))
+          "顺时针一路推回卡斯托耳身边：用了 %.1f 秒（灰盒 %.1f 秒），停在方位 %.1f°，并肩=%s，月光照着 波吕丢刻斯 %.2f / 卡斯托耳 %.2f，人一直在他身后=%s；%s" % (took, exp["seconds"], d["polluxAz"], d["joined"], d["lit"], d["litC"], behind, state()[:30]))
     check(d["bridgeK"] == 1 and not d["dormant"] and d["railsOn"] == d["rails"] and not d["chainOn"] and not d["chainShown"], "月桥出现（护栏 %d 块立起来），桥头的铜链收起来了" % d["railsOn"])
     look(30.0, -12.0)
     yield from wait(10)

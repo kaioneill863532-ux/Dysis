@@ -5,7 +5,9 @@
 #include "Sky/DysisTimeComponent.h"
 #include "UI/DysisCopy.h"
 #include "UI/DysisHUD.h"
+#include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "EngineUtils.h"
 #include "GameFramework/Character.h"
 
 UDysisCharacterMovement::UDysisCharacterMovement()
@@ -67,12 +69,52 @@ void UDysisCharacterMovement::TickComponent(float DeltaTime, ELevelTick TickType
 		if (RespawnTimer <= 0.0f) FinishRespawn();
 		return;
 	}
+	UpdateOneWayFloors(DeltaTime);
 	ApplyGreyboxCarry();   // 光挪了，人先跟着挪，再处理这一帧的走动
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (Velocity.Z < -MaxFallSpeedCm) Velocity.Z = -MaxFallSpeedCm;
 	HandleDysisFloors(DeltaTime);
 	UpdateBeamHeadroom();
 	UpdateRespawn(DeltaTime);
+}
+
+void UDysisCharacterMovement::UpdateOneWayFloors(float DeltaTime)
+{
+	UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(UpdatedComponent);
+	UWorld* World = GetWorld();
+	if (!Body || !World) return;
+	// 每秒重新找一遍带 Tag 的板（光是开局后才生成的，有的板后来才出现）
+	OneWayClock -= DeltaTime;
+	if (OneWayClock <= 0.0f)
+	{
+		OneWayClock = 1.0f;
+		OneWayFloors.Reset();
+		for (TActorIterator<AActor> It(World); It; ++It)
+			It->ForEachComponent<UPrimitiveComponent>(false, [this](UPrimitiveComponent* C) { if (C->ComponentHasTag(TEXT("DysisOneWay"))) OneWayFloors.Add(C); });
+	}
+	const FVector Foot = FootCm();
+	for (const TWeakObjectPtr<UPrimitiveComponent>& Weak : OneWayFloors)
+	{
+		UPrimitiveComponent* C = Weak.Get();
+		if (!C) continue;
+		bool bIgnore = false;
+		if (C->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
+		{
+			// 板在自己坐标里的半尺寸：盒子组件直接问；引擎方块（100 cm）按缩放算
+			const UBoxComponent* Box = Cast<UBoxComponent>(C);
+			const FVector Half = Box ? Box->GetScaledBoxExtent() : C->GetComponentScale().GetAbs() * 50.0;
+			const FTransform& T = C->GetComponentTransform();
+			const FVector D = Foot - T.GetLocation();
+			const double X = FVector::DotProduct(D, T.GetUnitAxis(EAxis::X)), Y = FVector::DotProduct(D, T.GetUnitAxis(EAxis::Y)), Z = FVector::DotProduct(D, T.GetUnitAxis(EAxis::Z));
+			// 人在板的正下方（或者贴着边）、脚比板面低出一步迈不上去的高度：不挡
+			if (FMath::Abs(X) <= Half.X + 45.0 && FMath::Abs(Y) <= Half.Y + 45.0) bIgnore = Z < Half.Z - 50.0;
+		}
+		if (bIgnore != OneWayIgnored.Contains(Weak))
+		{
+			Body->IgnoreComponentWhenMoving(C, bIgnore);
+			if (bIgnore) OneWayIgnored.Add(Weak); else OneWayIgnored.Remove(Weak);
+		}
+	}
 }
 
 void UDysisCharacterMovement::UpdateBeamHeadroom()
