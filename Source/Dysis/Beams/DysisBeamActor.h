@@ -134,6 +134,12 @@ public:
 	/** 这束光的形状每重算一次加一（移动组件靠它知道“光挪了，人要跟着挪”）。 */
 	int32 GetFrameSerial() const { return FrameSerial; }
 
+	/** 这束光此刻有没有（灰盒 beam.valid）：窗被照亮了、光射得出去。 */
+	bool HasLight() const { return IsGreybox() && bFrameValid; }
+
+	/** 这一点在不在光柱里（灰盒 insidePrism）。TolCm：比光照到的地方再往前多算多少。 */
+	bool ContainsPoint(const FVector& PointCm, double TolCm = 15.0) const;
+
 	/** 测试用：把时刻摆到 H，立刻重算，返回这束光的状态（JSON，单位厘米，和 Tools/greybox/golden/greybox_beams.json 对得上）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Beam")
 	FString DebugSolve(float H);

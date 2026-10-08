@@ -1,7 +1,8 @@
 # 给“机关总管”（ADysisDirector）准备关卡（UE 编辑器 Python，可以重复跑；跑完存关卡）：
 #   1. 每个模型部件（标签以 SM_ 开头）带上一个和标签一样的 Tag——运行时没有标签，总管靠 Tag 找部件。
 #   2. L1 的两个机关合成一个：留下西南那个（A），挪到两处沿回廊走的正中间（方位 328.5°，贴外墙），B 的部件删掉。
-#   3. 已经由总管接手的旧玩法 Actor 删掉（水闸拉杆、机关 A / B、两块石板的滑动器、瀑布驱动器、屋顶踏步、接光、金苹果），免得两套逻辑打架。
+#   3. 已经由总管接手的旧玩法 Actor 删掉（水闸拉杆、机关 A / B、两块石板的滑动器、瀑布驱动器、屋顶踏步、接光、金苹果、
+#      三相像的镜光源和日之龛、虹那条支线的对齐判定 / 棱镜 / 窗台和铜柱的驱动器 / 虹之龛），免得两套逻辑打架。
 import unreal, math
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
 actors = list(sub.get_all_level_actors())
@@ -38,7 +39,8 @@ gone = []
 for lab in ("SM_Mech_LeverB_Base", "SM_Mech_LeverB_Arm", "SM_Mech_LeverB_Chain",
             "DysisLeverA", "DysisLeverB", "DysisLeverSluice", "DysisSlider_b2", "DysisSlider_iris", "Mech_Waterfall",
             "DysisRoofSteps", "DysisCatchLight", "DysisGoldenApple",
-            "DysisMirrorSource", "Niche_Sun", "Mech_SunNicheLid"):
+            "DysisMirrorSource", "Niche_Sun", "Mech_SunNicheLid",
+            "DysisRainbowAlign", "DysisPrism", "Mech_PrismColumn", "Mech_SillLedge", "Niche_Rainbow"):
     a = by_label.get(lab)
     if not a: continue
     for ch in a.get_attached_actors():      # 挂在它下面的模型部件留着

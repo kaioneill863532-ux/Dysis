@@ -465,7 +465,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 		{
 			const double U = (i + 0.5) / NU, V = (j + 0.5) / NV;
 			const FVector P = DysisGB::PolarCm(W.Az - HalfDeg + 2.0 * HalfDeg * U, DysisGB::R_IN - 2.0, FMath::Lerp(double(W.Z0Cm), double(W.Z0Cm + W.HeightCm), V));
-			if (P.Z < ShadowZ) continue;
+			if (P.Z < ShadowZ || UDysisWorldState::InIsleShadow(P, Sun)) continue;
 			if (CastLight(P + Sun * 0.1, Sun, 40000.0) < 0.0)
 			{
 				++LitCount;
@@ -621,7 +621,7 @@ void ADysisBeamActor::UpdateGreyboxMirror(double H)
 			{
 				const double U = (i + 0.5) / NU, V = (j + 0.5) / NV;
 				const FVector P = M.Center + M.U * ((U - 0.5) * M.WidthCm) + M.V * ((V - 0.5) * M.HeightCm) + M.N * 8.0;
-				if (CastLight(P + LightDir * 2.0, LightDir, 40000.0) < 0.0)
+				if ((bMoon || !UDysisWorldState::InIsleShadow(P, LightDir)) && CastLight(P + LightDir * 2.0, LightDir, 40000.0) < 0.0)
 				{
 					++Hit;
 					U0 = FMath::Min(U0, U - 0.5 / NU); U1 = FMath::Max(U1, U + 0.5 / NU);
@@ -749,6 +749,21 @@ void ADysisBeamActor::WorldToStrip(const FVector& P, double& OutA, double& OutS)
 FVector ADysisBeamActor::StripToWorld(double A, double S) const
 {
 	return FrameB0 + (FrameB1 - FrameB0) * A + FrameL * S;
+}
+
+bool ADysisBeamActor::ContainsPoint(const FVector& P, double TolCm) const
+{
+	// 灰盒 insidePrism：把点换成光柱自己的坐标（沿窗宽 0–1、沿窗高 0–1、沿光多少厘米），再看有没有超出照到的地方
+	if (!HasLight()) return false;
+	const FVector D = P - FrameO, VxL = FVector::CrossProduct(FrameV, FrameL);
+	const double Det = FVector::DotProduct(FrameU, VxL);
+	if (FMath::Abs(Det) < 1.0e-9) return false;
+	const double X = FVector::DotProduct(D, VxL) / Det;
+	const double Y = FVector::DotProduct(FrameU, FVector::CrossProduct(D, FrameL)) / Det;
+	const double S = FVector::DotProduct(FrameU, FVector::CrossProduct(FrameV, D)) / Det;
+	if (X < -0.02 || X > 1.02 || Y < -0.02 || Y > 1.02 || S < 0.0) return false;
+	const double Reach = FMath::Lerp(FMath::Lerp(FrameC[0], FrameC[1], X), FMath::Lerp(FrameC[2], FrameC[3], X), Y);
+	return S <= Reach + TolCm;
 }
 
 bool ADysisBeamActor::ClampToRail(FVector& Foot) const

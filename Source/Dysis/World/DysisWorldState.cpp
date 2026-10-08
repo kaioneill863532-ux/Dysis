@@ -99,6 +99,14 @@ double UDysisWorldState::ShadowZ(const FVector& SunDir)
 	return WS_FAR_ISLE_RIDGE - D * FMath::Tan(Alt);
 }
 
+bool UDysisWorldState::InIsleShadow(const FVector& P, const FVector& SunDir)
+{
+	const double Alt = FMath::Asin(FMath::Clamp(double(SunDir.Z), -1.0, 1.0));
+	if (Alt <= 0.0) return false;   // 太阳落下去以后挡板远在天上，不管事（夜里照的是月亮）
+	const FVector Hz = FVector(SunDir.X, SunDir.Y, 0.0).GetSafeNormal();
+	return P.Z <= ShadowZ(SunDir) + FVector::DotProduct(P, Hz) * FMath::Tan(Alt);
+}
+
 float UDysisWorldState::MistAt(FVector P) const
 {
 	const float R = DysisGB::ROf(P);

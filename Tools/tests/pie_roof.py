@@ -155,7 +155,8 @@ def main():
         pawn.add_movement_input(unreal.Vector(tx + math.cos(t) * corr, ty + math.sin(t) * corr, 0), 1.0, False); yield
     yield from wait(30)
     f = foot()
-    check("zone=L3" in state() and abs(f[2] - 2300) < 6 and mv.get_editor_property("respawn_count") == 0, "沿夜里的楼梯走到四层：脚高 %.0f cm，%s" % (f[2], state()[:60]))
+    a, r = az_r()
+    check("zone=L3" in state() and abs(f[2] - 2300) < 6 and mv.get_editor_property("respawn_count") == 0, "沿夜里的楼梯走到四层：脚高 %.0f cm，方位 %.1f° 半径 %.0f，%s" % (f[2], a, r, state()[:60]))
     yield from shoot(w, "走下楼梯到四层")
     say("全部通过" if bad[0] == 0 else "有 %d 条没过" % bad[0])
 

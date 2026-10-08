@@ -15,6 +15,7 @@
 #include "DysisDirector.generated.h"
 
 class UStaticMeshComponent;
+class UStaticMesh;
 class UBoxComponent;
 class UDysisTimeComponent;
 struct FDysisRoofPieceSpec;
@@ -112,6 +113,47 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	void DebugSetNight(bool bNight);
 
+	// ───── 虹那条支线（伊莉丝浮雕 → 虹桥 → 窗台石沿和虹之龛 → 棱镜 → 塞勒涅）—— DysisDirectorRainbow.cpp ─────
+
+	/** 伊莉丝浮雕解开了：影子的头落进了人形，虹醒过来。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bReliefDone = false;
+
+	/** 虹桥现在能不能踩（长到头以后能踩；入夜以后整座消失）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bBridgeOn = false;
+
+	/** 南窗下的石沿和虹之龛从墙里伸出来多少（0–1）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	float SillK = 0.0f;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bIrisNicheOpen = false;
+
+	/** 棱镜的铜柱从窗台里升起来多少（0–1）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	float PrismExt = 0.0f;
+
+	/** 棱镜转到第几格（8 格：第 0 格哪一色都不对，第 1–7 格依次让红…紫落在塞勒涅的眼睛上）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	int32 PrismSlot = 0;
+
+	/** 靛色的光落进了塞勒涅的眼睛（她醒了）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bSeleneOn = false;
+
+	/** 测试用：这条支线现在的样子（JSON）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeRainbow() const;
+
+	/** 测试用：棱镜在第 Slot 格、时刻 H 时，七色各落在哪（JSON：七个点，照不到的是 null；near = 哪一色落在塞勒涅眼睛上）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugPrismHits(int32 Slot, float H) const;
+
+	/** 测试用：把“影子对上了多少”清零（一个个位置试的时候用，免得真的解开）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugResetRelief();
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -173,6 +215,55 @@ private:
 	FQuat SunLidBase = FQuat::Identity;
 	FVector SunShardBase = FVector::ZeroVector;
 	float SunNicheT = 0.0f;
+
+	// 虹那条支线（灰盒 IRISREL / RB / BRIDGE / SILL / PRISM / SELENE）—— DysisDirectorRainbow.cpp
+	void SetupRainbow();
+	void AddRainbowInteracts();
+	void UpdateIrisRelief(float Dt);
+	void UpdateRainbow(float Dt);
+	void PlaceSill(float K);
+	void SetBridgeOn(bool bOn);
+	void PlacePrism();
+	/** 从 Start 朝 Dir 看过去有没有被挡住（人、光自己不算）。 */
+	bool RainbowSeesLight(const FVector& Start, const FVector& Dir) const;
+	/** 一道色光从棱镜出去落到哪里。 */
+	bool SpectrumHit(const FVector& OutDir, FVector& OutPos, FVector& OutNormal) const;
+	UStaticMeshComponent* MakeGlow(UStaticMesh* Mesh, const FLinearColor& Color, float Intensity);
+
+	TWeakObjectPtr<class ADysisBeamActor> IrisBeam;
+	float ReliefAlign = 0.0f, ReliefMissCm = 900.0f;
+	float RainbowT = 0.0f;                   // 浮雕解开以后过了多久（灰盒 RB.active）
+	float BridgeK = 0.0f;
+	TWeakObjectPtr<AActor> BridgeActor;
+	TArray<TWeakObjectPtr<UBoxComponent>> BridgeFloor;   // 能踩的面：一段段薄板
+	TArray<TWeakObjectPtr<UBoxComponent>> BridgeRails;
+	struct FSillPart { TWeakObjectPtr<AActor> Actor; FVector Base = FVector::ZeroVector; float Yaw0 = 0.0f; bool bSolid = false; };
+	TArray<FSillPart> SillParts;             // 石沿、龛的背板、两扇门、碎片
+	FVector SillOffset = FVector::ZeroVector;
+	float IrisNicheT = 0.0f;
+	struct FPrismPart { TWeakObjectPtr<AActor> Actor; FVector Base = FVector::ZeroVector; float Yaw0 = 0.0f; };
+	TArray<FPrismPart> PrismParts;           // 铜柱、棱镜、铜缝、转盘
+	TWeakObjectPtr<UBoxComponent> PrismBlock;
+	float PrismYawDeg = 0.0f, PrismWheelDeg = 0.0f;
+	FVector PrismHitPos[7];
+	bool bPrismHit[7] = { false, false, false, false, false, false, false };
+	int32 SeleneColor = -1;
+	float SeleneLit = 0.0f, SeleneTalkIn = -1.0f;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> PlaneMesh;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> BridgeMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> BandsMID;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> BandsPlane;
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> PrismRays;
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> PrismSpots;
+	UPROPERTY()
+	TObjectPtr<class UDysisDialogueComponent> SeleneDialogue;
 
 	TMap<FName, TWeakObjectPtr<AActor>> Pieces;
 	TArray<FDysisInteract> Interacts;

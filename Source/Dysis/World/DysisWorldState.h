@@ -93,6 +93,11 @@ public:
 	/** 远处岩岛的影子爬到多高（厘米）：太阳沉到它的山脊后面时，这个高度以下照不到太阳。 */
 	static double ShadowZ(const FVector& SunDir);
 
+	/** 这一点朝太阳看过去，是不是被远处岩岛挡着（灰盒 placeOccluder 的那块挡板）。
+	 *  岛影的边界不是水平的：ShadowZ 是它在殿中心的高度，往太阳那一侧每走 1 m 高出 tan(太阳高度) m。
+	 *  只在日落前后有区别（太阳高的时候影子边界远在地面以下）。 */
+	static bool InIsleShadow(const FVector& PointCm, const FVector& SunDir);
+
 	// ───── 测试用：把状态直接摆成某个样子（之后不再自动更新，直到 DebugRelease） ─────
 	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
 	void DebugSetMist(float Amt, float FrontCm);

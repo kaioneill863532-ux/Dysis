@@ -178,7 +178,7 @@ void ADysisDirector::UpdateMirrors(float Dt)
 	};
 	auto CenterLit = [&](const FVector& Dir) { return MirrorSeesLight(Center + (Face + FVector(0.0, 0.0, 0.3)) * 15.0, Dir); };
 	int32 Form = 0;
-	if (bDay && Facing(Sun) && CenterLit(Sun)) Form = 1;
+	if (bDay && Facing(Sun) && !UDysisWorldState::InIsleShadow(Center, Sun) && CenterLit(Sun)) Form = 1;
 	else if (bNight && Facing(Moon) && CenterLit(Moon)) Form = 2;
 
 	bool bChanged = Form != MirrorForm;

@@ -36,6 +36,8 @@ ADysisDirector::ADysisDirector()
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Plane(TEXT("/Engine/BasicShapes/Plane.Plane"));
+	if (Plane.Succeeded()) PlaneMesh = Plane.Object;
 
 	SluiceMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SluiceMarker"));
 	SluiceMarker->SetupAttachment(RootComponent);
@@ -106,6 +108,7 @@ void ADysisDirector::BeginPlay()
 	UpdateWaterfall();
 	SetupRoof();
 	SetupMirror();
+	SetupRainbow();
 	BuildInteracts();
 }
 
@@ -163,6 +166,7 @@ void ADysisDirector::BuildInteracts()
 		Interacts.Add(MoveTemp(I));
 	}
 	AddMirrorInteracts();
+	AddRainbowInteracts();
 }
 
 const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
@@ -261,5 +265,6 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateCrown(DeltaTime);
 	UpdateMirrors(DeltaTime);
 	UpdateNiches(DeltaTime);
+	UpdateIrisRelief(DeltaTime);
 	UpdateCatch(DeltaTime);
 }
