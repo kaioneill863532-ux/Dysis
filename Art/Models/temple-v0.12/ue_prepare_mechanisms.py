@@ -37,7 +37,8 @@ print("机关 A 的部件挪了：", moved)
 gone = []
 for lab in ("SM_Mech_LeverB_Base", "SM_Mech_LeverB_Arm", "SM_Mech_LeverB_Chain",
             "DysisLeverA", "DysisLeverB", "DysisLeverSluice", "DysisSlider_b2", "DysisSlider_iris", "Mech_Waterfall",
-            "DysisRoofSteps", "DysisCatchLight", "DysisGoldenApple"):
+            "DysisRoofSteps", "DysisCatchLight", "DysisGoldenApple",
+            "DysisMirrorSource", "Niche_Sun", "Mech_SunNicheLid"):
     a = by_label.get(lab)
     if not a: continue
     for ch in a.get_attached_actors():      # 挂在它下面的模型部件留着

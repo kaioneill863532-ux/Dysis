@@ -50,6 +50,10 @@ namespace
 	constexpr double GB_TERR_Z = -120.0, GB_TERR_EDGE_N = 3205.828;   // 北面台地的高度、崖边离内墙多远
 	constexpr double GB_BEAM_PAD = 35.0;                         // 能踩的面比光两侧各宽 0.35 m
 	constexpr double GB_FAR = 12000.0;                           // 光最远照 120 m
+	// 三相像的镜光：灰盒 CROSS.T / CROSS.Mc —— 光要够到的那一点（日之龛石台内沿往里 0.35 m、台面上 0.3 m），和它离镜子下沿的距离
+	const FVector GB_MIRROR_CROSS_T(-136.305, 1296.857, 2030.0);
+	constexpr double GB_MIRROR_CROSS_DIST = 2629.0;
+	constexpr double GB_MIRROR_WALK_PAST = 45.0;                 // 能踩的面比那一点再多铺 0.45 m
 
 	int32 FindGreyboxWindow(const FString& Id)
 	{
@@ -122,8 +126,10 @@ void ADysisBeamActor::BeginPlay()
 		FString Id = GreyboxId.IsNone() ? FString() : GreyboxId.ToString();
 		if (Id.IsEmpty() && bPrologueBeam) Id = TEXT("isle");
 		if (Id.IsEmpty() && !bFromMirror && !bOculusBeam && BeamZone.ToString().StartsWith(TEXT("beam:"))) Id = BeamZone.ToString().RightChop(5);
+		if (Id.Equals(TEXT("mmoon"), ESearchCase::IgnoreCase)) GreyboxMirror = 2;
+		else if (bFromMirror || Id.Equals(TEXT("mirror"), ESearchCase::IgnoreCase)) { GreyboxMirror = 1; Id = TEXT("mirror"); }
 		GreyboxIndex = FindGreyboxWindow(Id);
-		bGreyboxOculus = GreyboxIndex < 0 && (bOculusBeam || Id.Equals(TEXT("oculus"), ESearchCase::IgnoreCase)) && !bFromMirror;
+		bGreyboxOculus = GreyboxIndex < 0 && GreyboxMirror == 0 && (bOculusBeam || Id.Equals(TEXT("oculus"), ESearchCase::IgnoreCase));
 		if (bGreyboxOculus) Id = TEXT("oculus");
 		if (IsGreybox())
 		{
@@ -401,6 +407,9 @@ double ADysisBeamActor::CastLight(const FVector& Start, const FVector& Dir, doub
 	if (const APlayerController* PC = World->GetFirstPlayerController())
 		if (const APawn* Pawn = PC->GetPawn()) Params.AddIgnoredActor(Pawn);   // 人不挡光路
 	for (TActorIterator<ADysisBeamActor> It(World); It; ++It) Params.AddIgnoredActor(*It);   // 别的光（它们的踩踏面）也不挡
+	if (GreyboxMirror != 0)
+		if (const UDysisWorldState* MirrorState = UDysisWorldState::Get(this))
+			for (const TWeakObjectPtr<AActor>& A : MirrorState->Mirror.Self) if (A.IsValid()) Params.AddIgnoredActor(A.Get());   // 雕像和镜子自己不挡自己的光
 	if (bGreyboxOculus)
 	{
 		// 圆眼光柱是从光圈中间的洞下来的：叶片和屋顶细桥不算挡它（灰盒 b._blk）
@@ -428,6 +437,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 	++FrameSerial;
 	bFrameValid = false; bClean = false; Lit = 0.0; Need = 0.0;
 	if (bGreyboxOculus) { UpdateGreyboxOculus(H); return; }
+	if (GreyboxMirror != 0) { UpdateGreyboxMirror(H); return; }
 	const FGreyboxWindow& W = GWindows[GreyboxIndex];
 	const UDysisWorldState* State = UDysisWorldState::Get(this);
 	const bool bNight = State && State->IsNight();
@@ -583,9 +593,74 @@ void ADysisBeamActor::UpdateGreyboxOculus(double H)
 	Done();
 }
 
+void ADysisBeamActor::UpdateGreyboxMirror(double H)
+{
+	// 灰盒 computeMirrorBeam / mirrorLitBy / mirrorFrame。镜子的位置和朝向由机关总管写在世界状态里。
+	auto Done = [this]()
+	{
+		bWalkable = ComputeGreyboxWalkable();
+		ApplyGreyboxComponents();
+	};
+	UDysisWorldState* State = UDysisWorldState::Get(this);
+	if (!State || !State->Mirror.bValid) { Done(); return; }
+	FDysisMirrorState& M = State->Mirror;
+	const bool bMoon = GreyboxMirror == 2;
+	const int32 Form = bMoon ? 2 : 1;
+	if (!bMoon) M.bHasLitBox = false;
+	if (M.Form != Form || M.W3[Form] < 0.95f) { Done(); return; }
+	const FVector LightDir = bMoon ? UDysisSkyLibrary::DysisMoonDir(float(H)) : UDysisSkyLibrary::DysisSunDir(float(H));
+
+	// 镜面上哪一块被照着（6 × 4 取样）
+	double LitFrac = 0.0, U0 = 2.0, U1 = -1.0, V0 = 2.0, V1 = -1.0;
+	if (LightDir.Z > 0.003 && FVector::DotProduct(M.N, LightDir) > 0.05)
+	{
+		constexpr int32 NU = 6, NV = 4;
+		int32 Hit = 0;
+		for (int32 i = 0; i < NU; ++i)
+			for (int32 j = 0; j < NV; ++j)
+			{
+				const double U = (i + 0.5) / NU, V = (j + 0.5) / NV;
+				const FVector P = M.Center + M.U * ((U - 0.5) * M.WidthCm) + M.V * ((V - 0.5) * M.HeightCm) + M.N * 8.0;
+				if (CastLight(P + LightDir * 2.0, LightDir, 40000.0) < 0.0)
+				{
+					++Hit;
+					U0 = FMath::Min(U0, U - 0.5 / NU); U1 = FMath::Max(U1, U + 0.5 / NU);
+					V0 = FMath::Min(V0, V - 0.5 / NV); V1 = FMath::Max(V1, V + 0.5 / NV);
+				}
+			}
+		LitFrac = double(Hit) / double(NU * NV);
+		if (Hit > 0)
+		{
+			M.bHasLitBox = true;
+			M.LitBox[0] = float(U0); M.LitBox[1] = float(U1); M.LitBox[2] = float(V0); M.LitBox[3] = float(V1);
+		}
+	}
+	Lit = LitFrac;
+	if (LitFrac < 0.34) { Done(); return; }
+
+	// 按反射定律射出去
+	const FVector D = -LightDir;
+	const FVector R = (D - M.N * (2.0 * FVector::DotProduct(D, M.N))).GetSafeNormal();
+	M.ReflectDir = R;
+	const FVector Q0 = M.Center + M.U * ((U0 - 0.5) * M.WidthCm) + M.V * ((V0 - 0.5) * M.HeightCm);
+	const FVector Q1 = Q0 + M.U * ((U1 - U0) * M.WidthCm);
+	const FVector Q2 = Q0 + M.V * ((V1 - V0) * M.HeightCm);
+	const FVector Q3 = Q1 + M.V * ((V1 - V0) * M.HeightCm);
+	// 能踩的一面是光束的下表面：看沿光走 3 m 以后哪条边更低
+	const bool bLowFirst = (Q0 + R * 300.0).Z <= (Q2 + R * 300.0).Z;
+	const FVector Corners[4] = { bLowFirst ? Q0 : Q2, bLowFirst ? Q1 : Q3, bLowFirst ? Q2 : Q0, bLowFirst ? Q3 : Q1 };
+	SetGreyboxFrame(Corners, R, 8.0, -30.0, false, 0.0);
+	double MinEdge = FrameEdge[0];
+	for (int32 i = 1; i < 7; ++i) MinEdge = FMath::Min(MinEdge, FrameEdge[i]);
+	// 日相的镜光要够得到日之龛的石台（镜子下沿到石台 26.3 m，留 2.5 m 余量）
+	bClean = !bMoon && Lit > 0.5 && FrameU.Size() > 120.0 && MinEdge > GB_MIRROR_CROSS_DIST - 250.0;
+	Done();
+}
+
 bool ADysisBeamActor::ComputeGreyboxWalkable() const
 {
-	if (bGreyboxOculus)
+	if (GreyboxMirror == 2) return false;   // 月光反射不能踩
+	if (bGreyboxOculus || GreyboxMirror == 1)
 	{
 		if (!bFrameValid || !bClean) return false;
 	}
@@ -634,12 +709,18 @@ void ADysisBeamActor::ApplyGreyboxComponents()
 		const double Ht = FMath::Abs(FVector::DotProduct(FrameV, Z));
 		Visual->SetWorldLocationAndRotation(FrameO + (FrameU + FrameV) * 0.5 + X * (Len * 0.5), FRotationMatrix::MakeFromXY(X, Y).ToQuat());
 		Visual->SetWorldScale3D(FVector(Len, Wd, FMath::Max(Ht, 1.0)) / 100.0);
-		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * (bGreyboxOculus ? 1.1f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f));
+		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * (bGreyboxOculus ? 1.1f : GreyboxMirror == 1 ? 0.85f : GreyboxMirror == 2 ? 0.6f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f));
 	}
 
 	// 能踩的面：光的下表面，从 s0 到 s1，两侧各宽 0.35 m。用一块 4 cm 厚的板，顶面就是那个面。
 	const bool bGrace = GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(GraceTimer);
-	const bool bSolid = bFrameValid && (bWalkable || bGrace) && FrameS1 > FrameS0 + 1.0;
+	// 镜光例外：只铺到日之龛石台的上方。灰盒里是一直铺到墙的，人走到头再往旁边迈一步落到石台上；
+	// 但最后那一段光贴着四层楼板的底面过去（离楼板不到 1.8 m），UE 里人有头顶碰撞、站不直。
+	// 所以这里铺到石台上方就停，人顺着光走到头自然落在石台上（落差 0.25–0.55 m）。光本身照多远不变。
+	double WalkS1 = FrameS1;
+	if (GreyboxMirror == 1 && bFrameValid)
+		WalkS1 = FMath::Min(WalkS1, FVector::DotProduct(GB_MIRROR_CROSS_T - (FrameB0 + FrameB1) * 0.5, FrameL) + GB_MIRROR_WALK_PAST);
+	const bool bSolid = bFrameValid && (bWalkable || bGrace) && WalkS1 > FrameS0 + 1.0;
 	Collision->SetCollisionEnabled(bSolid ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	if (bSolid)
 	{
@@ -649,9 +730,9 @@ void ADysisBeamActor::ApplyGreyboxComponents()
 		const FVector Yw = FVector::CrossProduct(N, FrameL).GetSafeNormal();
 		const double Width = FMath::Abs(FVector::DotProduct(E, Yw));
 		constexpr double Thick = 4.0;
-		const FVector Center = FrameB0 + E * 0.5 + FrameL * ((FrameS0 + FrameS1) * 0.5) - N * (Thick * 0.5);
+		const FVector Center = FrameB0 + E * 0.5 + FrameL * ((FrameS0 + WalkS1) * 0.5) - N * (Thick * 0.5);
 		Collision->SetWorldLocationAndRotation(Center, FRotationMatrix::MakeFromXY(FrameL, Yw).ToQuat());
-		Collision->SetWorldScale3D(FVector(FrameS1 - FrameS0, Width, Thick) / 100.0);
+		Collision->SetWorldScale3D(FVector(WalkS1 - FrameS0, Width, Thick) / 100.0);
 	}
 }
 
@@ -681,8 +762,11 @@ bool ADysisBeamActor::ClampToRail(FVector& Foot) const
 	const double Lo = FMath::Min(0.0, L1) + 6.0, Hi = FMath::Max(0.0, L1) - 6.0;
 	const double Lat = FVector::DotProduct(Foot - FrameB0, NH);
 	if (Lat >= Lo && Lat <= Hi) return false;
+	// 三相像的镜光很长：除了起头 1.5 m 和落到石台前的 2.5 m，两边一直拦着，走歪了也不会掉下去
+	const double SAlong = FVector::DotProduct(Foot - (FrameB0 + FrameB1) * 0.5, FrameL);
+	const bool bHold = GreyboxMirror == 1 && SAlong > 150.0 && SAlong < FrameS1 - 250.0;
 	// 边上往下 6.2 m 以内有别的落脚处，就不拦（可以从光上走到旁边的地面上）
-	if (const UWorld* World = GetWorld())
+	if (const UWorld* World = bHold ? nullptr : GetWorld())
 	{
 		FCollisionQueryParams Params(TEXT("DysisBeamRail"), true);
 		Params.AddIgnoredActor(this);

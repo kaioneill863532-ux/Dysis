@@ -1,5 +1,6 @@
 ﻿#include "DysisCharacterMovement.h"
 #include "DysisGreybox.h"
+#include "Mechanisms/DysisDirector.h"
 #include "Optics/DysisVirtualSurface.h"
 #include "Sky/DysisTimeComponent.h"
 #include "UI/DysisCopy.h"
@@ -70,7 +71,32 @@ void UDysisCharacterMovement::TickComponent(float DeltaTime, ELevelTick TickType
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (Velocity.Z < -MaxFallSpeedCm) Velocity.Z = -MaxFallSpeedCm;
 	HandleDysisFloors(DeltaTime);
+	UpdateBeamHeadroom();
 	UpdateRespawn(DeltaTime);
+}
+
+void UDysisCharacterMovement::UpdateBeamHeadroom()
+{
+	UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(UpdatedComponent);
+	if (!Body) return;
+	const ADysisBeamActor* Beam = StandingBeam.Get();
+	const bool bOnMirror = Beam && Beam->GreyboxId == TEXT("mirror");
+	if (bOnMirror)
+	{
+		if (HeadroomSlab.IsValid()) return;
+		const ADysisDirector* Director = ADysisDirector::Get(this);
+		if (AActor* Slab = Director ? Director->Piece(TEXT("SM_Floor_L3")) : nullptr)
+		{
+			Body->IgnoreActorWhenMoving(Slab, true);
+			HeadroomSlab = Slab;
+		}
+	}
+	else if (HeadroomSlab.IsValid() && IsMovingOnGround())
+	{
+		// 跳起来、掉下去的那一会儿先不恢复（人可能还有一截在楼板里），等踩到别的地面再说
+		Body->IgnoreActorWhenMoving(HeadroomSlab.Get(), false);
+		HeadroomSlab = nullptr;
+	}
 }
 
 void UDysisCharacterMovement::ApplyGreyboxCarry()

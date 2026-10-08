@@ -122,7 +122,7 @@ public:
 	FName GreyboxId;
 
 	/** 是不是按灰盒算的窗光。 */
-	bool IsGreybox() const { return GreyboxIndex >= 0 || bGreyboxOculus; }
+	bool IsGreybox() const { return GreyboxIndex >= 0 || bGreyboxOculus || GreyboxMirror != 0; }
 
 	/** 能踩的面上的坐标：A = 横向（0–1，从 b0 到 b1），S = 沿光走了多远（厘米）。灰盒 beamLocal / beamWorld。 */
 	void WorldToStrip(const FVector& PointCm, double& OutA, double& OutS) const;
@@ -194,6 +194,8 @@ private:
 	void UpdateGreybox(double H);
 	/** 圆眼光柱（灰盒 computeOculusBeam）：从光圈中间斜着落下来，能踩的是光柱朝太阳那一侧的面。 */
 	void UpdateGreyboxOculus(double H);
+	/** 三相像的镜光（日相反射阳光，能踩）和月光反射（月相，不能踩）：灰盒 computeMirrorBeam。 */
+	void UpdateGreyboxMirror(double H);
 	/** 灰盒 setBeamFrame：四个角、沿光的方向、从哪开始能踩。 */
 	void SetGreyboxFrame(const FVector Corners[4], const FVector& L, double StartOff, double WalkFrom, bool bHasMinZ, double MinZ);
 	void ApplyIsleGrow();
@@ -207,6 +209,7 @@ private:
 
 	int32 GreyboxIndex = -1;       // 内置窗表里的下标；−1 = 不是灰盒窗光
 	bool bGreyboxOculus = false;   // 圆眼光柱（也按灰盒算，但不是窗光）
+	int32 GreyboxMirror = 0;       // 1 = 三相像的镜光（日），2 = 三相像反射的月光（夜）；0 = 不是
 	mutable TArray<TWeakObjectPtr<AActor>> OculusLightIgnore;   // 圆眼光柱不被光圈叶片和屋顶细桥挡
 	mutable bool bOculusIgnoreBuilt = false;
 	int32 FrameSerial = 0;

@@ -7,6 +7,23 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "DysisWorldState.generated.h"
 
+/** 三相像手里那面铜镜现在的样子（机关总管每帧写，镜光和月光反射读）。厘米、单位向量。 */
+struct FDysisMirrorState
+{
+	bool bValid = false;
+	FVector Center = FVector::ZeroVector;      // 镜面中心
+	FVector U = FVector::RightVector;          // 镜面的横向
+	FVector V = FVector::UpVector;             // 镜面的竖向（朝上的那一边）
+	FVector N = FVector::ForwardVector;        // 镜面的法线
+	float WidthCm = 220.0f, HeightCm = 140.0f;
+	int32 Form = 0;                            // 0 暗相（垂镜）、1 日相（举镜）、2 月相（递镜）
+	float W3[3] = { 1.0f, 0.0f, 0.0f };        // 三相各占多少（暗、日、月），慢慢过渡
+	bool bHasLitBox = false;                   // 镜面上被照亮的那一块（0–1）：U0、U1、V0、V1
+	float LitBox[4] = { 0.0f, 1.0f, 0.0f, 1.0f };
+	FVector ReflectDir = FVector::ForwardVector;   // 反射出去的方向（有光时）
+	TArray<TWeakObjectPtr<AActor>> Self;       // 雕像、镜子自己：算它被没被照到时不算挡光
+};
+
 UCLASS()
 class DYSIS_API UDysisWorldState : public UTickableWorldSubsystem
 {
@@ -60,6 +77,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
 	void DebugSetIris(float ACm);
 	bool IsIrisDebug() const { return bDebugIris; }
+
+	// ───── 三相像的镜子 ─────
+	FDysisMirrorState Mirror;
 
 	// ───── 别的 ─────
 

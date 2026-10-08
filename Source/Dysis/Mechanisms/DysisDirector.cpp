@@ -105,6 +105,7 @@ void ADysisDirector::BeginPlay()
 	PlaceSlider();
 	UpdateWaterfall();
 	SetupRoof();
+	SetupMirror();
 	BuildInteracts();
 }
 
@@ -161,6 +162,7 @@ void ADysisDirector::BuildInteracts()
 		I.Act = [this]() { CatchLight(); };
 		Interacts.Add(MoveTemp(I));
 	}
+	AddMirrorInteracts();
 }
 
 const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
@@ -257,5 +259,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateSlider(DeltaTime);
 	UpdateWaterfall();
 	UpdateCrown(DeltaTime);
+	UpdateMirrors(DeltaTime);
+	UpdateNiches(DeltaTime);
 	UpdateCatch(DeltaTime);
 }

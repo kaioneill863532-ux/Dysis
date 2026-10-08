@@ -87,6 +87,12 @@ private:
 	double CarryA = 0.0, CarryS = 0.0;   // 人在光上的位置：横向 0–1、沿光多少厘米
 	int32 CarrySerial = 0;               // 记这个位置时光的形状是第几版
 
+	// ── 镜光上不碰头 ──
+	/** 镜光通到日之龛石台的最后几米从四层楼板底下贴着过去。灰盒里人走路没有头顶碰撞，
+	 *  这里人站在镜光上时也不让那块楼板挡着；落到别的地面上以后恢复。 */
+	void UpdateBeamHeadroom();
+	TWeakObjectPtr<AActor> HeadroomSlab;   // 现在让开的那块楼板（没有就是空）
+
 	// ── 落脚点和回档 ──
 	FVector LastSafeFootholdCm = FVector::ZeroVector;   // 上一个落脚点（脚底的位置）
 	bool bHasFoothold = false;

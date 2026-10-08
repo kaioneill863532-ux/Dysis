@@ -92,6 +92,26 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DescribeRoof() const;
 
+	/** 三相像的底座转到第几格（6 格：0 月之龛、1 夜里照女神、2 白天照日之龛……）。按一次绞盘转一格。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	int32 MirrorSlot = 2;
+
+	/** 日之龛打开了没有。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bSunNicheOpen = false;
+
+	/** 测试用：三相像现在的样子（JSON）：朝向、仰角、是哪一相、镜面中心和法线。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeMirror() const;
+
+	/** 测试用：直接把三相像转到第几格。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugSetMirrorSlot(int32 Slot);
+
+	/** 测试用：直接入夜 / 回到白天（不用真的去屋顶接光）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugSetNight(bool bNight);
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -134,6 +154,25 @@ private:
 	void CatchLight();
 	void UpdateCatch(float Dt);
 	FVector ArmTopCm() const;
+
+	// 三相像和日之龛（灰盒 mirrorStatue / placeMirror / updateMirrors / updateNiches）—— DysisDirectorMirror.cpp
+	void SetupMirror();
+	void AddMirrorInteracts();
+	void PlaceMirror();
+	void UpdateMirrors(float Dt);
+	void UpdateNiches(float Dt);
+	/** 从 Start 朝 Dir 看过去有没有被挡住（三相像自己、人、光的踩踏板不算）。 */
+	bool MirrorSeesLight(const FVector& Start, const FVector& Dir) const;
+	TWeakObjectPtr<AActor> MirrorStatue, MirrorPlate;
+	float MirrorStatueYaw0 = 0.0f;
+	FQuat MirrorPlateBase = FQuat::Identity;
+	float MirrorYawNow = 153.191f;
+	float MirrorW3[3] = { 1.0f, 0.0f, 0.0f };   // 暗、日、月
+	int32 MirrorForm = 0;
+	TWeakObjectPtr<AActor> SunLid, SunShard;
+	FQuat SunLidBase = FQuat::Identity;
+	FVector SunShardBase = FVector::ZeroVector;
+	float SunNicheT = 0.0f;
 
 	TMap<FName, TWeakObjectPtr<AActor>> Pieces;
 	TArray<FDysisInteract> Interacts;

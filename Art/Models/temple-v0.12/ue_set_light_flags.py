@@ -1,6 +1,6 @@
 # 标出“不挡光”的部件（UE 编辑器 Python，可以重复跑；跑完存关卡）。
 # 灰盒里每个部件有四个开关：能踩 w、挡人 s、挡光 l、挡镜头 c。导进 UE 以后所有带碰撞的部件默认四样全挡，
-# 但灰盒里有些是不挡光的：回廊内沿的栏杆（“栏杆不算挡光，但画出来的影子是有的”）、外立面的装饰（窗框、线脚、壁柱……只挡镜头）。
+# 但灰盒里有些是不挡光的：回廊内沿的栏杆（“栏杆不算挡光，但画出来的影子是有的”）、外立面的装饰（窗框、线脚、壁柱……只挡镜头）、日之龛的小匣子。
 # 光路是用“可见性”这一路射线算的，所以把这些部件对“可见性”射线设成忽略；别的（挡人、挡镜头）不变。
 import unreal, collections
 sub = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -9,7 +9,8 @@ IGN = unreal.CollisionResponseType.ECR_IGNORE
 def no_light(folder):
     f = str(folder)
     part = f.split("/")[-1] if "/" in f else f
-    return part.startswith("03 ") or part.startswith("05")      # 03 栏杆；05、05a、05b、05c…… 外立面装饰
+    # 03 栏杆；05、05a、05b、05c…… 外立面装饰；11.05 日之龛（灰盒里只是摆在石台上的模型，没有碰撞，镜光是穿过它照到墙上的）
+    return part.startswith("03 ") or part.startswith("05") or part.startswith("11.05 ")
 seen = collections.Counter(); changed = 0
 for a in sub.get_all_level_actors():
     if a.get_class().get_name() != "StaticMeshActor": continue

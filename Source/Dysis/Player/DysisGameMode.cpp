@@ -27,7 +27,7 @@ void ADysisGameMode::EnsureWindowBeams()
 {
 	UWorld* World = GetWorld();
 	if (!World) return;
-	static const TCHAR* Ids[] = { TEXT("isle"), TEXT("b1"), TEXT("b2"), TEXT("iris"), TEXT("c"), TEXT("h1"), TEXT("h2"), TEXT("h3") };
+	static const TCHAR* Ids[] = { TEXT("isle"), TEXT("b1"), TEXT("b2"), TEXT("iris"), TEXT("c"), TEXT("h1"), TEXT("h2"), TEXT("h3"), TEXT("oculus"), TEXT("mirror"), TEXT("mmoon") };
 	TSet<FName> Have;
 	for (TActorIterator<ADysisBeamActor> It(World); It; ++It)
 		if (It->IsGreybox()) Have.Add(It->GreyboxId);
