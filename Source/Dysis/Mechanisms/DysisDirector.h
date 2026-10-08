@@ -402,6 +402,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> EndingDialogue;
 
+	/** 关卡标题（灰盒 LEVELS / updateLevel）：头一次走进某一段，屏幕中间出一次标题。 */
+	void UpdateLevelTitle();
+	int32 SeenLevel = -1;
+
 	TMap<FName, TWeakObjectPtr<AActor>> Pieces;
 	TArray<FDysisInteract> Interacts;
 

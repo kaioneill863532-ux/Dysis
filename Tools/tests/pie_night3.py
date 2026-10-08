@@ -136,7 +136,7 @@ def main():
         if still > 90: break
         yield
     f = foot()
-    check(done and zones <= {"L0", "gbridge", "shadowbr", "pav"} and mv.get_editor_property("respawn_count") == 0, "从池沿走上半桥、走过影桥、走进水亭：脚 (%.0f, %.0f, %.0f)，一路的区域 %s" % (f[0], f[1], f[2], sorted(zones)))
+    check(done and zones <= {"L0", "gbridge", "shadowbr", "pav"} and mv.get_editor_property("respawn_count") == 0, "从池沿走上半桥、走过影桥、走进水亭：脚 (%.0f, %.0f, %.0f)，一路的区域 %s（走到了=%s，卡住=%s，回落脚点 %d 次，%s）" % (f[0], f[1], f[2], sorted(zones), done, still > 90, mv.get_editor_property("respawn_count"), state()[:28]))
     look(C["GOD"]["halfAz"], 4.0)
     yield from wait(10)
     yield from shoot(w, "水亭里_回头看影桥")

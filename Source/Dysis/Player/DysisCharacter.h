@@ -104,6 +104,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")
 	float CameraTunnelDistance = 260.f;
 
+	/** 入夜以后镜头用固定曝光（不然自动曝光会把月夜提亮得和白天一样）。数越大越亮；主界面夜里用的也是 1.2。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")
+	float NightExposureBias = 1.2f;
+
 	/** 开局镜头的俯仰（度，负 = 往下看；灰盒 0.22 弧度）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")
 	float StartPitch = -12.6f;

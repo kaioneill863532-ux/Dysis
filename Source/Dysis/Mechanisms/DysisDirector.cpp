@@ -278,6 +278,43 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateGoddess(DeltaTime);
 	UpdateShadowBridge(DeltaTime);
 	UpdateFinale(DeltaTime);
+	UpdateLevelTitle();
 	UpdateStairs(DeltaTime);
 	UpdateCatch(DeltaTime);
+}
+
+// ───────────────────────── 关卡标题 ─────────────────────────
+
+void ADysisDirector::UpdateLevelTitle()
+{
+	// 灰盒 levelOf：按脚下的区域分段——白天 序、日1–日5，入夜以后 月1–月5；每一段头一次走进去出一次标题
+	static const TCHAR* const Names[11][2] = {
+		{ TEXT("序"), TEXT("登殿") }, { TEXT("日1"), TEXT("午后·开闸") }, { TEXT("日2"), TEXT("未时·双窗") }, { TEXT("日3"), TEXT("申时·光阶") },
+		{ TEXT("日4"), TEXT("酉时·圆眼") }, { TEXT("日5"), TEXT("日落·最后一缕") },
+		{ TEXT("月1"), TEXT("月升·回廊") }, { TEXT("月2"), TEXT("初夜·天鹅") }, { TEXT("月3"), TEXT("中夜·三相") }, { TEXT("月4"), TEXT("夜半·双子") }, { TEXT("月5"), TEXT("子夜·瀑布后的女神") } };
+	if (!GameStarted()) return;
+	const UDysisTimeComponent* Time = PlayerTime();
+	if (!Time) return;
+	const FString& Z = Time->Zone;
+	int32 Lv = -1;
+	if (!bCaught)
+	{
+		if (Z == TEXT("out") || Z == TEXT("beam:isle")) Lv = 0;
+		else if (Z == TEXT("L0") || Z == TEXT("beam:b1") || Z == TEXT("wfback")) Lv = 1;
+		else if (Z == TEXT("L1") || Z == TEXT("beam:b2") || Z == TEXT("rainbow") || Z == TEXT("sill")) Lv = 2;
+		else if (Z == TEXT("L2") || Z.StartsWith(TEXT("beam:h")) || Z == TEXT("beam:mirror") || Z == TEXT("ledge")) Lv = 3;
+		else if (Z == TEXT("L3")) Lv = 4;
+		else if (Z == TEXT("beam:oculus") || Z == TEXT("rbridge") || Z == TEXT("crown")) Lv = 5;
+	}
+	else
+	{
+		if (Z == TEXT("crown") || Z == TEXT("rbridge")) Lv = 6;
+		else if (Z == TEXT("L3") || Z == TEXT("tun:TS")) Lv = 7;
+		else if (Z == TEXT("L2") || Z == TEXT("tun:TR")) Lv = 8;
+		else if (Z == TEXT("L1") || Z == TEXT("moonbr")) Lv = 9;
+		else if (Z == TEXT("L0") || Z == TEXT("pav") || Z == TEXT("gbridge") || Z == TEXT("shadowbr") || Z == TEXT("wfback")) Lv = 10;
+	}
+	if (Lv <= SeenLevel) return;
+	SeenLevel = Lv;
+	if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->ShowTitle(Names[Lv][0], Names[Lv][1], 2.4f);
 }

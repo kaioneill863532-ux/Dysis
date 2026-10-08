@@ -281,6 +281,18 @@ void ADysisCharacter::Tick(float DeltaSeconds)
 void ADysisCharacter::UpdateCamera(float Dt)
 {
 	if (!CameraArm) return;
+	if (Camera)
+	{
+		// 白天自动曝光（殿里殿外亮度差很多）；入夜以后固定曝光，月夜才是暗的
+		const bool bNightLook = Time && Time->bNight;
+		FPostProcessSettings& PP = Camera->PostProcessSettings;
+		PP.bOverride_AutoExposureMethod = bNightLook;
+		PP.AutoExposureMethod = AEM_Manual;
+		PP.bOverride_AutoExposureApplyPhysicalCameraExposure = bNightLook;
+		PP.AutoExposureApplyPhysicalCameraExposure = false;
+		PP.bOverride_AutoExposureBias = bNightLook;
+		PP.AutoExposureBias = NightExposureBias;
+	}
 	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	if (ViewMode == EDysisViewMode::FirstPerson)
 	{

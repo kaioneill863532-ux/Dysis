@@ -106,6 +106,23 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	FLinearColor MoonColor = FLinearColor(0.62f, 0.72f, 0.95f);
 
+	/** 夜里的环境光（灰盒 nightAmb：一盏不被遮挡的半球光，天上来的是深蓝）。UE 里用四盏不投影子的平行光从四面斜上方照下来顶着：
+	 *  月光照不到的回廊深处也看得清。强度跟着“入夜多少”走（太阳在地平线上 1.5° 到地平线下 9° 之间慢慢亮起来）。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
+	TArray<TObjectPtr<UDirectionalLightComponent>> NightFill;
+
+	/** 每一盏的照度（勒克斯）。0.59 = 朝上的面得到的和灰盒一样多（灰盒 0.45 × 换算 3.0）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	float NightFillLux = 0.59f;
+
+	/** 这四盏斜着的角度（离地平线多少度）：越低墙面得到的越多、地面越少。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	float NightFillElevationDeg = 35.0f;
+
+	/** 灰盒 nightAmb 天上那一半的颜色（#3a4c70）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	FLinearColor NightFillColor = FLinearColor(0.0423f, 0.0723f, 0.1620f);
+
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 

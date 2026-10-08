@@ -43,6 +43,21 @@ ADysisSkyActor::ADysisSkyActor()
 	MoonLight->SetAtmosphereSunLight(true);
 	MoonLight->SetAtmosphereSunLightIndex(1);
 
+	for (int32 i = 0; i < 4; ++i)
+	{
+		UDirectionalLightComponent* Fill = CreateDefaultSubobject<UDirectionalLightComponent>(*FString::Printf(TEXT("NightFill%d"), i));
+		Fill->SetupAttachment(RootComponent);
+		Fill->SetMobility(EComponentMobility::Movable);
+		Fill->SetAtmosphereSunLight(false);
+		Fill->SetCastShadows(false);
+		Fill->SetIntensity(0.0f);
+		NightFill.Add(Fill);
+	}
+	// 半透明、水、体积雾只认一盏平行光：太阳优先，其次月亮（不排的话引擎会在屏幕上提示“几盏平行光在抢”）
+	SunLight->ForwardShadingPriority = 10;
+	MoonLight->ForwardShadingPriority = 9;
+	SunSkyGlow->ForwardShadingPriority = 1;
+
 	MoonDisc = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MoonDisc"));
 	MoonDisc->SetupAttachment(RootComponent);
 	MoonDisc->SetMobility(EComponentMobility::Movable);
@@ -114,6 +129,17 @@ void ADysisSkyActor::SetTime(float H)
 		SunSkyGlow->SetWorldRotation(UDysisSkyLibrary::DysisLightRotation(SunDir));
 		SunSkyGlow->SetIntensity(FMath::Lerp(2.4f, 3.6f, K) * Smooth(TwilightEndAltDeg, 1.2f, SunAlt) * SunLuxPerGreyboxUnit);
 		SunSkyGlow->SetLightColor(SunColorHigh);
+	}
+	// 夜里的环境光（灰盒 nightAmb.intensity = 0.45 × dusk）
+	{
+		const float Dusk = Smooth(1.5f, -9.f, SunAlt);
+		for (int32 i = 0; i < NightFill.Num(); ++i)
+			if (UDirectionalLightComponent* Fill = NightFill[i])
+			{
+				Fill->SetWorldRotation(FRotator(-NightFillElevationDeg, 45.0f + 90.0f * i, 0.0f));
+				Fill->SetIntensity(NightFillLux * Dusk);
+				Fill->SetLightColor(NightFillColor);
+			}
 	}
 	MoonDiscOpacity = Smooth(-1.5f, 1.f, MoonAlt) * Smooth(4.f, -2.f, SunAlt);
 	ApplyMoonDisc();
