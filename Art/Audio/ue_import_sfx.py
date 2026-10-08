@@ -103,25 +103,38 @@ def import_sounds(files):
     return todo, skipped, bad
 
 
-def fix_looping_and_save(files):
-    """按 manifest 设 Looping，保存。返回 (保存了几个, 问题列表)。"""
-    saved, problems = 0, []
+def fix_looping_and_save(files, imported):
+    """按 manifest 设 Looping 并保存。
+
+    这次新导入的：一定保存。没重新导入的（WAV 没改过）：Looping 和 manifest 不一样才改、才存
+    （有人误改了，或 manifest 改了哪些是循环），其余不动，免得每次重跑都把 265 个 .uasset 重存一遍。
+    返回 (保存了几个, 其中修好的旧资产几个, 问题列表)。
+    """
+    new = {(f["folder"], f["name"]) for f in imported}
+    saved, fixed, problems = 0, 0, []
     for f in files:
         path = "%s/%s/%s" % (GAME_DIR, f["folder"], f["name"])
+        is_new = (f["folder"], f["name"]) in new
         asset = unreal.load_asset(path)
         if asset is None:
-            problems.append("%s：导入以后还是加载不到" % path)
-            continue
+            if is_new:
+                problems.append("%s：导入以后还是加载不到" % path)
+            continue   # 没导入过的由 check() 报“缺”
+        changed = False
         try:
             if bool(asset.get_editor_property("looping")) != f["loop"]:
                 asset.set_editor_property("looping", f["loop"])
+                changed = True
         except Exception as e:  # noqa: BLE001
             problems.append("%s：设 Looping 失败（%s）" % (path, e))
+        if not (is_new or changed):
+            continue
         if unreal.EditorAssetLibrary.save_loaded_asset(asset, False):
             saved += 1
+            fixed += 0 if is_new else 1
         else:
             problems.append("%s：保存失败" % path)
-    return saved, problems
+    return saved, fixed, problems
 
 
 # ───────────────────────── 2) 殿内混响 ─────────────────────────
@@ -232,7 +245,9 @@ def run():
     todo, skipped, bad = import_sounds(files)
     for b in bad:
         say("  ✗ " + b)
-    saved, problems = fix_looping_and_save(todo) if todo else (0, [])
+    saved, fixed, problems = fix_looping_and_save(files, todo)
+    if fixed:
+        say("Looping 和 manifest 不一样的旧资产：改好并保存了 %d 个" % fixed)
     for p in problems:
         say("  ✗ " + p)
     reverb_problem = build_reverb()

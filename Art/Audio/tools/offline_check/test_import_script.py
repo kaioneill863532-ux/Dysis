@@ -40,13 +40,18 @@ assert len(dirs) == 1 and dirs[0] is not old and dirs[0].folder == "Dysis_Audio"
 assert S["autobind"] == 1 and S["saved_maps"] == 1 and S["loaded_map"] == "/Game/Dysis/Maps/Dysis_Temple"
 print("RUN1 OK: tasks", len(S["tasks"]), "loops", len(loops), "saved assets", S["saved_assets"], "soft paths match", len(soft), "reverb assets", len(S["saved_reverb"]))
 
-# 第二次：全部跳过；调度仍只有一个
+# 第二次：全部跳过；调度仍只有一个。先把一个循环素材的 Looping 误改掉：重跑要改回来、只存这一个
 S["tasks"].clear(); n_actors_before = len(S["actors"])
+broken = sorted(loops)[0]; S["assets"][broken].props["looping"] = False
+saved_before = S["saved_assets"]
 runpy.run_path(script, run_name="__main__")
 assert len(S["tasks"]) == 0, len(S["tasks"])
+assert S["assets"][broken].props["looping"] is True, "looping not restored on a skipped asset"
+assert S["saved_assets"] - saved_before == 1, ("only the fixed asset should be re-saved", S["saved_assets"] - saved_before)
+assert any("改好并保存了 1 个" in m for m in unreal.LOG), "fixed-count line"
 dirs = [a for a in S["actors"] if a.label == "DysisSfx"]
 assert len(dirs) == 1 and S["autobind"] == 2 and S["saved_maps"] == 2 and S["reverb_builds"] == 2
-print("RUN2 OK: re-run skipped all imports, one director, reverb rebuilt")
+print("RUN2 OK: re-run skipped all imports, restored 1 broken Looping (saved only that one), one director, reverb rebuilt")
 assert any("全部通过" in m for m in unreal.LOG), "final line"
 
 # 第三次：C++ 没编译新代码（没有 build_temple_reverb）——脚本不能崩，音效照常，最后一行说有问题
