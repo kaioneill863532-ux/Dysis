@@ -182,7 +182,11 @@ void ADysisBeamActor::Tick(float DeltaTime)
 		// 开场的光伸出来、雾升起来是随时间变的：这两样每帧都更新（不用重新打光线）。
 		const double H = CachedSky->GetTime();
 		SolveClock += DeltaTime;
-		if (FMath::Abs(H - LastSolvedH) > 0.004 || SolveClock > 0.2) UpdateGreybox(H);
+		const UDysisWorldState* State = UDysisWorldState::Get(this);
+		const int32 LightSerial = State ? State->LightSerial : 0;
+		const bool bLightMoved = LightSerial != SeenLightSerial;
+		SeenLightSerial = LightSerial;
+		if (bLightMoved || FMath::Abs(H - LastSolvedH) > 0.004 || SolveClock > 0.2) UpdateGreybox(H);
 		else
 		{
 			ApplyIsleGrow();

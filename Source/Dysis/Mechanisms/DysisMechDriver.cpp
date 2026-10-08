@@ -176,10 +176,12 @@ void ADysisMechDriver::ApplyAlpha()
 	case EDysisMechMotion::Reveal:
 	{
 		// 显隐切换：月石隐去（碰撞关+隐藏）、月桥显形（碰撞开+显示）、外窗石块消失。
-		if (Alpha >= 1.0)
+		// 触发以前是反过来的样子：要“显形”的（月桥……）开局看不见、踩不着、不挡光；要“隐去”的开局在场。
+		// （原来开局不处理，夜里才出现的月桥白天就立在水庭上，踩上去时间会跳到夜里，还挡着日1 的光。）
 		{
-			TargetMesh->SetActorHiddenInGame(!bRevealToVisible);
-			TargetMesh->SetActorEnableCollision(bRevealToVisible && bRevealCollision);
+			const bool bShown = (Alpha >= 1.0) ? bRevealToVisible : !bRevealToVisible;
+			TargetMesh->SetActorHiddenInGame(!bShown);
+			TargetMesh->SetActorEnableCollision(bShown && (bRevealToVisible ? bRevealCollision : true));
 		}
 		break;
 	}

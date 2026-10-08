@@ -52,6 +52,10 @@ public:
 
 	// ───── 别的 ─────
 
+	/** 挡光的东西挪了（推拉石板、雕像……）就加一：各束光看见它变了就重算。 */
+	int32 LightSerial = 0;
+	void BumpLight() { ++LightSerial; }
+
 	/** 入夜了没有（接住最后一缕光以后）。 */
 	bool IsNight() const;
 

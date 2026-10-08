@@ -472,13 +472,8 @@ void ADysisHUD::DrawHintBar(float Dt)
 	{
 		if (UDysisInteractComponent* Interact = ResolveInteract())
 		{
-			AActor* Target = nullptr;
-			if (Interact->CanInteractNow(Target))
-				if (const IDysisInteractable* I = Cast<IDysisInteractable>(Target))
-				{
-					const FText Prompt = I->GetInteractPrompt();
-					if (!Prompt.IsEmpty()) Want = TEXT("E　") + Prompt.ToString();
-				}
+			FText Prompt;
+			if (Interact->GetPrompt(Prompt)) Want = TEXT("E　") + Prompt.ToString();
 		}
 	}
 	if (!Want.IsEmpty()) HintShownText = Want;

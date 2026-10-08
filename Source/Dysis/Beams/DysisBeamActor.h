@@ -207,6 +207,7 @@ private:
 	int32 FrameSerial = 0;
 	double LastSolvedH = 1.0e9;
 	double SolveClock = 0.0;       // 离上次重算过了多久（机关挪动时没有 H 变化，也要定时重算）
+	int32 SeenLightSerial = 0;     // 上次重算时“挡光的东西挪了几次”
 	// 灰盒 beam 对象上的那些量（厘米）
 	bool bFrameValid = false;
 	bool bClean = false;

@@ -1,6 +1,7 @@
 ﻿#include "DysisGameMode.h"
 #include "DysisCharacter.h"
 #include "Beams/DysisBeamActor.h"
+#include "Mechanisms/DysisDirector.h"
 #include "UI/DysisHUD.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -15,6 +16,9 @@ ADysisGameMode::ADysisGameMode()
 void ADysisGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	// 机关总管：关卡里没摆就生成一个
+	if (UWorld* World = GetWorld())
+		if (!ADysisDirector::Get(World)) World->SpawnActor<ADysisDirector>();
 	// 等关卡里摆好的光先认完自己的名字（它们的 BeginPlay），下一帧再补缺的
 	GetWorldTimerManager().SetTimerForNextTick(this, &ADysisGameMode::EnsureWindowBeams);
 }
