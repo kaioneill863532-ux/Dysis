@@ -69,6 +69,18 @@ UTexture2D* ADysisHUD::UITex(FName Key, const TCHAR* Path)
 
 // ───────────────────────── 通知 ─────────────────────────
 
+UDysisInteractComponent* ADysisHUD::ResolveInteract()
+{
+	UDysisInteractComponent* Interact = CachedInteract.Get();
+	if (!Interact)
+	{
+		if (APlayerController* PC = GetOwningPlayerController())
+			if (APawn* Pawn = PC->GetPawn())
+				if ((Interact = Pawn->FindComponentByClass<UDysisInteractComponent>())) CachedInteract = Interact;
+	}
+	return Interact;
+}
+
 void ADysisHUD::ShowNotification(const FText& Text, float DurationSeconds)
 {
 	NotificationText = Text.ToString();
@@ -222,7 +234,7 @@ void ADysisHUD::DrawMenu()
 	for (int32 i = 0; i < 3; ++i)
 	{
 		const bool bSel = (i == MenuIndex);
-		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Menu%d", i))), GMenuItems[i].TexPath);
+		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Menu%d"), i)), GMenuItems[i].TexPath);
 		float ItemW = 260.0f, ItemH = 64.0f;
 		if (Tex)
 		{
@@ -285,7 +297,7 @@ void ADysisHUD::DrawShards()
 	for (const FShard& S : Shards)
 	{
 		if (!Save->GetCurrent()->HasNiche(S.Niche)) continue;
-		if (UTexture2D* T = UITex(FName(*FString::Printf(TEXT("Shard%d", int32(S.Niche)))), S.TexPath))
+		if (UTexture2D* T = UITex(FName(*FString::Printf(TEXT("Shard%d"), int32(S.Niche))), S.TexPath))
 		{
 			const float IW = float(T->GetSizeX()) / FMath::Max(1, T->GetSizeY()) * IconH;
 			X -= IW;
@@ -331,7 +343,7 @@ void ADysisHUD::DrawPause()
 	for (int32 i = 0; i < 3; ++i)
 	{
 		const bool bSel = (i == PauseIndex);
-		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Pause%d", i))), Items[i].TexPath);
+		UTexture2D* Tex = UITex(FName(*FString::Printf(TEXT("Pause%d"), i)), Items[i].TexPath);
 		float ItemH = 64.0f, ItemW = 240.0f;
 		if (Tex)
 		{
