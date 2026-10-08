@@ -47,7 +47,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD")
 	bool bStartInMainMenu = true;
 
-	/** UI 字体（思源宋体 FontFace）；空 = 引擎默认字体。 */
+	/** UI 字体（正文；默认阿里巴巴普惠体 45 Light）。读不出来时退回引擎自带的中文字体。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD")
 	TObjectPtr<UFontFace> FontFace;
 

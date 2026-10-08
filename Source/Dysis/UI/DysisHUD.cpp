@@ -99,8 +99,9 @@ ADysisHUD* ADysisHUD::Get(const UObject* WorldContext)
 void ADysisHUD::BeginPlay()
 {
 	Super::BeginPlay();
-	if (!FontFace) FontFace = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/SourceHanSerifSC-Regular.SourceHanSerifSC-Regular"));
-	if (!FontFaceBold) FontFaceBold = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/SourceHanSerifSC-Bold.SourceHanSerifSC-Bold"));
+	// 界面字体：阿里巴巴普惠体 3.0（正文 45 Light，名牌和标题 65 Medium），由 Art/UI/ue_import_fonts.py 导入
+	if (!FontFace) FontFace = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/PuHuiTi_Light.PuHuiTi_Light"));
+	if (!FontFaceBold) FontFaceBold = LoadObject<UFontFace>(this, TEXT("/Game/Dysis/UI/Fonts/PuHuiTi_Medium.PuHuiTi_Medium"));
 	const FString EngineCjkFont = FPaths::EngineContentDir() / TEXT("Slate/Fonts/DroidSansFallback.ttf");
 	if (FontFace)
 	{

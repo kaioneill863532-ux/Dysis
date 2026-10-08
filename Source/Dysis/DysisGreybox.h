@@ -28,6 +28,14 @@ namespace DysisGB
 		const float A = FMath::RadiansToDegrees(FMath::Atan2(float(P.Y), float(P.X)));
 		return A < 0.0f ? A + 360.0f : A;
 	}
+	/** 灰盒的 P(az, r, y)：方位角（度）、半径、高度 → UE 厘米。 */
+	inline FVector PolarCm(double AzDeg, double R, double Z)
+	{
+		const double A = FMath::DegreesToRadians(AzDeg);
+		return FVector(R * FMath::Cos(A), R * FMath::Sin(A), Z);
+	}
+	/** 两个方位角差多少（−180…180，度）。灰盒 angDiff。 */
+	inline double AngDiff(double A, double B) { return FMath::Fmod(FMath::Fmod(A - B, 360.0) + 540.0, 360.0) - 180.0; }
 	/** 离殿中轴的水平距离（厘米）。 */
 	inline float ROf(const FVector& P) { return FMath::Sqrt(float(P.X * P.X + P.Y * P.Y)); }
 	/** 方位角 Az 在不在 [A0, A1] 这段弧里（灰盒 inArc）。 */

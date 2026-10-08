@@ -12,14 +12,14 @@
 namespace
 {
 	// 灰盒常数（厘米）
-	constexpr float R_A = 1219.0f;            // 回廊内沿（中庭半径）
-	constexpr float CEIL_Z = 2950.0f;         // 天花板
-	constexpr float F3_Z = 2300.0f;           // 四层地面
-	constexpr float HARP_GAP0 = 156.06774f, HARP_GAP1 = 195.86795f;   // 光阶那一段回廊的缺口（度）
+	constexpr float WS_R_A = 1219.0f;            // 回廊内沿（中庭半径）
+	constexpr float WS_CEIL_Z = 2950.0f;         // 天花板
+	constexpr float WS_F3_Z = 2300.0f;           // 四层地面
+	constexpr float WS_HARP_GAP0 = 156.06774f, WS_HARP_GAP1 = 195.86795f;   // 光阶那一段回廊的缺口（度）
 	// 海峡上的水沫（开场就有）：从台地崖边到小岛，一条 9 m 宽的带子
-	constexpr float STRAIT_AZ = 23.73427f, STRAIT_R0 = 3055.828f, STRAIT_R1 = 5358.794f, STRAIT_HALF_W = 450.0f, STRAIT_Z0 = -1600.0f, STRAIT_Z1 = -90.0f;
+	constexpr float WS_STRAIT_AZ = 23.73427f, WS_STRAIT_R0 = 3055.828f, WS_STRAIT_R1 = 5358.794f, WS_STRAIT_HALF_W = 450.0f, WS_STRAIT_Z0 = -1600.0f, WS_STRAIT_Z1 = -90.0f;
 	// 远处的岩岛
-	constexpr double FAR_ISLE_AZ = 240.0, FAR_ISLE_DIST = 46300.0, FAR_ISLE_RIDGE = 5690.0;
+	constexpr double WS_FAR_ISLE_AZ = 240.0, WS_FAR_ISLE_DIST = 46300.0, WS_FAR_ISLE_RIDGE = 5690.0;
 
 	const ACharacter* PlayerCharacter(const UWorld* World)
 	{
@@ -89,9 +89,9 @@ double UDysisWorldState::ShadowZ(const FVector& SunDir)
 {
 	const double Alt = FMath::Asin(FMath::Clamp(double(SunDir.Z), -1.0, 1.0));
 	if (Alt <= 0.0) return 1.0e6;
-	const double Diff = FMath::Fmod(FMath::Fmod(double(DysisGB::AzOf(SunDir)) - FAR_ISLE_AZ, 360.0) + 540.0, 360.0) - 180.0;
-	const double D = FAR_ISLE_DIST / FMath::Max(0.2, FMath::Cos(FMath::DegreesToRadians(Diff)));
-	return FAR_ISLE_RIDGE - D * FMath::Tan(Alt);
+	const double Diff = FMath::Fmod(FMath::Fmod(double(DysisGB::AzOf(SunDir)) - WS_FAR_ISLE_AZ, 360.0) + 540.0, 360.0) - 180.0;
+	const double D = WS_FAR_ISLE_DIST / FMath::Max(0.2, FMath::Cos(FMath::DegreesToRadians(Diff)));
+	return WS_FAR_ISLE_RIDGE - D * FMath::Tan(Alt);
 }
 
 float UDysisWorldState::MistAt(FVector P) const
@@ -99,16 +99,16 @@ float UDysisWorldState::MistAt(FVector P) const
 	const float R = DysisGB::ROf(P);
 	float M = 0.0f;
 	// 中庭的雾：只在雾已经升到的高度以下；回廊里淡得多
-	if (P.Z > -60.0 && P.Z < FMath::Min(CEIL_Z, MistFrontCm))
+	if (P.Z > -60.0 && P.Z < FMath::Min(WS_CEIL_Z, MistFrontCm))
 	{
-		const bool bHarpGap = P.Z > F3_Z - 60.0 && P.Z < CEIL_Z && R > R_A - 30.0f && R < DysisGB::R_IN && DysisGB::InArc(DysisGB::AzOf(P), HARP_GAP0, HARP_GAP1);
-		M += MistAmt * ((R < R_A || bHarpGap) ? 1.0f : (R < DysisGB::R_IN ? 0.1f : 0.0f));
+		const bool bHarpGap = P.Z > WS_F3_Z - 60.0 && P.Z < WS_CEIL_Z && R > WS_R_A - 30.0f && R < DysisGB::R_IN && DysisGB::InArc(DysisGB::AzOf(P), WS_HARP_GAP0, WS_HARP_GAP1);
+		M += MistAmt * ((R < WS_R_A || bHarpGap) ? 1.0f : (R < DysisGB::R_IN ? 0.1f : 0.0f));
 	}
 	// 海峡上的水沫
-	const float Cos = FMath::Cos(FMath::DegreesToRadians(STRAIT_AZ)), Sin = FMath::Sin(FMath::DegreesToRadians(STRAIT_AZ));
+	const float Cos = FMath::Cos(FMath::DegreesToRadians(WS_STRAIT_AZ)), Sin = FMath::Sin(FMath::DegreesToRadians(WS_STRAIT_AZ));
 	const float Along = float(P.X) * Cos + float(P.Y) * Sin;
 	const float Lat = FMath::Abs(float(P.X) * Sin - float(P.Y) * Cos);
-	if (Along > STRAIT_R0 && Along < STRAIT_R1 && Lat < STRAIT_HALF_W && P.Z > STRAIT_Z0 && P.Z < STRAIT_Z1) M += 1.0f;
+	if (Along > WS_STRAIT_R0 && Along < WS_STRAIT_R1 && Lat < WS_STRAIT_HALF_W && P.Z > WS_STRAIT_Z0 && P.Z < WS_STRAIT_Z1) M += 1.0f;
 	return M;
 }
 
@@ -143,7 +143,7 @@ void UDysisWorldState::Tick(float DeltaTime)
 	{
 		FlowK = DysisGB::Toward(FlowK, bSluiceOpen ? 1.0f : 0.0f, bSluiceOpen ? 0.9f : 0.45f, DeltaTime);
 		MistAmt = DysisGB::Toward(MistAmt, bSluiceOpen ? 1.0f : 0.0f, bSluiceOpen ? 0.1f : 0.2f, DeltaTime);
-		if (bSluiceOpen) MistFrontCm = FMath::Min(CEIL_Z + 200.0f, FMath::Max(MistFrontCm, DysisGB::WATER_Z) + DeltaTime * 300.0f);
+		if (bSluiceOpen) MistFrontCm = FMath::Min(WS_CEIL_Z + 200.0f, FMath::Max(MistFrontCm, DysisGB::WATER_Z) + DeltaTime * 300.0f);
 		else if (MistAmt < 0.01f) MistFrontCm = -100.0f;
 	}
 

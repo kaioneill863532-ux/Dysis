@@ -58,13 +58,6 @@ namespace
 			if (Id.Equals(GWindows[i].Id, ESearchCase::IgnoreCase)) return i;
 		return -1;
 	}
-	/** 灰盒的 P(az, r, y)：方位角、半径、高度 → UE 厘米。 */
-	FVector PolarCm(double AzDeg, double R, double Z)
-	{
-		const double A = FMath::DegreesToRadians(AzDeg);
-		return FVector(R * FMath::Cos(A), R * FMath::Sin(A), Z);
-	}
-	double AngDiff(double A, double B) { return FMath::Fmod(FMath::Fmod(A - B, 360.0) + 540.0, 360.0) - 180.0; }
 }
 
 ADysisBeamActor::ADysisBeamActor()
@@ -430,7 +423,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 
 	const FVector Sun = UDysisSkyLibrary::DysisSunDir(float(H));   // 指向太阳的单位向量
 	if (Sun.Z < 0.003) { Done(); return; }
-	if (FMath::Abs(AngDiff(DysisGB::AzOf(Sun), W.Az)) > 85.0) { Done(); return; }
+	if (FMath::Abs(DysisGB::AngDiff(DysisGB::AzOf(Sun), W.Az)) > 85.0) { Done(); return; }
 	if (W.bHarp && !bNight && (H < GB_H_H0 - 1.5 || H > GB_H_H1 + 1.5)) { Done(); return; }
 
 	// 窗洞上 8 × 5 个取样点，各朝太阳打一条光线：没被挡住的算照亮；岛影以下的不算
@@ -443,7 +436,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 		for (int32 j = 0; j < NV; ++j)
 		{
 			const double U = (i + 0.5) / NU, V = (j + 0.5) / NV;
-			const FVector P = PolarCm(W.Az - HalfDeg + 2.0 * HalfDeg * U, DysisGB::R_IN - 2.0, FMath::Lerp(double(W.Z0Cm), double(W.Z0Cm + W.HeightCm), V));
+			const FVector P = DysisGB::PolarCm(W.Az - HalfDeg + 2.0 * HalfDeg * U, DysisGB::R_IN - 2.0, FMath::Lerp(double(W.Z0Cm), double(W.Z0Cm + W.HeightCm), V));
 			if (P.Z < ShadowZ) continue;
 			if (CastLight(P + Sun * 0.1, Sun, 40000.0) < 0.0)
 			{
@@ -473,7 +466,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 	}
 	else if (W.bHasFloor) NeedCm = (W.Z0Cm - W.FloorZ) / FMath::Max(0.05, double(Sun.Z)) - 150.0;
 
-	const FVector Corners[4] = { PolarCm(A0, DysisGB::R_IN, Z0), PolarCm(A1, DysisGB::R_IN, Z0), PolarCm(A0, DysisGB::R_IN, Z1), PolarCm(A1, DysisGB::R_IN, Z1) };
+	const FVector Corners[4] = { DysisGB::PolarCm(A0, DysisGB::R_IN, Z0), DysisGB::PolarCm(A1, DysisGB::R_IN, Z0), DysisGB::PolarCm(A0, DysisGB::R_IN, Z1), DysisGB::PolarCm(A1, DysisGB::R_IN, Z1) };
 	SetGreyboxFrame(Corners, L, 5.0, WalkFrom, W.bHasMinZ, W.MinZ);
 	if (bIsle)
 	{

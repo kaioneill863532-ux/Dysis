@@ -24,12 +24,6 @@ namespace
 		{ TEXT("SM_Mech_Slider_Panel_iris"), 171.43f, 8.35f, 1905.0f, false },   // 南边“虹的窗”：开局开着
 	};
 	constexpr float SliderSeconds = 1.6f;
-
-	FVector PolarCm(double AzDeg, double R, double Z)
-	{
-		const double A = FMath::DegreesToRadians(AzDeg);
-		return FVector(R * FMath::Cos(A), R * FMath::Sin(A), Z);
-	}
 }
 
 ADysisDirector::ADysisDirector()
@@ -108,22 +102,19 @@ void ADysisDirector::BuildInteracts()
 {
 	Interacts.Reset();
 	{
-		// 水闸：文案表没有“关上”这一项——开了以后再去碰，只是看一眼
+		// 水闸：只能开，不能关；开了以后就不能再互动了（2026-10-08 定的）
 		FDysisInteract I;
 		I.Id = TEXT("sluice");
 		I.PosCm = SluicePos; I.Z0 = 60.0f; I.Z1 = 270.0f; I.RadiusCm = 190.0f;
-		I.Label = [this]()
-		{
-			const UDysisWorldState* S = UDysisWorldState::Get(this);
-			return FText::FromString(S && S->bSluiceOpen ? TEXT("看看水闸") : DysisCopy::PromptWaterGate);
-		};
+		I.When = [this]() { const UDysisWorldState* S = UDysisWorldState::Get(this); return S && !S->bSluiceOpen; };
+		I.Label = []() { return FText::FromString(DysisCopy::PromptWaterGate); };
 		I.Act = [this]() { ToggleSluice(); };
 		Interacts.Add(MoveTemp(I));
 	}
 	{
 		FDysisInteract I;
 		I.Id = TEXT("lever");
-		I.PosCm = PolarCm(LeverAz, LeverR, LeverZ); I.Z0 = LeverZ - 30.0f; I.Z1 = LeverZ + 180.0f; I.RadiusCm = 160.0f;
+		I.PosCm = DysisGB::PolarCm(LeverAz, LeverR, LeverZ); I.Z0 = LeverZ - 30.0f; I.Z1 = LeverZ + 180.0f; I.RadiusCm = 160.0f;
 		I.Label = []() { return FText::FromString(TEXT("拉动机关")); };
 		I.Act = [this]() { PullLever(); };
 		Interacts.Add(MoveTemp(I));
@@ -165,12 +156,9 @@ void ADysisDirector::ToggleSluice()
 {
 	UDysisWorldState* S = UDysisWorldState::Get(this);
 	if (!S) return;
-	if (!S->bSluiceOpen)
-	{
-		S->SetSluiceOpen(true);
-		ADysisHUD::Notify(GetWorld(), DysisCopy::WaterGateOpened, 5.6f);
-	}
-	else ADysisHUD::Notify(GetWorld(), DysisCopy::FeedbackWaterGateReinteract, 5.6f);
+	if (S->bSluiceOpen) return;
+	S->SetSluiceOpen(true);
+	ADysisHUD::Notify(GetWorld(), DysisCopy::WaterGateOpened, 5.6f);
 }
 
 void ADysisDirector::UpdateWaterfall()
@@ -214,7 +202,7 @@ void ADysisDirector::PlaceSlider()
 		if (!A) continue;
 		const float Open = P.bOpenAt ? K : 1.0f - K;
 		const float Az = P.Az + P.Shift * Open;
-		A->SetActorLocationAndRotation(PolarCm(Az, DysisGB::R_OUT + 10.0f, P.Z), FRotator(0.0f, P.Yaw0 + (Az - P.Az0), 0.0f));
+		A->SetActorLocationAndRotation(DysisGB::PolarCm(Az, DysisGB::R_OUT + 10.0f, P.Z), FRotator(0.0f, P.Yaw0 + (Az - P.Az0), 0.0f));
 	}
 	// 杆：从一边扳到另一边（灰盒 ±0.5 弧度）
 	if (AActor* Arm = LeverArm.Get())
