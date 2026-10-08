@@ -360,8 +360,8 @@ void ADysisDirector::UpdateCatch(float Dt)
 	}
 	const float Before = CineSeconds;
 	CineSeconds += Dt;
-	// 取下以后跟在人右手边
-	if (const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
+	// 取下以后跟在人右手边（放上水亭的月托以后就留在那里了，见 UpdateFinale）
+	if (const APlayerController* PC = (GetWorld() && !bApplePlaced) ? GetWorld()->GetFirstPlayerController() : nullptr)
 		if (Time)
 		{
 			const FVector Right = FRotationMatrix(FRotator(0.0f, PC->GetControlRotation().Yaw, 0.0f)).GetUnitAxis(EAxis::Y);

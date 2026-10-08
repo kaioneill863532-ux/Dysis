@@ -1,5 +1,5 @@
-# 由灰盒导出的 golden/greybox_night2.json 生成夜里第二段要用的数据表（C++ 头文件）：月桥中线的 73 个点、
-# 厚墙和月之龛两块月石的取样点。重新导出以后再跑一次：
+# 由灰盒导出的 golden/greybox_night2.json、greybox_night3.json 生成夜里要用的数据表（C++ 头文件）：月桥中线的 73 个点、
+# 厚墙和月之龛两块月石的取样点、女神身上的取样点。重新导出以后再跑一次：
 #   python Tools/greybox/gen_night_data.py
 import json, os
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -14,6 +14,9 @@ out = ["// 由 Tools/greybox/gen_night_data.py 从灰盒 v0.12 导出的数据�
 out += table("GDysisMoonBridgePts", c["bridge"]["pts"])
 out += ["/** L1 东南厚墙（月石 twinWall）的九个取样点。 */"] + table("GDysisTwinWallSamples", c["twinWall"]["samples"])
 out += ["/** 月之龛（月石 moonShrine）的九个取样点。 */"] + table("GDysisMoonShrineSamples", c["MSHRINE"]["samples"])
+g3 = json.load(open(os.path.join(HERE, "golden", "greybox_night3.json"), encoding="utf-8"))["consts"]["GOD"]
+out += ["/** 瀑布后面的女神：怀里那轮月亮盘面上的五个点（月光要整个罩住它们）。 */"] + table("GDysisGoddessSamples", g3["samples"], 5)
+out += ["/** 女神身上从脚到头五个高度（月光扫过她身上多少，只管她亮不亮）。 */"] + table("GDysisGoddessSweep", g3["sweep"], 5)
 dst = os.path.normpath(os.path.join(HERE, "..", "..", "Source", "Dysis", "Mechanisms", "DysisNightData.generated.h"))
 open(dst, "wb").write(b"\xef\xbb\xbf" + "\n".join(out).encode("utf-8"))
 print("wrote", dst, len(c["bridge"]["pts"]), "bridge points")

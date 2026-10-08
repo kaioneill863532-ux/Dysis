@@ -194,6 +194,32 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	float DebugStatueMoonLit(FVector FootCm) const;
 
+	// ───── 夜里第三段：瀑布后面的女神、半桥、影桥、放苹果和结局 —— DysisDirectorFinale.cpp ─────
+
+	/** 月光整个落进了女神怀里的月亮：她亮起来，水池东北边伸出半桥。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bGoddessLit = false;
+
+	/** 金苹果放上了水亭浑天仪的月托。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bApplePlaced = false;
+
+	/** 测试用：这一段现在的样子（JSON）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeFinale() const;
+
+	/** 测试用：女神身上的取样点照没照到（"lit,box,…|lit,box,…"：前五个是怀里的月亮，后五个是全身）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugGoddessLit() const;
+
+	/** 测试用：时刻 H 时屋顶细桥落在水面上的影子的四个角（JSON；月亮太低就是 null）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugBridgeShadow(float H) const;
+
+	/** 测试用：月桥直接出现（不用先解双子）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugShowMoonBridge();
+
 	virtual void Tick(float DeltaTime) override;
 
 protected:
@@ -355,6 +381,26 @@ private:
 	float PolluxYaw0 = 0.0f;
 	TWeakObjectPtr<UBoxComponent> PolluxBlock, ChainBlock;
 	TArray<TWeakObjectPtr<UBoxComponent>> MoonRails;
+
+	// 夜里第三段（灰盒 GOD / SHADOWBR / placeApple）—— DysisDirectorFinale.cpp
+	void SetupFinale();
+	void AddFinaleInteracts();
+	void UpdateGoddess(float Dt);
+	void UpdateShadowBridge(float Dt);
+	void UpdateFinale(float Dt);
+	bool RoofBridgeShadow(float H, FVector OutQuad[4]) const;
+	float GoddessLit = 0.0f, GoddessSweep = 0.0f, GoddessDwell = 0.0f, HalfBridgeExt = 0.0f, ShadowOn = 0.0f, FinaleT = 0.0f;
+	bool bGoddessGlint = false, bGoddessHinted = false, bShadowTold = false, bEndingStarted = false, bEndingDone = false;
+	TWeakObjectPtr<AActor> HalfDeck;
+	TWeakObjectPtr<UBoxComponent> HalfFloor;
+	TArray<TWeakObjectPtr<UBoxComponent>> HalfRails;
+	TWeakObjectPtr<class ADysisInvisibleWall> ShadowFloor;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> ShadowPlane;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> ShadowMID;
+	UPROPERTY()
+	TObjectPtr<class UDysisDialogueComponent> EndingDialogue;
 
 	TMap<FName, TWeakObjectPtr<AActor>> Pieces;
 	TArray<FDysisInteract> Interacts;
