@@ -17,8 +17,10 @@ Dysis/
 │       └── Sky/                 月亮圆盘材质
 ├── Source/Dysis/           C++ 源码
 │   ├── Sky/                日月轨道、时间函数库、玩家时间组件
+│   ├── Audio/              背景音乐管理器；音效系统（设置页、播放、总调度、脚步）
 │   └── Player/             测试用第一人称玩家与 GameMode
 ├── Art/Models/temple-v0.12/     建筑模型源文件：Blender、FBX、UE 导入脚本、机关清单、核对报告
+├── Art/Audio/              265 个音效 WAV、一键导入脚本 ue_import_sfx.py、说明（README.md）
 └── Docs/
     ├── UE实现说明.md        日月与时间系统的实现、给程序的接口、已知问题
     └── Design/             游戏设计、系统文档、施工图

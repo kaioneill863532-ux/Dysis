@@ -20,6 +20,8 @@ public class Dysis : ModuleRules
 			"MovieScene",
 			"Slate",       // HUD 的 FSlateFontInfo/FCanvasTextItem（思源宋体 FontFace 画字）
 			"SlateCore",
+			"DeveloperSettings",   // 音效设置页（Audio/DysisSfxSettings：Project Settings → Game → Dysis 音效）
+			"AssetRegistry",       // 殿内混响资产一键生成（Audio/DysisSfxReverb.cpp，编辑器里用）
 		});
 		
 		// Uncomment if you are using online features

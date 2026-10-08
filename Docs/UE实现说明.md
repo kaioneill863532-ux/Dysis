@@ -19,6 +19,7 @@ UE 5.8 里“日月在天上的固定轨道”和“时间由玩家站的位置�
 | `Content/Dysis/UI/Portraits/` ×4 | 对话立绘（赫利俄斯/狄西斯/塞勒涅/伊莉丝）——按台词行首人名自动挂出 |
 | `Content/Dysis/UI/References/Mockups/` ×8 | 示意图（主界面/设置/局内两款/四角色），美术参考不进游戏画面（设置页 v1 拿设置示意图占位） |
 | `Content/Dysis/UI/Fonts/SourceHanSerifSC-*.uasset` | 思源宋体 FontFace（Regular/Bold，`tools/import_fonts.py` 导入）；`DysisHUD` BeginPlay 自动加载 Regular 画全部 UI 文字，缺资产退回引擎默认字体 |
+| `Source/Dysis/Audio/DysisSfx*`、`Art/Audio/` | 音效：265 个 WAV 由 `Art/Audio/ue_import_sfx.py` 导入到 `Content/Dysis/Audio/SFX/` 并在关卡里摆好总调度 `DysisSfx`；触发条件、调节（Project Settings → Game → Dysis 音效）、测试见 [Art/Audio/README.md](../Art/Audio/README.md) |
 
 `Source/Dysis/Dysis.Build.cs` 里加了 `PublicIncludePaths.Add(ModuleDirectory);`，子文件夹按 `"Sky/xxx.h"` 引用。
 
