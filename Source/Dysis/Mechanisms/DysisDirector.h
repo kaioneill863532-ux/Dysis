@@ -30,6 +30,7 @@ struct FDysisInteract
 	TFunction<bool()> When;                // 空 = 一直能用
 	TFunction<FText()> Label;
 	TFunction<void()> Act;
+	TFunction<FVector()> Anchor;           // 提示（圆角方块里的 E 和旁边的字）浮在哪；空 = 互动点上方 1.1 m
 };
 
 UCLASS()
@@ -49,6 +50,9 @@ public:
 
 	/** 脚站在这里时够得着的互动点里最近的一个（没有就是空）。 */
 	const FDysisInteract* NearestInteract(const FVector& FootCm) const;
+
+	/** 这个互动点的提示浮在世界里的哪一点。 */
+	FVector InteractAnchor(const FDysisInteract& I) const;
 
 	/** 按 E：做最近那个互动点的事。返回有没有做。 */
 	bool Interact(const FVector& FootCm);
@@ -222,6 +226,28 @@ public:
 
 	virtual void Tick(float DeltaTime) override;
 
+	// ───── 夜里几样“看的”东西：金苹果的光、瀑布上的月虹、结局的星座 —— DysisDirectorSky.cpp ─────
+
+	/** 伊莉丝和塞勒涅的那段话说完了：之后夜里月亮升到东边不高不低的地方，瀑布前面会有一道月虹。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	bool bSeleneTalked = false;
+
+	/** 月虹现在显出来多少（0–1）。 */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
+	float MoonbowK = 0.0f;
+
+	/** 测试用：直接算作那段话说完了（或者没说过）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugSetSeleneTalked(bool bTalked);
+
+	/** 测试用：直接放结局（bAllShards = 三片碎片都集齐了的那一个，有星座）。人要先站在水亭上。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugPlayEnding(bool bAllShards);
+
+	/** 测试用：这几样现在的样子（JSON）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeSkyFx() const;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -251,6 +277,8 @@ private:
 		TWeakObjectPtr<AActor> Curb;                 // 踏步内沿的一道铜边：跟着踏步走，只挡镜头
 		FVector CurbBase = FVector::ZeroVector;
 		float BladeYaw = 0.0f;
+		TWeakObjectPtr<UStaticMeshComponent> BladeLook;   // 叶片只管看的那一份（形状不动，用材质剪出光圈）
+		float BladeLookDz = 0.0f;
 		TArray<FRoofWall> Walls;                     // 看不见的墙（跟着踏面走），人不会掉进光圈、也走不出屋顶
 	};
 	void SetupRoof();
@@ -377,7 +405,7 @@ private:
 	int32 TwinState = 0;                         // 0 藏在墙里、1 墙透开了（在龛里）、2 正在拉出来、3 出来了（可以推）、4 并肩了
 	float TwinT = 0.0f, PolluxAz = 0.0f, PolluxLit = 0.0f, CastorLit = 0.0f, TwinLitClock = 0.0f;
 	bool bShrineTold = false;
-	TWeakObjectPtr<AActor> Pollux, Castor, TwinChain, MoonDeck, MoonShrineShard;
+	TWeakObjectPtr<AActor> Pollux, Castor, TwinChain, MoonDeck, MoonShrineShard, MoonShrineNiche;
 	float PolluxYaw0 = 0.0f;
 	TWeakObjectPtr<UBoxComponent> PolluxBlock, ChainBlock;
 	TArray<TWeakObjectPtr<UBoxComponent>> MoonRails;
@@ -401,6 +429,44 @@ private:
 	TObjectPtr<class UMaterialInstanceDynamic> ShadowMID;
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> EndingDialogue;
+
+	// 金苹果的光、月虹、结局的星座 —— DysisDirectorSky.cpp
+	void SetupSkyFx();
+	void UpdateAppleLight(float Dt);
+	void UpdateMoonbow(float Dt);
+	void StartStarShow();
+	void UpdateEndingStars(float Dt);
+	bool StarShowDone() const;
+	struct FConStar { FVector Dir = FVector::UpVector; float Gain = 1.0f, At = 0.0f, PulseAt = 1.0e9f; };
+	struct FConLine { int32 A = 0, B = 0; float At = 0.0f; };
+	TArray<FConStar> ConStarInfo;
+	TArray<FConLine> ConLineInfo;
+	float StarShowT = -1.0f, StarShowEnd = 0.0f;   // 星座的动画放到第几秒（< 0 = 没开始）
+	bool bSeleneTalkStarted = false, bEndingAll = false;
+	FLinearColor AppleLightColor = FLinearColor::White;
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> AppleLight;
+	/** 月之龛里碎片的一点微光（灰盒里碎片自己发光）：龛透开了、碎片还在的时候亮着，夜里远远就能看见龛在哪。 */
+	UPROPERTY()
+	TObjectPtr<class UPointLightComponent> ShrineGlow;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> MoonbowPlane;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> MoonbowMID;
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> ConStars;
+	UPROPERTY()
+	TObjectPtr<class UInstancedStaticMeshComponent> ConLines;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> ConStarMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> ConLineMID;
+	UPROPERTY()
+	TObjectPtr<class ACameraActor> EndingCamera;
+
+	/** 光圈叶片“只管看的那一份”用的材质（每种原来的材质一个），参数 Aperture = 现在的光圈半径。 */
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> IrisMIDs;
 
 	/** 机关的音效 —— DysisDirectorSfx.cpp：每帧看一遍各个机关的状态，哪个变了就在它那里放对应的一次性音效
 	 *  （音效表在 Audio/DysisSfxDefaults.cpp；脚步、环境声、界面声还是 ADysisSfxDirector 管）。 */

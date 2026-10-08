@@ -112,6 +112,7 @@ void ADysisDirector::BeginPlay()
 	SetupNight();
 	SetupTwins();
 	SetupFinale();
+	SetupSkyFx();
 	BuildInteracts();
 }
 
@@ -120,7 +121,14 @@ void ADysisDirector::CollectPieces()
 	Pieces.Reset();
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		for (const FName& Tag : It->Tags)
-			if (Tag.ToString().StartsWith(TEXT("SM_"))) { Pieces.Add(Tag, *It); break; }
+		{
+			const FString Name = Tag.ToString();
+			if (!Name.StartsWith(TEXT("SM_"))) continue;
+			Pieces.Add(Tag, *It);
+			// 模型里带的对位标记（SM_MARK_*，比如殿心正上方 45 m 的那个红方块）：导入核对用的，游戏里不显示、不挡东西
+			if (Name.StartsWith(TEXT("SM_MARK_"))) { It->SetActorHiddenInGame(true); It->SetActorEnableCollision(false); }
+			break;
+		}
 }
 
 AActor* ADysisDirector::Piece(FName Label) const
@@ -166,6 +174,7 @@ void ADysisDirector::BuildInteracts()
 		I.When = [this]() { return !bCaught; };
 		I.Label = []() { return FText::FromString(DysisCopy::PromptTakeApple); };
 		I.Act = [this]() { CatchLight(); };
+		I.Anchor = [this]() { return ArmTopCm(); };
 		Interacts.Add(MoveTemp(I));
 	}
 	AddMirrorInteracts();
@@ -188,6 +197,14 @@ const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
 		if (D < I.RadiusCm && D < BestDist) { Best = &I; BestDist = D; }
 	}
 	return Best;
+}
+
+FVector ADysisDirector::InteractAnchor(const FDysisInteract& I) const
+{
+	if (I.Anchor) return I.Anchor();
+	const FVector P = I.Pos();
+	const FVector2D ZR = I.ZRange();
+	return FVector(P.X, P.Y, FMath::Max(P.Z, ZR.X + 30.0) + 110.0);   // 默认：互动点（或它那一层的地面）上方 1.1 m
 }
 
 bool ADysisDirector::Interact(const FVector& Foot)
@@ -281,6 +298,9 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateLevelTitle();
 	UpdateStairs(DeltaTime);
 	UpdateCatch(DeltaTime);
+	UpdateAppleLight(DeltaTime);
+	UpdateMoonbow(DeltaTime);
+	UpdateEndingStars(DeltaTime);
 	UpdateSfx();
 }
 

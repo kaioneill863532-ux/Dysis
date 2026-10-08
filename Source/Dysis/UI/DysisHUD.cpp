@@ -15,6 +15,7 @@
 #include "Engine/FontFace.h"
 #include "Engine/GameInstance.h"
 #include "Engine/Texture2D.h"
+#include "TextureResource.h"
 #include "Fonts/CompositeFont.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -466,17 +467,9 @@ void ADysisHUD::SetShard(int32 Index, bool bHave)
 void ADysisHUD::DrawHintBar(float Dt)
 {
 	const float S = Canvas->SizeX / MockW;
-	// 内容：有通知显示通知；没有通知、也不在对话里时，显示脚边能互动的东西
+	// 内容：只有通知（解谜反馈、提示、机关反馈）。“按 E 做什么”不在这里，浮在互动点旁边（DrawInteractPrompt）
 	FString Want;
 	if (NotificationTimer > 0.0f) { Want = NotificationText; NotificationTimer -= Dt; }
-	else if (!(ActiveDialogue && ActiveDialogue->IsPlaying()))
-	{
-		if (UDysisInteractComponent* Interact = ResolveInteract())
-		{
-			FText Prompt;
-			if (Interact->GetPrompt(Prompt)) Want = TEXT("E   ") + Prompt.ToString();
-		}
-	}
 	if (!Want.IsEmpty()) HintShownText = Want;
 	HintAlpha = Approach(HintAlpha, Want.IsEmpty() ? 0.0f : 1.0f, Want.IsEmpty() ? 2.5f : 6.0f, Dt);
 	if (HintAlpha <= 0.01f || HintShownText.IsEmpty()) return;
@@ -490,6 +483,69 @@ void ADysisHUD::DrawHintBar(float Dt)
 	const float LineH = Px * (Canvas->SizeY / 1080.0f) * 1.4f;
 	const float Top = CY - Lines.Num() * LineH * 0.5f + LineH * 0.08f;
 	for (int32 i = 0; i < Lines.Num(); ++i) DrawUIText(Lines[i], Cream.CopyWithNewOpacity(HintAlpha), CX, Top + i * LineH, Px, 0.5f);
+}
+
+UTexture2D* ADysisHUD::KeycapTexture()
+{
+	// 圆角方块（像一个键帽）：深色半透明的底、米色的边。现画一张小图，只画一次
+	if (Keycap) return Keycap;
+	const int32 N = 96;
+	Keycap = UTexture2D::CreateTransient(N, N, PF_B8G8R8A8);
+	if (!Keycap) return nullptr;
+	Keycap->SRGB = true;
+	FColor* Px = static_cast<FColor*>(Keycap->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE));
+	const float Half = N * 0.5f - 2.0f, Round = 22.0f, Border = 5.0f;
+	const FLinearColor Edge(0.96f, 0.93f, 0.86f, 0.95f), Fill(0.07f, 0.06f, 0.05f, 0.72f);
+	for (int32 y = 0; y < N; ++y)
+		for (int32 x = 0; x < N; ++x)
+		{
+			// 到圆角方块边缘的距离（里面是负的）
+			const float Qx = FMath::Abs(x + 0.5f - N * 0.5f) - (Half - Round), Qy = FMath::Abs(y + 0.5f - N * 0.5f) - (Half - Round);
+			const float D = FVector2D(FMath::Max(Qx, 0.0f), FMath::Max(Qy, 0.0f)).Size() + FMath::Min(FMath::Max(Qx, Qy), 0.0f) - Round;
+			const float Outer = FMath::Clamp(0.5f - D, 0.0f, 1.0f), Inner = FMath::Clamp(0.5f - (D + Border), 0.0f, 1.0f);
+			FLinearColor C = FMath::Lerp(Edge, Fill, Inner);
+			C.A *= Outer;
+			Px[y * N + x] = C.ToFColor(true);
+		}
+	Keycap->GetPlatformData()->Mips[0].BulkData.Unlock();
+	Keycap->UpdateResource();
+	return Keycap;
+}
+
+void ADysisHUD::DrawInteractPrompt(float Dt)
+{
+	// 走近能互动的东西：在它旁边浮出一个圆角方块（里面一个 E）和一行字。对话的时候不出。
+	FString Want;
+	FVector Anchor = FVector::ZeroVector;
+	if (!(ActiveDialogue && ActiveDialogue->IsPlaying()))
+		if (UDysisInteractComponent* Interact = ResolveInteract())
+		{
+			FText Prompt;
+			if (Interact->GetPromptAt(Prompt, Anchor)) Want = Prompt.ToString();
+		}
+	const float S = Canvas->SizeY / 1080.0f;
+	const float Key = 42.0f * S, Gap = 12.0f * S, LabelPx = 25.0f;
+	if (!Want.IsEmpty())
+	{
+		PromptText = Want;
+		const float LabelW = float(MeasureText(Want, MakeFont(LabelPx)).X);
+		// 互动点投到屏幕上，提示放在它右边一点；看不见它（在镜头后面、出了屏幕）就放在屏幕中间偏下
+		FVector2D OnScreen;
+		APlayerController* PC = GetOwningPlayerController();
+		FVector2D Target(Canvas->SizeX * 0.5f - (Key + Gap + LabelW) * 0.5f, Canvas->SizeY * 0.68f);
+		if (PC && PC->ProjectWorldLocationToScreen(Anchor, OnScreen, false) && OnScreen.X > 0.0 && OnScreen.X < Canvas->SizeX && OnScreen.Y > 0.0 && OnScreen.Y < Canvas->SizeY)
+		{
+			Target.X = FMath::Clamp(float(OnScreen.X) + 30.0f * S, 40.0f * S, Canvas->SizeX - (Key + Gap + LabelW) - 40.0f * S);
+			Target.Y = FMath::Clamp(float(OnScreen.Y), 120.0f * S, Canvas->SizeY - 120.0f * S);
+		}
+		PromptPos = PromptAlpha < 0.05f ? Target : FMath::Lerp(PromptPos, Target, FMath::Min(1.0f, Dt * 12.0f));
+	}
+	PromptAlpha = Approach(PromptAlpha, Want.IsEmpty() ? 0.0f : 1.0f, Want.IsEmpty() ? 5.0f : 8.0f, Dt);
+	if (PromptAlpha <= 0.01f || PromptText.IsEmpty()) return;
+	const float X0 = float(PromptPos.X), Y0 = float(PromptPos.Y) - Key * 0.5f;
+	DrawUIImage(KeycapTexture(), X0, Y0, Key, Key, FLinearColor(1.0f, 1.0f, 1.0f, PromptAlpha));
+	DrawUIText(TEXT("E"), Cream.CopyWithNewOpacity(PromptAlpha), X0 + Key * 0.5f, Y0 + Key * 0.5f - 24.0f * S * 0.72f, 24.0f, 0.5f, true, false);
+	DrawUIText(PromptText, Cream.CopyWithNewOpacity(PromptAlpha), X0 + Key + Gap, Y0 + Key * 0.5f - LabelPx * S * 0.72f, LabelPx, 0.0f);
 }
 
 void ADysisHUD::DrawDialogue()
@@ -546,6 +602,7 @@ void ADysisHUD::DrawInGame(float Dt)
 	DrawUIImage(UITex("SettingsInGame", TEXT("/Game/Dysis/UI/InGame/SettingsInGame.SettingsInGame")), ClockBox.X * S, ClockBox.Y * S, ClockBox.W * S, ClockBox.H * S);
 	DrawShards();
 	DrawHintBar(Dt);
+	DrawInteractPrompt(Dt);
 	DrawDialogue();
 }
 

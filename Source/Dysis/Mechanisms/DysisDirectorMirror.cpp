@@ -5,6 +5,7 @@
 //   · 镜面的位置、朝向、被照亮的那一块写进世界状态（UDysisWorldState::Mirror），镜光和月光反射从那里读。
 //   · 日之龛：顺着镜光走到石台上，按 E 打开，得到太阳碎片。
 #include "DysisDirector.h"
+#include "Audio/DysisMusicManager.h"
 #include "DysisGreybox.h"
 #include "World/DysisWorldState.h"
 #include "Beams/DysisBeamActor.h"
@@ -235,6 +236,11 @@ void ADysisDirector::DebugSetNight(bool bNight)
 {
 	bCaught = bNight;
 	if (UDysisTimeComponent* Time = PlayerTime()) Time->SetNight(bNight);
+	if (ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this))
+	{
+		if (bNight) Music->SwitchToNight();
+		else if (Music->IsNight()) Music->PlayDay();
+	}
 }
 
 FString ADysisDirector::DescribeMirror() const

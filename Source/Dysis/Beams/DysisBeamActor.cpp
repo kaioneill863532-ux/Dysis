@@ -701,7 +701,30 @@ void ADysisBeamActor::ApplyGreyboxComponents()
 	LenCm = bFrameValid ? Len : 0.0;
 
 	// 看得见的光：一根沿着光的长条（截面 = 被照亮的那一块窗）。亮度：照亮比例 × 增益，不能踩的暗一些。
-	const bool bShow = bFrameValid && Len > 5.0;
+	// 殿里的光要有水雾托着才显得出来：沿光每隔半米看一下那里有没有雾，只显出有雾的那一段；没开水闸的时候殿里一点也看不见
+	// （灰盒里没有雾也留着 8% 的亮度，所以还没开闸光路就隐约在那里了——那是个老毛病，这里不要）。
+	// 殿外不用雾：开场从岛上通过来的那一束，外面那一段一直看得见，伸进殿里的那一段也要等雾起来。
+	float MistLook = 0.0f;
+	double ShowS0 = 0.0, ShowS1 = 0.0;
+	if (bFrameValid && Len > 5.0)
+	{
+		const UDysisWorldState* MistState = UDysisWorldState::Get(this);
+		const FVector C0 = FrameO + (FrameU + FrameV) * 0.5;
+		double Sum = 0.0;
+		int32 Count = 0;
+		for (double S = 25.0; S < Len; S += 50.0)
+		{
+			const FVector P = C0 + FrameL * S;
+			const float M = DysisGB::ROf(P) > DysisGB::R_OUT ? 1.0f : FMath::Clamp(MistState ? MistState->MistAt(P) : 0.0f, 0.0f, 1.0f);
+			if (M <= 0.02f) continue;
+			if (Count == 0) ShowS0 = S - 25.0;
+			ShowS1 = FMath::Min(S + 25.0, Len);
+			Sum += M;
+			++Count;
+		}
+		MistLook = Count > 0 ? FMath::Clamp(float(Sum / Count) * 1.6f, 0.0f, 1.0f) : 0.0f;
+	}
+	const bool bShow = bFrameValid && ShowS1 > ShowS0 + 5.0 && MistLook > 0.01f;
 	Visual->SetVisibility(bShow);
 	if (bShow)
 	{
@@ -711,9 +734,9 @@ void ADysisBeamActor::ApplyGreyboxComponents()
 		Y = Wd > 1.0e-3 ? Y / Wd : FVector::RightVector;
 		const FVector Z = FVector::CrossProduct(X, Y);
 		const double Ht = FMath::Abs(FVector::DotProduct(FrameV, Z));
-		Visual->SetWorldLocationAndRotation(FrameO + (FrameU + FrameV) * 0.5 + X * (Len * 0.5), FRotationMatrix::MakeFromXY(X, Y).ToQuat());
-		Visual->SetWorldScale3D(FVector(Len, Wd, FMath::Max(Ht, 1.0)) / 100.0);
-		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * (bGreyboxOculus ? 1.1f : GreyboxMirror == 1 ? 0.85f : GreyboxMirror == 2 ? 0.6f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f));
+		Visual->SetWorldLocationAndRotation(FrameO + (FrameU + FrameV) * 0.5 + X * ((ShowS0 + ShowS1) * 0.5), FRotationMatrix::MakeFromXY(X, Y).ToQuat());
+		Visual->SetWorldScale3D(FVector(ShowS1 - ShowS0, Wd, FMath::Max(Ht, 1.0)) / 100.0);
+		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * (bGreyboxOculus ? 1.1f : GreyboxMirror == 1 ? 0.85f : GreyboxMirror == 2 ? 0.6f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f) * MistLook);
 	}
 
 	// 能踩的面：光的下表面，从 s0 到 s1，两侧各宽 0.35 m。用一块 4 cm 厚的板，顶面就是那个面。

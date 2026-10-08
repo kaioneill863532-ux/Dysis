@@ -81,34 +81,66 @@ void UDysisCharacterMovement::TickComponent(float DeltaTime, ELevelTick TickType
 void UDysisCharacterMovement::UpdateOneWayFloors(float DeltaTime)
 {
 	UPrimitiveComponent* Body = Cast<UPrimitiveComponent>(UpdatedComponent);
+	const UCapsuleComponent* Capsule = Cast<UCapsuleComponent>(UpdatedComponent);
 	UWorld* World = GetWorld();
 	if (!Body || !World) return;
-	// 每秒重新找一遍带 Tag 的板（光是开局后才生成的，有的板后来才出现）
+	// 每秒重新找一遍带 Tag 的组件（光是开局后才生成的，有的板后来才出现）：
+	//   DysisOneWay = 能踩的薄板（只托脚）；DysisNoTrap = 会忽然出现的护栏、挡块
 	OneWayClock -= DeltaTime;
 	if (OneWayClock <= 0.0f)
 	{
 		OneWayClock = 1.0f;
 		OneWayFloors.Reset();
 		for (TActorIterator<AActor> It(World); It; ++It)
-			It->ForEachComponent<UPrimitiveComponent>(false, [this](UPrimitiveComponent* C) { if (C->ComponentHasTag(TEXT("DysisOneWay"))) OneWayFloors.Add(C); });
+			It->ForEachComponent<UPrimitiveComponent>(false, [this](UPrimitiveComponent* C) { if (C->ComponentHasTag(TEXT("DysisOneWay")) || C->ComponentHasTag(TEXT("DysisNoTrap"))) OneWayFloors.Add(C); });
 	}
 	const FVector Foot = FootCm();
+	const double Radius = Capsule ? Capsule->GetScaledCapsuleRadius() : 30.0, HalfHeight = Capsule ? Capsule->GetScaledCapsuleHalfHeight() : 90.0;
 	for (const TWeakObjectPtr<UPrimitiveComponent>& Weak : OneWayFloors)
 	{
 		UPrimitiveComponent* C = Weak.Get();
 		if (!C) continue;
-		bool bIgnore = false;
-		if (C->GetCollisionEnabled() != ECollisionEnabled::NoCollision)
+		const bool bOn = C->GetCollisionEnabled() != ECollisionEnabled::NoCollision;
+		bool bIgnore = false, bTouch = false;
+		if (bOn)
 		{
-			// 板在自己坐标里的半尺寸：盒子组件直接问；引擎方块（100 cm）按缩放算
+			// 组件在自己坐标里的半尺寸：盒子组件直接问；引擎方块（100 cm）按缩放算
 			const UBoxComponent* Box = Cast<UBoxComponent>(C);
 			const FVector Half = Box ? Box->GetScaledBoxExtent() : C->GetComponentScale().GetAbs() * 50.0;
 			const FTransform& T = C->GetComponentTransform();
+			const FVector AX = T.GetUnitAxis(EAxis::X), AY = T.GetUnitAxis(EAxis::Y), AZ = T.GetUnitAxis(EAxis::Z);
 			const FVector D = Foot - T.GetLocation();
-			const double X = FVector::DotProduct(D, T.GetUnitAxis(EAxis::X)), Y = FVector::DotProduct(D, T.GetUnitAxis(EAxis::Y)), Z = FVector::DotProduct(D, T.GetUnitAxis(EAxis::Z));
-			// 人在板的正下方（或者贴着边）、脚比板面低出一步迈不上去的高度：不挡
-			if (FMath::Abs(X) <= Half.X + 45.0 && FMath::Abs(Y) <= Half.Y + 45.0) bIgnore = Z < Half.Z - 50.0;
+			// 脚的正上方（正下方）这块板的某一个面离脚有多高（沿竖直方向量；板可以是斜的、很短的一段，比如虹桥是 90 段接起来的）。
+			// 脚不在这一面的正下方（四周放宽 45 cm）就不算。
+			auto GapAbove = [&](double FaceLocalZ, double& OutGap)
+			{
+				if (FMath::Abs(AZ.Z) < 0.2) return false;   // 竖着的板不这么量
+				OutGap = (FaceLocalZ - FVector::DotProduct(D, AZ)) / AZ.Z;
+				const FVector Q = D + FVector(0.0, 0.0, OutGap);
+				return FMath::Abs(FVector::DotProduct(Q, AX)) <= Half.X + 45.0 && FMath::Abs(FVector::DotProduct(Q, AY)) <= Half.Y + 45.0;
+			};
+			double Gap = 0.0;
+			// ① 能踩的板：它的顶面比脚高出一步迈不上去的高度（人在它下面，或者贴着它的边）——不挡
+			if (C->ComponentHasTag(TEXT("DysisOneWay"))) { if (GapAbove(Half.Z, Gap)) bIgnore = Gap > 50.0; }
+			// ①′ 桥边的护栏：它是立在桥面上的，底边就是桥面。底边比脚高出那么多 = 人不在桥上（在桥底下、桥旁边）——也不挡，
+			//     不然人站在桥头底下时桥一出现，两边是护栏、前面是压下来的桥面，就被圈在里面了
+			else if (GapAbove(-Half.Z, Gap)) bIgnore = Gap > 50.0;
+			// 人的身子（胶囊）现在是不是插在这个组件里：沿胶囊的中轴取 5 个点，看离盒子有没有一个半径那么近
+			for (int32 i = 0; i < 5 && !bTouch; ++i)
+			{
+				const FVector P = D + FVector(0.0, 0.0, Radius + (HalfHeight - Radius) * 2.0 * i / 4.0);
+				const double QX = FMath::Max(FMath::Abs(FVector::DotProduct(P, AX)) - Half.X, 0.0), QY = FMath::Max(FMath::Abs(FVector::DotProduct(P, AY)) - Half.Y, 0.0), QZ = FMath::Max(FMath::Abs(FVector::DotProduct(P, AZ)) - Half.Z, 0.0);
+				bTouch = QX * QX + QY * QY + QZ * QZ < FMath::Square(Radius - 1.5);
+			}
 		}
+		// ② 它开始挡人的那一刻（刚出现：虹桥长出来、护栏立起来；或者人从桥底下往桥头走，桥面低到“脚够得着”了）
+		//    人的身子正好插在里面：先不挡，等人走出来了再算数——不然人会被卡死在里面
+		const bool bBlocks = bOn && !bIgnore;
+		bool& bWasBlocking = OneWayWasOn.FindOrAdd(Weak, bBlocks);
+		if (bBlocks && !bWasBlocking && bTouch) OneWayTrapped.Add(Weak);
+		else if (OneWayTrapped.Contains(Weak) && (!bOn || !bTouch)) OneWayTrapped.Remove(Weak);
+		bWasBlocking = bBlocks;
+		bIgnore = bIgnore || OneWayTrapped.Contains(Weak);
 		if (bIgnore != OneWayIgnored.Contains(Weak))
 		{
 			Body->IgnoreComponentWhenMoving(C, bIgnore);

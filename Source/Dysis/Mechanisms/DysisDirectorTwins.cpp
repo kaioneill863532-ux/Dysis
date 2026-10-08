@@ -15,6 +15,7 @@
 #include "UI/DysisHUD.h"
 #include "World/DysisWorldState.h"
 #include "Components/BoxComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -32,6 +33,10 @@ namespace
 	// 月之龛：二层北墙，方位 6.58°，离地 1.55 m
 	const FVector TwnShrinePos(1564.634, 180.405, 1639.706);
 	constexpr float TwnShrineZ = 1604.706f;
+	// 灰盒里月之龛的石台、背板和碎片是做在墙里面的（墙面往里 0–0.6 m），可墙的模型上没有洞：月石透开以后还是只看见墙。
+	// 墙的模型开出洞以前，先把这三样一起朝殿心挪出来这么多：背板正好贴在墙面上，石台和碎片在墙外面
+	constexpr double TwnShrineShift = 56.0;
+	const FVector TwnShrineOut = TwnShrinePos - FVector(TwnShrinePos.X, TwnShrinePos.Y, 0.0).GetSafeNormal() * TwnShrineShift;
 
 	enum { TwnHidden = 0, TwnInNiche = 1, TwnPulling = 2, TwnIsOut = 3, TwnJoined = 4 };
 
@@ -123,6 +128,7 @@ void ADysisDirector::SetupTwins()
 				Box->SetBoxExtent(FVector((D.Size() + 15.0) * 0.5, 5.0, 110.0));
 				Box->SetWorldLocationAndRotation((A + B) * 0.5 + Sn * (Sg * (TwnBridgeHalfW + 10.0)) + FVector(0.0, 0.0, 110.0), FRotator(0.0f, Yaw, 0.0f));
 				Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				Box->ComponentTags.Add(TEXT("DysisNoTrap"));
 				MoonRails.Add(Box);
 			}
 		}
@@ -141,6 +147,7 @@ void ADysisDirector::SetupTwins()
 		Box->SetBoxExtent(FVector(40.0, 40.0, 110.0));
 		Box->SetWorldLocation(TwnNiche + FVector(0.0, 0.0, 110.0));
 		Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Box->ComponentTags.Add(TEXT("DysisNoTrap"));
 		PolluxBlock = Box;
 	}
 	// 铜链后面看不见的挡板：桥头那一段栏杆口，合拢前过不去
@@ -152,8 +159,32 @@ void ADysisDirector::SetupTwins()
 		ChainBlock = Box;
 	}
 	MoonShrineShard = Piece(TEXT("SM_Mech_MoonShrine_Shard"));
-	if (AActor* Sh = MoonShrineShard.Get()) { TwnMovable(Sh); Sh->SetActorEnableCollision(false); Sh->SetActorHiddenInGame(true); }
+	MoonShrineNiche = Piece(TEXT("SM_Mech_MoonShrine_Niche"));
+	// 石台（连背板）和碎片：挪到墙外面，平时藏着，月石透开了才显出来；都不挡人、不挡光
+	for (AActor* A : { MoonShrineShard.Get(), MoonShrineNiche.Get() })
+		if (A)
+		{
+			TwnMovable(A);
+			A->SetActorEnableCollision(false);
+			A->SetActorHiddenInGame(true);
+			A->AddActorWorldOffset(TwnShrineOut - TwnShrinePos);
+		}
 
+	if (!ShrineGlow)
+	{
+		ShrineGlow = NewObject<UPointLightComponent>(this);
+		ShrineGlow->SetupAttachment(RootComponent);
+		ShrineGlow->SetMobility(EComponentMobility::Movable);
+		ShrineGlow->SetIntensityUnits(ELightUnits::Candelas);
+		ShrineGlow->SetAttenuationRadius(320.0f);
+		ShrineGlow->SetSourceRadius(8.0f);
+		ShrineGlow->SetCastShadows(false);
+		ShrineGlow->SetLightColor(FLinearColor(FColor(0x9f, 0xb8, 0xff)));
+		ShrineGlow->SetIntensity(0.0f);
+		ShrineGlow->RegisterComponent();
+		// 放在碎片朝殿心这一侧稍高一点：照亮碎片朝外的一面、石台和背板
+		ShrineGlow->SetWorldLocation(TwnShrineOut - FVector(TwnShrinePos.X, TwnShrinePos.Y, 0.0).GetSafeNormal() * 28.0 + FVector(0.0, 0.0, 18.0));
+	}
 	TwinState = TwnHidden; TwinT = 0.0f; PolluxAz = TwnWallAz; PolluxLit = CastorLit = 0.0f; TwinLitClock = 0.0f;
 	bTwinsJoined = bMoonShard = bShrineTold = false;
 }
@@ -176,7 +207,7 @@ void ADysisDirector::AddTwinsInteracts()
 		// 月之龛：墙透开以后取出月亮碎片
 		FDysisInteract I;
 		I.Id = TEXT("moonShrine");
-		I.Pos = []() { return TwnShrinePos; };
+		I.Pos = []() { return TwnShrineOut; };
 		I.ZRange = []() { return FVector2D(TwnShrineZ - 160.0, TwnShrineZ + 40.0); };
 		I.RadiusCm = 160.0f;
 		I.When = [this]() { const FMoonstone* S = FindMoonstone(TEXT("moonShrine")); return !bMoonShard && S && S->K > 0.6f; };
@@ -304,6 +335,12 @@ void ADysisDirector::UpdateTwins(float Dt)
 			const bool bShow = !bMoonShard && Shrine->K > 0.2f;
 			if (Sh->IsHidden() == bShow) Sh->SetActorHiddenInGame(!bShow);
 			Sh->AddActorWorldRotation(FRotator(0.0f, FMath::RadiansToDegrees(Dt), 0.0f));
+		}
+		if (ShrineGlow) ShrineGlow->SetIntensity(bMoonShard ? 0.0f : 0.7f * DysisGB::Smoothstep(0.2f, 1.0f, Shrine->K));
+		if (AActor* Niche = MoonShrineNiche.Get())
+		{
+			const bool bShow = Shrine->K > 0.2f;   // 碎片拿走以后石台还留着
+			if (Niche->IsHidden() == bShow) Niche->SetActorHiddenInGame(!bShow);
 		}
 		if (Shrine->K > 0.6f && !bShrineTold)
 		{

@@ -7,6 +7,7 @@
 // 标准答案：Tools/greybox/golden/greybox_night3.json；测试：Tools/tests/pie_night3.py。
 // 灰盒里瀑布被月光打到的那一块会透开（只是画面效果），这里还没做；月光本来就不被瀑布挡着。
 #include "DysisDirector.h"
+#include "Audio/DysisMusicManager.h"
 #include "DysisGreybox.h"
 #include "DysisNightData.generated.h"
 #include "Beams/DysisBeamActor.h"
@@ -85,6 +86,7 @@ void ADysisDirector::SetupFinale()
 			Box->SetBoxExtent(FVector((FinHalfR0 - FinHalfR1 + 40.0f) * 0.5f, 4.0f, 135.0f));
 			Box->SetWorldLocationAndRotation(DysisGB::PolarCm(FinHalfAz + Sg * Off, (FinHalfR0 + 10.0f + FinHalfR1 - 30.0f) * 0.5f, 85.0f), FRotator(0.0f, FinHalfAz + Sg * Off, 0.0f));
 			Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Box->ComponentTags.Add(TEXT("DysisNoTrap"));
 			HalfRails.Add(Box);
 		}
 	}
@@ -131,6 +133,7 @@ void ADysisDirector::AddFinaleInteracts()
 	FDysisInteract I;
 	I.Id = TEXT("placeApple");
 	I.Pos = []() { return FVector(0.0, 0.0, FinPavTop); };
+	I.Anchor = []() { return FinArmillary; };
 	I.ZRange = []() { return FVector2D(FinPavTop - 30.0, FinPavTop + 160.0); };
 	I.RadiusCm = 280.0f;
 	I.When = [this]() { return bCaught && !bApplePlaced; };
@@ -312,17 +315,22 @@ void ADysisDirector::UpdateFinale(float Dt)
 	{
 		bEndingStarted = true;
 		const bool bAll = bSunNicheOpen && bIrisNicheOpen && bMoonShard;
+		bEndingAll = bAll;
 		const TCHAR* const* Lines = bAll ? DysisCopy::EndingB : DysisCopy::EndingA;
 		const int32 Num = bAll ? DysisCopy::EndingBCount : DysisCopy::EndingACount;
 		EndingDialogue->Lines.SetNum(Num);
 		for (int32 i = 0; i < Num; ++i) EndingDialogue->Lines[i] = FText::FromString(Lines[i]);
 		EndingDialogue->Play();
 	}
-	// 对话放完：黑场，回到主界面
-	if (bEndingStarted && !bEndingDone && EndingDialogue && !EndingDialogue->IsPlaying() && FinaleT > 5.0f)
+	// 三片碎片都集齐了：塞勒涅说到“满天星斗将为你闪烁”那一句时镜头抬起来，天上的星连成双子座和天鹅座（DysisDirectorSky.cpp）
+	if (bEndingStarted && bEndingAll && !bEndingDone && StarShowT < 0.0f && EndingDialogue && FinaleT > 4.2f && (EndingDialogue->CurrentLine >= 1 || !EndingDialogue->IsPlaying()))
+		StartStarShow();
+	// 对话放完（有星座的话等它画完）：黑场，回到主界面
+	if (bEndingStarted && !bEndingDone && EndingDialogue && !EndingDialogue->IsPlaying() && FinaleT > 5.0f && (StarShowT < 0.0f || StarShowDone()))
 	{
 		bEndingDone = true;
 		FinaleT = 100.0f;
+		if (ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this)) Music->StopMusic(2.0f);
 		if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->FadeTo(1.0f, 2.0f);
 	}
 	if (bEndingDone && Before < 102.5f && FinaleT >= 102.5f)

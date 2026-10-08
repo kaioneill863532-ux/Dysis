@@ -7,6 +7,7 @@
 
 class UDirectionalLightComponent;
 class UStaticMeshComponent;
+class UInstancedStaticMeshComponent;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 
@@ -65,7 +66,7 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	float TwilightEndAltDeg = -14.0f;
 
-	/** 月光：Atmosphere Sun Light，Index 1。 */
+	/** 月光：只照物体，不照亮大气（照亮大气的话整片夜空是亮蓝色的，比灰盒亮得多）；夜空的颜色由下面的 NightDome 画。 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
 	TObjectPtr<UDirectionalLightComponent> MoonLight;
 
@@ -111,26 +112,108 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
 	TArray<TObjectPtr<UDirectionalLightComponent>> NightFill;
 
-	/** 每一盏的照度（勒克斯）。0.59 = 朝上的面得到的和灰盒一样多（灰盒 0.45 × 换算 3.0）。 */
-	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
-	float NightFillLux = 0.59f;
+	/** 每一盏的照度（勒克斯）。按灰盒的数算是 0.59（朝上的面得到 0.45 × 换算 3.0）；这里的引擎自己还会算一点反光，
+	 *  拿画面对下来 0.45 时月光照不到的墙和灰盒一样暗。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightFillLux = 0.45f;
 
 	/** 这四盏斜着的角度（离地平线多少度）：越低墙面得到的越多、地面越少。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	float NightFillElevationDeg = 35.0f;
 
+	/** 落日以后、天还没黑透的那一阵（灰盒 dayAmb × (1 − dusk)）：白天这一份环境光是引擎的天光出的，可太阳一落到地平线下
+	 *  引擎的天光很快就全黑了，灰盒里却是跟着 dusk 慢慢暗下去的——所以落日以后的这一份也让上面那四盏灯顶着。
+	 *  每一盏的照度（勒克斯；0.33 是拿灰盒同样时刻的画面对出来的）和颜色（灰盒 dayAmb 天上那一半 #b8c4d0）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float DayFillLux = 0.33f;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	FLinearColor DayFillColor = FLinearColor(0.479f, 0.552f, 0.631f);
+
+	/** 落日以后那一阵天的颜色（灰蒙蒙的暮色；灰盒里是它的天空着色器在太阳落到地平线下时画出来的样子），随着天黑慢慢换成夜空。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	FLinearColor TwilightSkyColor = FLinearColor(0.055f, 0.049f, 0.043f);
+
+	/** 游戏里接住最后一缕光的那一刻叫一下（时间组件会叫）：从这一刻起天由夜空的球来画、暮色的环境光亮起来。
+	 *  没叫过的时候（比如主界面的延时摄影）按太阳的高度自己判断：落到地平线下 1.2°–2° 之间换过去。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky")
+	void SetAfterSunset(bool bAfter);
+
 	/** 灰盒 nightAmb 天上那一半的颜色（#3a4c70）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	FLinearColor NightFillColor = FLinearColor(0.0423f, 0.0723f, 0.1620f);
+
+	/** 夜空（灰盒 nightDome）：罩在外面的一个大球，朝里的一面画夜空——地平线附近深蓝、头顶近乎黑，月亮周围一圈淡淡的光。
+	 *  太阳落到地平线下 2° 开始显出来，到 10° 完全盖住白天的天。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
+	TObjectPtr<UStaticMeshComponent> NightDome;
+
+	/** 夜空的材质，参数 Opacity、Glow、Halo、MoonDir（设置脚本会建 /Game/Dysis/Sky/M_DysisNightDome）。 */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> NightDomeMaterial;
+
+	/** 夜空的球有多大（厘米；要比月亮圆盘远）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	float NightDomeRadiusCm = 460000.f;
+
+	/** 夜空亮度的换算（灰盒的颜色 × 这个数）。3.6 是拿灰盒同样位置的画面对出来的。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightSkyGain = 3.6f;
+
+	/** 星星（灰盒 stars）：1800 颗，位置、亮度、颜色和灰盒同一套随机数；绕着北天极跟时间一起转。
+	 *  太阳落到地平线下 4° 开始出现，到 13° 全亮。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
+	TObjectPtr<UInstancedStaticMeshComponent> Stars;
+
+	/** 星星的材质，参数 Opacity、Glow（设置脚本会建 /Game/Dysis/Sky/M_DysisStar）。 */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> StarMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	int32 StarCount = 1800;
+
+	/** 星星离天空中心多远（厘米；在月亮圆盘和夜空的球之间）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	float StarDistanceCm = 430000.f;
+
+	/** 一颗星看上去多大（度）。灰盒是 1.6 个像素的点；这里是一个中间亮、边上淡的小圆片，稍大一点免得闪。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	float StarAngularSizeDeg = 0.16f;
+
+	/** 星星亮度的换算（灰盒的亮度 × 这个数）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float StarGain = 6.0f;
+
+	/** 星星现在显出来多少（0–1），给结局的星座用。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Sky")
+	float GetStarOpacity() const { return StarOpacity; }
+
+	/** 把夜里的灯和夜空按现在的参数重摆一遍（调过上面的数以后叫一下）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky")
+	void RefreshSky();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void BeginPlay() override;
 
 private:
 	void ApplyMoonDisc();
+	void BuildStars();
+	void ApplyNightSky();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> MoonDiscMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> NightDomeMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> StarMID;
+
+	int32 StarsBuilt = 0;
+	float StarOpacity = 0.f;
+	bool bTimeSet = false;
+	bool bAfterSunset = false;
+	float AfterSunsetK() const;
 
 	float CurrentH = 0.f;
 	FVector SunDir = FVector::UpVector;

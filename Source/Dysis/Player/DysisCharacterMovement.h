@@ -94,6 +94,8 @@ private:
 	void UpdateOneWayFloors(float DeltaTime);
 	TArray<TWeakObjectPtr<UPrimitiveComponent>> OneWayFloors;
 	TSet<TWeakObjectPtr<UPrimitiveComponent>> OneWayIgnored;
+	TSet<TWeakObjectPtr<UPrimitiveComponent>> OneWayTrapped;      // 出现时人正好在里面的：等人出来再挡
+	TMap<TWeakObjectPtr<UPrimitiveComponent>, bool> OneWayWasOn;   // 上一帧它挡不挡这个人
 	float OneWayClock = 0.0f;
 
 	// ── 镜光上不碰头 ──

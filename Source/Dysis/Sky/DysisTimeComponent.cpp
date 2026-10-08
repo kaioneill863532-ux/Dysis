@@ -103,6 +103,7 @@ void UDysisTimeComponent::SetNight(bool bInNight)
 {
 	if (bInNight && !bNight) Sticky = H;   // 同灰盒 catchLight：state.sticky = state.H
 	bNight = bInNight;
+	if (ADysisSkyActor* Sky = ResolveSky()) Sky->SetAfterSunset(bNight);   // 从这一刻起天是暮色、夜空（见 ADysisSkyActor::SetAfterSunset）
 }
 
 void UDysisTimeComponent::SetForcedTime(float InH) { bHasForcedTime = true; ForcedTime = InH; }

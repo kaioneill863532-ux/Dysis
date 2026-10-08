@@ -9,7 +9,7 @@ namespace DysisSkyData
 	inline constexpr double LAT = 35.0;
 	inline constexpr double DEC_SUN = -21.0;
 	inline constexpr double DEC_MOON = 20.0;
-	inline constexpr double F[4] = { 0.0, 6.0, 14.5, 23.0 };
+	inline constexpr double FLOOR_Y[4] = { 0.0, 6.0, 14.5, 23.0 };   // 灰盒里叫 F；这里改了名：F 和引擎数学库里的参数重名，合并编译时会报“隐藏了全局声明”
 	inline constexpr double CEIL = 29.5;
 	inline constexpr double RING_Y = 30.3;
 	inline constexpr double SEAM[2] = { 116.0, 140.0 };

@@ -104,9 +104,15 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")
 	float CameraTunnelDistance = 260.f;
 
-	/** 入夜以后镜头用固定曝光（不然自动曝光会把月夜提亮得和白天一样）。数越大越亮；主界面夜里用的也是 1.2。 */
-	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")
-	float NightExposureBias = 1.2f;
+	/** 入夜以后镜头用固定曝光（不然自动曝光会把月夜提亮得和白天一样）。数越大越亮，加 1 亮一倍。
+	 *  −1.0 是拿灰盒同样位置、同样时刻的画面对出来的：月光照不到的墙、夜空、月光照到的地面都和灰盒差不多亮。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Camera")
+	float NightExposureBias = -1.0f;
+
+	/** 刚入夜、天还没黑透的那一阵曝光再加多少（太阳落到地平线下 9° 以后就不加了）。负数 = 暗一些：
+	 *  灰盒里曝光是从白天的 0.95 慢慢升到夜里的 1.9 的，刚入夜时比深夜低 0.8 档；那一阵环境光本身亮得多（ADysisSkyActor::DayFillLux）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Camera")
+	float NightTwilightBoost = -0.8f;
 
 	/** 开局镜头的俯仰（度，负 = 往下看；灰盒 0.22 弧度）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")

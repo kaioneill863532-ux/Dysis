@@ -37,6 +37,9 @@ public:
 	/** 现在够得着的互动点的提示文字（界面上“E　……”那一行用）。没有就返回 false。 */
 	bool GetPrompt(FText& OutPrompt) const;
 
+	/** 同上，再给出提示该浮在世界里的哪一点（互动点旁边）。 */
+	bool GetPromptAt(FText& OutPrompt, FVector& OutAnchorCm) const;
+
 	/** 现在够得着哪个旧机关。 */
 	bool CanInteractNow(AActor*& OutTarget) const;
 

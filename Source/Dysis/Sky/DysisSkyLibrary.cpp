@@ -52,7 +52,7 @@ namespace
 	const FZoneLine& Floor(bool bNight, int32 Index) { return bNight ? NightZones[Index] : DayZones[Index]; }
 	int32 FloorIndexOfY(double Y)                // reference 的 F.index(yy)
 	{
-		for (int32 I = 0; I < 4; ++I) if (F[I] == Y) return I;
+		for (int32 I = 0; I < 4; ++I) if (FLOOR_Y[I] == Y) return I;
 		checkf(false, TEXT("DysisSkyData: stair end height %f is not in F"), Y);
 		return 0;
 	}
@@ -212,9 +212,9 @@ FString UDysisSkyLibrary::DysisZoneOf(const AActor* Ground, FVector FootCm)
 	}
 	// 高度兜底（灰盒 zoneOf 的最后几行）
 	if (Y > RING_Y - 0.3) return TEXT("crown");
-	if (Y >= F[3] - 0.3) return TEXT("L3");
-	if (Y >= F[2] - 0.3) return TEXT("L2");
-	if (Y >= F[1] - 0.3) return TEXT("L1");
+	if (Y >= FLOOR_Y[3] - 0.3) return TEXT("L3");
+	if (Y >= FLOOR_Y[2] - 0.3) return TEXT("L2");
+	if (Y >= FLOOR_Y[1] - 0.3) return TEXT("L1");
 	if (Y > -1.0) return TEXT("L0");
 	return TEXT("out");
 }

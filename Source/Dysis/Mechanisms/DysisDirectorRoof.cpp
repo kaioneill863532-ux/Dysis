@@ -6,6 +6,9 @@
 //   · 细桥的桥门：人走近桥尾自己转开；接住最后一缕光以后转回来锁死。
 //   · 接光：踏步完全升起、岛影还没漫过举起来的苹果时，在浑天仪旁按 E 取下金苹果——从这一刻起入夜。
 #include "DysisDirector.h"
+#include "Audio/DysisMusicManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "DysisRoofData.generated.h"
 #include "DysisGreybox.h"
 #include "World/DysisWorldState.h"
@@ -179,6 +182,46 @@ void ADysisDirector::SetupRoof()
 			Box->SetWorldLocationAndRotation(FVector(Mid.X, Mid.Y, RoofBridgeTopZ + 120.0f), Dir.Rotation());
 		}
 	}
+	// 光圈的叶片：关卡里的那一份只留着挡光（藏起来，照旧按光圈的大小缩短）；另做一份只管看的，形状不动，
+	// 用材质把光圈以内的部分剪掉——看上去叶片是收进去了，而不是被压扁了
+	IrisMIDs.Reset();
+	if (UMaterialInterface* Cut = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Night/M_DysisIrisBlade.M_DysisIrisBlade")))
+	{
+		TMap<UMaterialInterface*, UMaterialInstanceDynamic*> ByLook;
+		for (FRoofPiece& P : RoofPieces)
+		{
+			AActor* B = P.Blade.Get();
+			UStaticMeshComponent* Src = B ? B->FindComponentByClass<UStaticMeshComponent>() : nullptr;
+			if (!Src || !Src->GetStaticMesh()) continue;
+			UStaticMeshComponent* Look = NewObject<UStaticMeshComponent>(this);
+			Look->SetupAttachment(RootComponent);
+			Look->SetMobility(EComponentMobility::Movable);
+			Look->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Look->SetStaticMesh(Src->GetStaticMesh());
+			Look->RegisterComponent();
+			Look->SetWorldTransform(Src->GetComponentTransform());
+			for (int32 m = 0; m < Src->GetNumMaterials(); ++m)
+			{
+				UMaterialInterface* Orig = Src->GetMaterial(m);
+				UMaterialInstanceDynamic*& MID = ByLook.FindOrAdd(Orig);
+				if (!MID)
+				{
+					MID = UMaterialInstanceDynamic::Create(Cut, this);
+					if (UMaterialInstance* Inst = Cast<UMaterialInstance>(Orig)) MID->CopyParameterOverrides(Inst);
+					IrisMIDs.Add(MID);
+				}
+				Look->SetMaterial(m, MID);
+			}
+			P.BladeLook = Look;
+			P.BladeLookDz = float(Src->GetComponentLocation().Z - B->GetActorLocation().Z);
+			B->SetActorHiddenInGame(true);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Dysis 屋顶：找不到材质 /Game/Dysis/Night/M_DysisIrisBlade（跑一遍 Art/Night/ue_make_sky_materials.py），叶片先照旧缩短着显示"));
+	}
+
 	// 桥门
 	DoorLeaf = Piece(TEXT("SM_Mech_RoofBridgeDoor_Leaf"));
 	if (AActor* Door = DoorLeaf.Get()) { DoorClosedYaw = Door->GetActorRotation().Yaw; RoofMakeMovable(Door); }
@@ -237,9 +280,18 @@ void ADysisDirector::PlaceBlades()
 		const float Z = P.Spec->Kind == RoofUp ? P.Z : RoofRingZ;   // 夜里的楼梯降下去时叶片留在天花板的圈上
 		B->SetActorLocation(DysisGB::PolarCm(Az, RoofIrisR * (1.0f - Scale), Z));
 		B->SetActorScale3D(FVector(1.0, Scale, 1.0));
-		B->SetActorHiddenInGame(Open >= 0.995f);
 		B->SetActorEnableCollision(Open < 0.995f);
+		if (UStaticMeshComponent* Look = P.BladeLook.Get())
+		{
+			// 只管看的那一份：不缩，只跟着踏步升降
+			FVector L = Look->GetComponentLocation();
+			L.Z = Z + P.BladeLookDz;
+			Look->SetWorldLocation(L);
+			Look->SetVisibility(Open < 0.995f);
+		}
+		else B->SetActorHiddenInGame(Open >= 0.995f);
 	}
+	for (UMaterialInstanceDynamic* MID : IrisMIDs) if (MID) MID->SetScalarParameterValue(TEXT("Aperture"), RIn);
 	IrisShownCm = A;
 }
 
@@ -344,6 +396,7 @@ void ADysisDirector::CatchLight()
 	bCaught = true;
 	CineSeconds = 0.001f;
 	Time->SetNight(true);
+	if (ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this)) Music->SwitchToNight();   // 白天的曲子淡出，换成夜里的
 	ADysisHUD::Notify(GetWorld(), DysisCopy::AppleTaken, 5.0f);
 }
 

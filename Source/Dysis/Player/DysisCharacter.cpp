@@ -2,6 +2,7 @@
 #include "DysisCharacterMovement.h"
 #include "DysisGreybox.h"
 #include "Sky/DysisTimeComponent.h"
+#include "Sky/DysisSkyLibrary.h"
 #include "Interaction/DysisInteractComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -292,6 +293,11 @@ void ADysisCharacter::UpdateCamera(float Dt)
 		PP.AutoExposureApplyPhysicalCameraExposure = false;
 		PP.bOverride_AutoExposureBias = bNightLook;
 		PP.AutoExposureBias = NightExposureBias;
+		if (bNightLook && NightTwilightBoost != 0.0f)
+		{
+			const float SunAlt = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(UDysisSkyLibrary::DysisSunDir(Time->H).Z, -1.0, 1.0)));
+			PP.AutoExposureBias += NightTwilightBoost * (1.0f - DysisGB::Smoothstep(1.5f, -9.0f, SunAlt));
+		}
 	}
 	const float HalfHeight = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	if (ViewMode == EDysisViewMode::FirstPerson)

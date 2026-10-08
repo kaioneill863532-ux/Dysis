@@ -28,7 +28,7 @@ public:
 
 	/** 音乐总音量（0 = 静音，1 = 原始响度 -20 LUFS） */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Music", meta = (ClampMin = "0.0", ClampMax = "2.0"))
-	float MusicVolume = 0.8f;
+	float MusicVolume = 1.4f;
 
 	/** 开始播放时淡入的秒数 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Music", meta = (ClampMin = "0.0"))

@@ -76,6 +76,26 @@ bool UDysisInteractComponent::GetPrompt(FText& OutPrompt) const
 	return !OutPrompt.IsEmpty();
 }
 
+bool UDysisInteractComponent::GetPromptAt(FText& OutPrompt, FVector& OutAnchorCm) const
+{
+	OutPrompt = FText::GetEmpty();
+	if (const ADysisDirector* D = Director())
+		if (const FDysisInteract* I = D->NearestInteract(FootCm()))
+		{
+			if (I->Label) OutPrompt = I->Label();
+			OutAnchorCm = D->InteractAnchor(*I);
+			return !OutPrompt.IsEmpty();
+		}
+	AActor* Target = nullptr;
+	if (CanInteractNow(Target))
+		if (const IDysisInteractable* Interactable = Cast<IDysisInteractable>(Target))
+		{
+			OutPrompt = Interactable->GetInteractPrompt();
+			OutAnchorCm = Target->GetActorLocation() + FVector(0.0, 0.0, 110.0);
+		}
+	return !OutPrompt.IsEmpty();
+}
+
 bool UDysisInteractComponent::TryInteract()
 {
 	if (ADysisDirector* D = Director())

@@ -205,6 +205,7 @@ void ADysisDirector::SetupRainbow()
 			Box->SetBoxExtent(FVector((FVector::Dist(A, B) + 10.0) * 0.5, 5.0, 110.0));
 			Box->SetWorldLocationAndRotation((A + B) * 0.5 + FVector(0.0, 0.0, 110.0), FRotator(0.0f, AxYaw, 0.0f));
 			Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Box->ComponentTags.Add(TEXT("DysisNoTrap"));
 			BridgeRails.Add(Box);
 		}
 
@@ -261,6 +262,7 @@ void ADysisDirector::SetupRainbow()
 		Box->SetBoxExtent(FVector(30.0, 30.0, 70.0));
 		Box->SetWorldLocation(FVector(RbwPrismPos.X, RbwPrismPos.Y, RbwSillZ + 70.0));
 		Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Box->ComponentTags.Add(TEXT("DysisNoTrap"));
 		PrismBlock = Box;
 	}
 	// 七道色光和它们的落点
@@ -310,6 +312,7 @@ void ADysisDirector::AddRainbowInteracts()
 		I.When = [this]() { return !bIrisNicheOpen && SillK > 0.98f; };
 		I.Label = []() { return FText::FromString(DysisCopy::PromptOpenIrisNiche); };
 		I.Act = [this]() { bIrisNicheOpen = true; IrisNicheT = 0.001f; };
+		I.Anchor = []() { return RbwNichePos; };
 		Interacts.Add(MoveTemp(I));
 	}
 	{
@@ -329,6 +332,7 @@ void ADysisDirector::AddRainbowInteracts()
 		FDysisInteract I;
 		I.Id = TEXT("selene");
 		I.Pos = []() { return RbwSeleneIp; };
+		I.Anchor = []() { return RbwSeleneEye - RbwSeleneEye.GetSafeNormal2D() * 25.0; };
 		I.ZRange = []() { return FVector2D(-30.0, 190.0); };
 		I.RadiusCm = 160.0f;
 		I.Label = []() { return FText::FromString(DysisCopy::PromptViewRelief); };

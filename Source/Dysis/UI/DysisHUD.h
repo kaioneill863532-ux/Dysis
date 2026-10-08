@@ -73,12 +73,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面", meta = (ClampMin = "0.1"))
 	float MenuNightSpeed = 2.0f;
 
-	/** 主界面镜头用固定曝光（EV）：不让引擎自动把夜晚提亮成白天的样子。后一个数是入夜以后再加的量。 */
+	/** 主界面镜头用固定曝光（EV）：不让引擎自动把夜晚提亮成白天的样子。后一个数是入夜以后再加的量
+	 *  （负数 = 夜里暗下来：0.6 − 1.0 = −0.4，比游戏里的夜（ADysisCharacter::NightExposureBias = −1.0）稍亮一点，看得清殿顶）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面")
 	float MenuExposureBias = 0.6f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面")
-	float MenuNightExposureBoost = 0.6f;
+	float MenuNightExposureBoost = -1.0f;
 
 	virtual void DrawHUD() override;
 	virtual void BeginPlay() override;
@@ -147,6 +148,9 @@ protected:
 	void DrawInGame(float Dt);
 	void DrawDialogue();
 	void DrawHintBar(float Dt);
+	/** 能互动的东西旁边浮出来的提示：一个圆角方块里写着 E，旁边一行字（“转动雕像”之类）。和提示条分开。 */
+	void DrawInteractPrompt(float Dt);
+	UTexture2D* KeycapTexture();
 	void DrawShards();
 	void DrawTitle(float Dt);
 	void DrawDebug();
@@ -200,6 +204,13 @@ private:
 	float NotificationTimer = 0.0f;
 	float HintAlpha = 0.0f;
 	FString HintShownText;
+
+	// 互动提示（浮在互动点旁边）
+	float PromptAlpha = 0.0f;
+	FString PromptText;
+	FVector2D PromptPos = FVector2D::ZeroVector;
+	UPROPERTY(Transient)
+	TObjectPtr<UTexture2D> Keycap;
 
 	// 对话框
 	float DialogueAlpha = 0.0f;
