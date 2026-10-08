@@ -134,6 +134,41 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
 	FLinearColor TwilightSkyColor = FLinearColor(0.055f, 0.049f, 0.043f);
 
+	// ───── 黄昏的调子：太阳快落山时画面压暗、偏橙红，天边的红更浓（2026-10-08 用户：走到殿顶时不像黄昏、太亮、没有橙红色的感觉） ─────
+
+	/** 太阳落到这个高度（度）开始有黄昏的调子，落到 DuskFullAltDeg 时最浓；落日以后随着天黑慢慢退掉。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	float DuskStartAltDeg = 16.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	float DuskFullAltDeg = 3.0f;
+
+	/** 最浓时曝光加多少（负数 = 压暗）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	float DuskExposureBias = -1.2f;
+
+	/** 最浓时整个画面乘上的颜色（偏橙红）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	FLinearColor DuskTint = FLinearColor(1.06f, 0.87f, 0.72f);
+
+	/** 最浓时颜色的浓度（1 = 不变）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	float DuskSaturation = 1.08f;
+
+	/** 最浓时大气把蓝光散掉多少倍（越大落日越红、天边的橙红越浓）、空气里的尘雾多几倍（越大太阳周围那一片亮晕越大）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	float DuskRayleighScale = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
+	float DuskMieScale = 3.0f;
+
+	/** 现在黄昏的调子有多浓（0–1）。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Sky|黄昏")
+	float GetDuskLook() const;
+
+	/** 把黄昏的颜色写进一台镜头的后期设置；返回曝光该加多少（由镜头自己加到它的曝光上）。 */
+	float ApplyDuskLook(struct FPostProcessSettings& PP) const;
+
 	/** 游戏里接住最后一缕光的那一刻叫一下（时间组件会叫）：从这一刻起天由夜空的球来画、暮色的环境光亮起来。
 	 *  没叫过的时候（比如主界面的延时摄影）按太阳的高度自己判断：落到地平线下 1.2°–2° 之间换过去。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky")
@@ -214,6 +249,9 @@ private:
 	bool bTimeSet = false;
 	bool bAfterSunset = false;
 	float AfterSunsetK() const;
+	void ApplyDuskAtmosphere();
+	TWeakObjectPtr<class USkyAtmosphereComponent> Atmosphere;
+	float BaseRayleigh = -1.f, BaseMie = -1.f, AppliedDusk = -1.f;
 
 	float CurrentH = 0.f;
 	FVector SunDir = FVector::UpVector;

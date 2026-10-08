@@ -157,6 +157,12 @@ namespace DysisCopy
 	inline static const TCHAR* PromptPullPollux    = TEXT("拉出波吕丢刻斯雕像");
 	inline static const TCHAR* PromptTakeApple     = TEXT("取下金苹果");
 	inline static const TCHAR* PromptPlaceApple    = TEXT("放入金苹果");      // 取下后变为这个
+	// 下面四个文案表里没有（表里只有“看看浮雕”）：“查看显示”那一组要有个按钮才能看，按 2026-10-08 用户说的“查看××”补的
+	inline static const TCHAR* PromptViewStatue    = TEXT("查看雕像");       // 抱月女神像 / 托镜天使像 / 卡斯托耳
+	inline static const TCHAR* PromptViewArmillary = TEXT("查看浑天仪");     // 殿顶、水亭
+	inline static const TCHAR* PromptViewWall      = TEXT("查看石墙");       // 藏着波吕丢刻斯的墙 / 月门
+	inline static const TCHAR* PromptViewWaterGate = TEXT("查看水闸");       // 开了以后
+	inline static const TCHAR* DialogueContinue    = TEXT("单击鼠标  继续");  // 对话框右下角
 
 	// ═══════ 机关反馈 ═══════
 

@@ -7,6 +7,7 @@
 #include "Save/DysisSaveSubsystem.h"
 #include "Sky/DysisSkyLibrary.h"
 #include "Sky/DysisTimeComponent.h"
+#include "Sky/DysisSkyActor.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "CanvasItem.h"
@@ -306,6 +307,10 @@ void ADysisHUD::HoldMenuView(float RealDt)
 		PP.AutoExposureApplyPhysicalCameraExposure = false;
 		PP.bOverride_AutoExposureBias = true;
 		PP.AutoExposureBias = MenuExposureBias + MenuNightExposureBoost * Dusk;
+		// 黄昏的调子：颜色照搬游戏里的，压暗只用一半（主界面本来就是固定曝光，落日时已经不亮）
+		if (APawn* MenuPawn = PC->GetPawn())
+			if (const UDysisTimeComponent* MenuTime = MenuPawn->FindComponentByClass<UDysisTimeComponent>())
+				if (const ADysisSkyActor* Sky = MenuTime->SkyActor.Get()) PP.AutoExposureBias += 0.5f * Sky->ApplyDuskLook(PP);
 	}
 }
 
@@ -581,7 +586,7 @@ void ADysisHUD::DrawDialogue()
 	}
 	// 正文：主面板里（x 560–4050），最多三行
 	DrawUIParagraph(Body, Ink, 560.0f * S, BoxY + 430.0f * S, 30.0f, 3490.0f * S, 0.0f, 1.5f);
-	DrawUIText(TEXT("E  继续"), Ink.CopyWithNewOpacity(0.55f * DialogueAlpha), 4040.0f * S, BoxY + 1010.0f * S, 20.0f, 1.0f, false, false);
+	DrawUIText(DysisCopy::DialogueContinue, Ink.CopyWithNewOpacity(0.55f * DialogueAlpha), 3940.0f * S, BoxY + 1010.0f * S, 20.0f, 1.0f, false, false);
 }
 
 void ADysisHUD::DrawTitle(float Dt)
@@ -593,6 +598,16 @@ void ADysisHUD::DrawTitle(float Dt)
 	if (A <= 0.0f) { TitleT = -1.0f; return; }
 	const float CX = Canvas->SizeX * 0.5f, S = Canvas->SizeY / 1080.0f;
 	DrawUIText(TitleMain, Cream.CopyWithNewOpacity(A), CX, 372.0f * S, 68.0f, 0.5f, true);
+	// 罗马数字（关卡名）：界面的字体没有衬线，“II”光秃秃两竖像个暂停键，上下各画一道横线才像罗马数字
+	bool bRoman = !TitleMain.IsEmpty();
+	for (const TCHAR Ch : TitleMain) bRoman = bRoman && (Ch == TEXT('I') || Ch == TEXT('V') || Ch == TEXT('X'));
+	if (bRoman)
+	{
+		const float W = float(MeasureText(TitleMain, MakeFont(68.0f, true)).X) + 30.0f * S, T = 5.0f * S;
+		const FLinearColor Bar = Cream.CopyWithNewOpacity(A);
+		DrawRect(Bar, CX - W * 0.5f, 372.0f * S + RomanBarTop * S, W, T);
+		DrawRect(Bar, CX - W * 0.5f, 372.0f * S + RomanBarBottom * S, W, T);
+	}
 	DrawUIText(TitleSub, Cream.CopyWithNewOpacity(A * 0.9f), CX, 470.0f * S, 30.0f, 0.5f);
 }
 

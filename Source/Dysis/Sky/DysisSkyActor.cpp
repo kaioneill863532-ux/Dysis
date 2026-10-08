@@ -3,6 +3,9 @@
 #include "Components/DirectionalLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Engine/Scene.h"
+#include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -51,6 +54,7 @@ ADysisSkyActor::ADysisSkyActor()
 		Fill->SetAtmosphereSunLight(false);
 		Fill->SetCastShadows(false);
 		Fill->SetIntensity(0.0f);
+		Fill->ForwardShadingPriority = 5 - i;   // 四盏各排一个名次（太阳、月亮都灭着的那一阵，免得引擎在屏幕上提示“几盏平行光在抢”）
 		NightFill.Add(Fill);
 	}
 	// 半透明、水、体积雾只认一盏平行光：太阳优先，其次月亮（不排的话引擎会在屏幕上提示“几盏平行光在抢”）
@@ -113,6 +117,42 @@ void ADysisSkyActor::SetAfterSunset(bool bAfter)
 	if (bAfterSunset == bAfter) return;
 	bAfterSunset = bAfter;
 	RefreshSky();
+}
+
+float ADysisSkyActor::GetDuskLook() const
+{
+	// 太阳从 DuskStartAltDeg 落到 DuskFullAltDeg 越来越浓；落到地平线下以后跟着天黑退掉（到 −7° 没有）
+	return Smooth(DuskStartAltDeg, DuskFullAltDeg, SunAlt) * (1.f - Smooth(-1.5f, -7.f, SunAlt));
+}
+
+float ADysisSkyActor::ApplyDuskLook(FPostProcessSettings& PP) const
+{
+	const float K = GetDuskLook();
+	PP.bOverride_ColorGain = PP.bOverride_ColorSaturation = K > 0.001f;
+	PP.ColorGain = FVector4(FMath::Lerp(1.f, DuskTint.R, K), FMath::Lerp(1.f, DuskTint.G, K), FMath::Lerp(1.f, DuskTint.B, K), 1.f);
+	const float Sat = FMath::Lerp(1.f, DuskSaturation, K);
+	PP.ColorSaturation = FVector4(Sat, Sat, Sat, 1.f);
+	return DuskExposureBias * K;
+}
+
+void ADysisSkyActor::ApplyDuskAtmosphere()
+{
+	// 关卡里那一个大气：黄昏时把“散掉蓝光”和“尘雾”都调大，落日和天边就更红
+	if (!Atmosphere.IsValid() && GetWorld())
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+			if (USkyAtmosphereComponent* C = It->FindComponentByClass<USkyAtmosphereComponent>())
+			{
+				Atmosphere = C;
+				BaseRayleigh = C->RayleighScatteringScale;
+				BaseMie = C->MieScatteringScale;
+				break;
+			}
+	USkyAtmosphereComponent* C = Atmosphere.Get();
+	const float K = GetDuskLook();
+	if (!C || FMath::IsNearlyEqual(K, AppliedDusk, 0.002f)) return;
+	AppliedDusk = K;
+	C->SetRayleighScatteringScale(BaseRayleigh * FMath::Lerp(1.f, DuskRayleighScale, K));
+	C->SetMieScatteringScale(BaseMie * FMath::Lerp(1.f, DuskMieScale, K));
 }
 
 float ADysisSkyActor::AfterSunsetK() const
@@ -215,6 +255,7 @@ void ADysisSkyActor::SetTime(float H)
 	MoonDiscOpacity = Smooth(-1.5f, 1.f, MoonAlt) * Smooth(4.f, -2.f, SunAlt);
 	ApplyMoonDisc();
 	ApplyNightSky();
+	if (GetWorld() && GetWorld()->IsGameWorld()) ApplyDuskAtmosphere();   // 只在游戏里动大气（编辑器里拖时间预览时不改关卡里的那个大气）
 }
 
 void ADysisSkyActor::ApplyNightSky()

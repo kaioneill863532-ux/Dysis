@@ -177,6 +177,7 @@ void ADysisDirector::BuildInteracts()
 		I.Anchor = [this]() { return ArmTopCm(); };
 		Interacts.Add(MoveTemp(I));
 	}
+	AddViewInteracts();
 	AddMirrorInteracts();
 	AddRainbowInteracts();
 	AddNightInteracts();
@@ -301,6 +302,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateAppleLight(DeltaTime);
 	UpdateMoonbow(DeltaTime);
 	UpdateEndingStars(DeltaTime);
+	UpdateViews();
 	UpdateSfx();
 }
 
@@ -308,11 +310,12 @@ void ADysisDirector::Tick(float DeltaTime)
 
 void ADysisDirector::UpdateLevelTitle()
 {
-	// 灰盒 levelOf：按脚下的区域分段——白天 序、日1–日5，入夜以后 月1–月5；每一段头一次走进去出一次标题
+	// 灰盒 levelOf：按脚下的区域分段——白天 序、五层，入夜以后再五层；每一段头一次走进去出一次标题
 	static const TCHAR* const Names[11][2] = {
-		{ TEXT("序"), TEXT("登殿") }, { TEXT("日1"), TEXT("午后·开闸") }, { TEXT("日2"), TEXT("未时·双窗") }, { TEXT("日3"), TEXT("申时·光阶") },
-		{ TEXT("日4"), TEXT("酉时·圆眼") }, { TEXT("日5"), TEXT("日落·最后一缕") },
-		{ TEXT("月1"), TEXT("月升·回廊") }, { TEXT("月2"), TEXT("初夜·天鹅") }, { TEXT("月3"), TEXT("中夜·三相") }, { TEXT("月4"), TEXT("夜半·双子") }, { TEXT("月5"), TEXT("子夜·瀑布后的女神") } };
+		// 2026-10-08 用户定：层数用罗马数字，一层 I、二层 II……白天一路往上数（I→V），入夜以后一路往下数（V→I）。上下那两道横线是界面画的（ADysisHUD::DrawTitle）
+		{ TEXT("序"), TEXT("登殿") }, { TEXT("I"), TEXT("午后·开闸") }, { TEXT("II"), TEXT("未时·双窗") }, { TEXT("III"), TEXT("申时·光阶") },
+		{ TEXT("IV"), TEXT("酉时·圆眼") }, { TEXT("V"), TEXT("日落·最后一缕") },
+		{ TEXT("V"), TEXT("月升·回廊") }, { TEXT("IV"), TEXT("初夜·天鹅") }, { TEXT("III"), TEXT("中夜·三相") }, { TEXT("II"), TEXT("夜半·双子") }, { TEXT("I"), TEXT("子夜·瀑布后的女神") } };
 	if (!GameStarted()) return;
 	const UDysisTimeComponent* Time = PlayerTime();
 	if (!Time) return;

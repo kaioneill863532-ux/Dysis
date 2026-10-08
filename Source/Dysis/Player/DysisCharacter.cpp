@@ -3,6 +3,8 @@
 #include "DysisGreybox.h"
 #include "Sky/DysisTimeComponent.h"
 #include "Sky/DysisSkyLibrary.h"
+#include "Sky/DysisSkyActor.h"
+#include "HAL/IConsoleManager.h"
 #include "Interaction/DysisInteractComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -127,6 +129,7 @@ void ADysisCharacter::PostInitializeComponents()
 	InteractAction = MakeAction(TEXT("IA_DysisInteract"), EInputActionValueType::Boolean);
 	ViewAction = MakeAction(TEXT("IA_DysisView"), EInputActionValueType::Boolean);
 	RespawnAction = MakeAction(TEXT("IA_DysisRespawn"), EInputActionValueType::Boolean);
+	AdvanceAction = MakeAction(TEXT("IA_DysisAdvance"), EInputActionValueType::Boolean);
 
 	Mapping = NewObject<UInputMappingContext>(this, TEXT("IMC_Dysis"));
 	auto Swizzle = [this]() { return NewObject<UInputModifierSwizzleAxis>(this); };   // 默认 YXZ：键值放到 Y（前后）
@@ -143,6 +146,7 @@ void ADysisCharacter::PostInitializeComponents()
 	Mapping->MapKey(InteractAction, EKeys::E);
 	Mapping->MapKey(ViewAction, EKeys::V);
 	Mapping->MapKey(RespawnAction, EKeys::R);
+	Mapping->MapKey(AdvanceAction, EKeys::LeftMouseButton);
 }
 
 void ADysisCharacter::PawnClientRestart()
@@ -179,6 +183,7 @@ void ADysisCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		In->BindAction(InteractAction, ETriggerEvent::Started, this, &ADysisCharacter::TryInteractPressed);
 		In->BindAction(ViewAction, ETriggerEvent::Started, this, &ADysisCharacter::ToggleViewPressed);
 		In->BindAction(RespawnAction, ETriggerEvent::Started, this, &ADysisCharacter::RespawnPressed);
+		In->BindAction(AdvanceAction, ETriggerEvent::Started, this, &ADysisCharacter::AdvancePressed);
 	}
 }
 
@@ -191,19 +196,31 @@ bool ADysisCharacter::UiBlocksInput() const
 	return false;
 }
 
+bool ADysisCharacter::InDialogue() const
+{
+	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
+		if (const ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
+			return H->ActiveDialogue && H->ActiveDialogue->IsPlaying();
+	return false;
+}
+
+void ADysisCharacter::AdvancePressed()
+{
+	// 过剧情时单击鼠标 = 下一句
+	if (UiBlocksInput()) return;
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		if (ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
+			if (H->ActiveDialogue && H->ActiveDialogue->IsPlaying()) H->ActiveDialogue->Advance();
+}
+
 void ADysisCharacter::JumpPressed()
 {
-	if (!UiBlocksInput()) Jump();
+	if (!UiBlocksInput() && !InDialogue()) Jump();
 }
 
 void ADysisCharacter::TryInteractPressed()
 {
-	if (UiBlocksInput()) return;
-	// 对白播放中，E 键先当“下一句”
-	if (APlayerController* PC = Cast<APlayerController>(GetController()))
-		if (ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
-			if (H->ActiveDialogue && H->ActiveDialogue->IsPlaying())
-			{ H->ActiveDialogue->Advance(); return; }
+	if (UiBlocksInput() || InDialogue()) return;
 	if (Interact) Interact->TryInteract();
 }
 
@@ -215,8 +232,13 @@ void ADysisCharacter::ToggleViewPressed()
 
 void ADysisCharacter::RespawnPressed()
 {
-	if (UiBlocksInput()) return;
+	if (UiBlocksInput() || InDialogue()) return;
 	if (UDysisCharacterMovement* Move = Cast<UDysisCharacterMovement>(GetCharacterMovement())) Move->RespawnNow();
+}
+
+void ADysisCharacter::AddMovementInput(FVector WorldDirection, float ScaleValue, bool bForce)
+{
+	if (!InDialogue()) Super::AddMovementInput(WorldDirection, ScaleValue, bForce);
 }
 
 void ADysisCharacter::Move(const FInputActionValue& Value)
@@ -286,13 +308,17 @@ void ADysisCharacter::UpdateCamera(float Dt)
 	{
 		// 白天自动曝光（殿里殿外亮度差很多）；入夜以后固定曝光，月夜才是暗的
 		const bool bNightLook = Time && Time->bNight;
+		// 黄昏的调子（太阳快落山时压暗、偏橙红，见 ADysisSkyActor::ApplyDuskLook）：白天把它加在自动曝光上
+		const ADysisSkyActor* Sky = Time ? Time->SkyActor.Get() : nullptr;
 		FPostProcessSettings& PP = Camera->PostProcessSettings;
+		const float DuskBias = Sky ? Sky->ApplyDuskLook(PP) : 0.0f;
+		static const IConsoleVariable* DefaultBias = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DefaultFeature.AutoExposure.Bias"));
 		PP.bOverride_AutoExposureMethod = bNightLook;
 		PP.AutoExposureMethod = AEM_Manual;
 		PP.bOverride_AutoExposureApplyPhysicalCameraExposure = bNightLook;
 		PP.AutoExposureApplyPhysicalCameraExposure = false;
-		PP.bOverride_AutoExposureBias = bNightLook;
-		PP.AutoExposureBias = NightExposureBias;
+		PP.bOverride_AutoExposureBias = bNightLook || DuskBias != 0.0f;
+		PP.AutoExposureBias = bNightLook ? NightExposureBias : (DefaultBias ? DefaultBias->GetFloat() : 1.0f) + DuskBias;
 		if (bNightLook && NightTwilightBoost != 0.0f)
 		{
 			const float SunAlt = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(UDysisSkyLibrary::DysisSunDir(Time->H).Z, -1.0, 1.0)));

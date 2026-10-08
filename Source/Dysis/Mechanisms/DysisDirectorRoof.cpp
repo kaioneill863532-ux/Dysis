@@ -16,6 +16,7 @@
 #include "Sky/DysisTimeComponent.h"
 #include "UI/DysisCopy.h"
 #include "UI/DysisHUD.h"
+#include "UI/DysisDialogueComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
@@ -304,6 +305,10 @@ void ADysisDirector::UpdateCrown(float Dt)
 	const FString Zone = Time ? Time->Zone : FString();
 	const FVector Foot = Time ? Time->FootCm : FVector::ZeroVector;
 
+	// 主界面开着的时候：屋顶的踏步摆成升到头的样子（主界面的镜头就在屋顶上，升起来的那一圈台阶比落平的好看）；点了“开始游戏”再落平
+	if (!bStarted && !bMenuPose) { bMenuPose = true; CrownUp = 1.0f; }
+	else if (bStarted && bMenuPose) { bMenuPose = false; CrownUp = 0.0f; }
+
 	// 人在环道上：离细桥落脚处顺时针走了多远，前面的踏步就升多少
 	const float UpSpan = RoofWrap360(RoofUpTop0 - RoofLand1) + 3.0f;
 	if (bStarted && Time && Time->IsOnGround() && Zone == TEXT("crown"))
@@ -425,7 +430,14 @@ void ADysisDirector::UpdateCatch(float Dt)
 	if (Before <= 5.0f && CineSeconds > 5.0f)
 	{
 		if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->ShowTitle(TEXT("日落之后"), TEXT("入夜"), 2.4f);
-		ADysisHUD::Notify(GetWorld(), DysisCopy::NightHint, 6.0f);
+		// 狄西斯自己说的那一句：用剧情对话框（有她的立绘），不放在提示条里
+		if (!NightDialogue)
+		{
+			NightDialogue = NewObject<UDysisDialogueComponent>(this);
+			NightDialogue->RegisterComponent();
+			NightDialogue->Lines = { FText::FromString(DysisCopy::NightHint) };
+		}
+		NightDialogue->Play();
 	}
 }
 

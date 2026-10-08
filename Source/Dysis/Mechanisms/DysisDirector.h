@@ -430,6 +430,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> EndingDialogue;
 
+	// “查看××”：文案表“查看显示”那一组（走近了按 E 看一句描述）—— DysisDirectorViews.cpp
+	void AddViewInteracts();
+	void UpdateViews();
+	bool bTopArmillaryTold = false;              // 殿顶浑天仪那句“金苹果”的描述说过了
+	bool bMenuPose = false;                      // 主界面开着：屋顶的踏步摆成升到头的样子
+	/** 入夜以后狄西斯自己说的那一句，用剧情对话框放。 */
+	UPROPERTY()
+	TObjectPtr<class UDysisDialogueComponent> NightDialogue;
+
 	// 金苹果的光、月虹、结局的星座 —— DysisDirectorSky.cpp
 	void SetupSkyFx();
 	void UpdateAppleLight(float Dt);

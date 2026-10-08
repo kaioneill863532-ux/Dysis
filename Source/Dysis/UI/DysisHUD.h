@@ -81,6 +81,13 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面")
 	float MenuNightExposureBoost = -1.0f;
 
+	/** 关卡名是罗马数字时，上下那两道横线离这行字顶边多远（按 1080 高的画面算，像素）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|HUD")
+	float RomanBarTop = 12.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|HUD")
+	float RomanBarBottom = 74.0f;
+
 	virtual void DrawHUD() override;
 	virtual void BeginPlay() override;
 

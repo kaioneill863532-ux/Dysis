@@ -127,6 +127,17 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
+
+	/** 过剧情时人定在原地：任何“往哪边走”的输入都不收。 */
+	virtual void AddMovementInput(FVector WorldDirection, float ScaleValue = 1.0f, bool bForce = false) override;
+
+	/** 正在过剧情（对话框开着）：这时候人定在原地，不能走、跳、互动，只能转镜头和单击鼠标翻页。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Player")
+	bool InDialogue() const;
+
+	/** 单击鼠标左键：剧情对话翻到下一句（测试里也直接叫它）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Player")
+	void AdvancePressed();
 	virtual void PawnClientRestart() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
@@ -177,6 +188,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> RespawnAction;
+
+	/** 单击鼠标左键：剧情对话翻到下一句。 */
+	UPROPERTY()
+	TObjectPtr<UInputAction> AdvanceAction;
 
 	bool bRunning = false;
 	bool bStartPitchApplied = false;
