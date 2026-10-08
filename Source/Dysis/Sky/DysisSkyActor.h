@@ -51,9 +51,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Dysis|Sky")
 	float GetMoonDiscOpacity() const { return MoonDiscOpacity; }
 
-	/** 太阳光：Atmosphere Sun Light，Index 0。 */
+	/** 太阳光：照物体的那一盏（方向、谁是主光、亮度都按灰盒）。 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
 	TObjectPtr<UDirectionalLightComponent> SunLight;
+
+	/** 太阳照亮天空的那一盏（Atmosphere Sun Light，Index 0）：不照任何物体、不投影，只给大气用。
+	 *  白天和太阳光一样亮；太阳落到地平线下以后它还慢慢暗下去一阵（暮光），天不会一下子全黑——
+	 *  日落后、月亮升高之前这一小段，场景靠天光还看得见（灰盒里这一段是用环境光顶着的）。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")
+	TObjectPtr<UDirectionalLightComponent> SunSkyGlow;
+
+	/** 太阳落到地平线下多少度时暮光完全消失。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
+	float TwilightEndAltDeg = -14.0f;
 
 	/** 月光：Atmosphere Sun Light，Index 1。 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky")

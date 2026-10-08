@@ -474,7 +474,7 @@ void ADysisHUD::DrawHintBar(float Dt)
 		if (UDysisInteractComponent* Interact = ResolveInteract())
 		{
 			FText Prompt;
-			if (Interact->GetPrompt(Prompt)) Want = TEXT("E　") + Prompt.ToString();
+			if (Interact->GetPrompt(Prompt)) Want = TEXT("E   ") + Prompt.ToString();
 		}
 	}
 	if (!Want.IsEmpty()) HintShownText = Want;
@@ -525,7 +525,7 @@ void ADysisHUD::DrawDialogue()
 	}
 	// 正文：主面板里（x 560–4050），最多三行
 	DrawUIParagraph(Body, Ink, 560.0f * S, BoxY + 430.0f * S, 30.0f, 3490.0f * S, 0.0f, 1.5f);
-	DrawUIText(TEXT("E　继续"), Ink.CopyWithNewOpacity(0.55f * DialogueAlpha), 4040.0f * S, BoxY + 1010.0f * S, 20.0f, 1.0f, false, false);
+	DrawUIText(TEXT("E  继续"), Ink.CopyWithNewOpacity(0.55f * DialogueAlpha), 4040.0f * S, BoxY + 1010.0f * S, 20.0f, 1.0f, false, false);
 }
 
 void ADysisHUD::DrawTitle(float Dt)

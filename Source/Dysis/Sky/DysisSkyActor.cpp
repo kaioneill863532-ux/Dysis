@@ -25,8 +25,17 @@ ADysisSkyActor::ADysisSkyActor()
 	SunLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunLight"));
 	SunLight->SetupAttachment(RootComponent);
 	SunLight->SetMobility(EComponentMobility::Movable);
-	SunLight->SetAtmosphereSunLight(true);
-	SunLight->SetAtmosphereSunLightIndex(0);
+	SunLight->SetAtmosphereSunLight(false);   // 照亮大气的是下面的 SunSkyGlow
+
+	SunSkyGlow = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("SunSkyGlow"));
+	SunSkyGlow->SetupAttachment(RootComponent);
+	SunSkyGlow->SetMobility(EComponentMobility::Movable);
+	SunSkyGlow->SetAtmosphereSunLight(true);
+	SunSkyGlow->SetAtmosphereSunLightIndex(0);
+	SunSkyGlow->SetCastShadows(false);
+	SunSkyGlow->LightingChannels.bChannel0 = false;   // 不照任何物体
+	SunSkyGlow->LightingChannels.bChannel1 = false;
+	SunSkyGlow->LightingChannels.bChannel2 = false;
 
 	MoonLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("MoonLight"));
 	MoonLight->SetupAttachment(RootComponent);
@@ -98,6 +107,13 @@ void ADysisSkyActor::SetTime(float H)
 		SunLight->SetIntensity(0.f);
 		MoonLight->SetIntensity(GreyboxIntensity * MoonLuxPerGreyboxUnit);
 		MoonLight->SetLightColor(MoonColor);
+	}
+	// 天空：白天和太阳光一样亮（太阳高度 1.2° 以上两条曲线重合）；再往下不是到 −0.8° 就灭，而是一直暗到 TwilightEndAltDeg
+	if (SunSkyGlow)
+	{
+		SunSkyGlow->SetWorldRotation(UDysisSkyLibrary::DysisLightRotation(SunDir));
+		SunSkyGlow->SetIntensity(FMath::Lerp(2.4f, 3.6f, K) * Smooth(TwilightEndAltDeg, 1.2f, SunAlt) * SunLuxPerGreyboxUnit);
+		SunSkyGlow->SetLightColor(SunColorHigh);
 	}
 	MoonDiscOpacity = Smooth(-1.5f, 1.f, MoonAlt) * Smooth(4.f, -2.f, SunAlt);
 	ApplyMoonDisc();

@@ -49,6 +49,11 @@ namespace
 			if (UDysisWorldState* S = UDysisWorldState::Get(World))
 				S->DebugSetIsleGrow(Args.Num() == 0 || FCString::Atoi(*Args[0]) != 0, Args.Num() > 1 ? FCString::Atof(*Args[1]) : 1.0f);
 		}));
+	FAutoConsoleCommandWithWorldAndArgs GDysisIris(TEXT("Dysis.Iris"), TEXT("把屋顶的光圈摆成这么大：Dysis.Iris <半径 cm，40–1100>"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			if (UDysisWorldState* S = UDysisWorldState::Get(World)) S->DebugSetIris(Args.Num() > 0 ? FCString::Atof(*Args[0]) : 430.0f);
+		}));
 	FAutoConsoleCommandWithWorld GDysisWorldRelease(TEXT("Dysis.WorldRelease"), TEXT("雾和开场的光恢复自动"),
 		FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
 		{
@@ -127,9 +132,16 @@ void UDysisWorldState::DebugSetIsleGrow(bool bStarted, float K)
 	IsleGrowK = K;
 }
 
+void UDysisWorldState::DebugSetIris(float ACm)
+{
+	bDebugIris = true;
+	IrisACm = ACm;
+	BumpLight();
+}
+
 void UDysisWorldState::DebugRelease()
 {
-	bDebugMist = bDebugGrow = false;
+	bDebugMist = bDebugGrow = bDebugIris = false;
 }
 
 void UDysisWorldState::Tick(float DeltaTime)

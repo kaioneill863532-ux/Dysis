@@ -50,6 +50,17 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
 	float IsleGrowK = 0.0f;
 
+	// ───── 屋顶的光圈 ─────
+
+	/** 光圈现在张到多大（半径，厘米；合拢 40，全开 1100）。机关总管每帧写，圆眼光柱读。 */
+	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
+	float IrisACm = 40.0f;
+
+	/** 测试用：把光圈直接摆成这么大（之后机关总管不再改它，直到 DebugRelease）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|World")
+	void DebugSetIris(float ACm);
+	bool IsIrisDebug() const { return bDebugIris; }
+
 	// ───── 别的 ─────
 
 	/** 挡光的东西挪了（推拉石板、雕像……）就加一：各束光看见它变了就重算。 */
@@ -79,4 +90,5 @@ public:
 private:
 	bool bDebugMist = false;
 	bool bDebugGrow = false;
+	bool bDebugIris = false;
 };

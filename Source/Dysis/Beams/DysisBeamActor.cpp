@@ -123,7 +123,9 @@ void ADysisBeamActor::BeginPlay()
 		if (Id.IsEmpty() && bPrologueBeam) Id = TEXT("isle");
 		if (Id.IsEmpty() && !bFromMirror && !bOculusBeam && BeamZone.ToString().StartsWith(TEXT("beam:"))) Id = BeamZone.ToString().RightChop(5);
 		GreyboxIndex = FindGreyboxWindow(Id);
-		if (GreyboxIndex >= 0)
+		bGreyboxOculus = GreyboxIndex < 0 && (bOculusBeam || Id.Equals(TEXT("oculus"), ESearchCase::IgnoreCase)) && !bFromMirror;
+		if (bGreyboxOculus) Id = TEXT("oculus");
+		if (IsGreybox())
 		{
 			GreyboxId = FName(*Id);
 			BeamZone = FName(*(FString(TEXT("beam:")) + Id));
@@ -399,6 +401,21 @@ double ADysisBeamActor::CastLight(const FVector& Start, const FVector& Dir, doub
 	if (const APlayerController* PC = World->GetFirstPlayerController())
 		if (const APawn* Pawn = PC->GetPawn()) Params.AddIgnoredActor(Pawn);   // 人不挡光路
 	for (TActorIterator<ADysisBeamActor> It(World); It; ++It) Params.AddIgnoredActor(*It);   // 别的光（它们的踩踏面）也不挡
+	if (bGreyboxOculus)
+	{
+		// 圆眼光柱是从光圈中间的洞下来的：叶片和屋顶细桥不算挡它（灰盒 b._blk）
+		if (!bOculusIgnoreBuilt)
+		{
+			bOculusIgnoreBuilt = true;
+			for (TActorIterator<AActor> It(World); It; ++It)
+				for (const FName& Tag : It->Tags)
+				{
+					const FString T = Tag.ToString();
+					if (T.StartsWith(TEXT("SM_Mech_IrisBlades_")) || T == TEXT("SM_RoofBridge")) { OculusLightIgnore.Add(*It); break; }
+				}
+		}
+		for (const TWeakObjectPtr<AActor>& A : OculusLightIgnore) if (A.IsValid()) Params.AddIgnoredActor(A.Get());
+	}
 	FHitResult Hit;
 	if (World->LineTraceSingleByChannel(Hit, Start, Start + Dir * Far, ECC_Visibility, Params)) return Hit.Distance;
 	return -1.0;
@@ -410,6 +427,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 	SolveClock = 0.0;
 	++FrameSerial;
 	bFrameValid = false; bClean = false; Lit = 0.0; Need = 0.0;
+	if (bGreyboxOculus) { UpdateGreyboxOculus(H); return; }
 	const FGreyboxWindow& W = GWindows[GreyboxIndex];
 	const UDysisWorldState* State = UDysisWorldState::Get(this);
 	const bool bNight = State && State->IsNight();
@@ -536,10 +554,46 @@ void ADysisBeamActor::ApplyIsleGrow()
 	FrameFar *= 0.25;
 }
 
+void ADysisBeamActor::UpdateGreyboxOculus(double H)
+{
+	// 灰盒 computeOculusBeam。光圈半径 a 由机关总管写在世界状态里。
+	auto Done = [this]()
+	{
+		bWalkable = ComputeGreyboxWalkable();
+		ApplyGreyboxComponents();
+	};
+	const UDysisWorldState* State = UDysisWorldState::Get(this);
+	const double A = State ? State->IrisACm : 40.0;
+	const FVector Sun = UDysisSkyLibrary::DysisSunDir(float(H));
+	constexpr double IrisZ0 = 3004.0, IrisZ1 = 3028.0, F3Z = 2300.0;
+	if (A < 100.0 || Sun.Z < 0.01) { Done(); return; }
+	if (IrisZ1 < UDysisWorldState::ShadowZ(Sun)) { Done(); return; }
+	const FVector L = -Sun;
+	const FVector Hd = FVector(L.X, L.Y, 0.0).GetSafeNormal();     // 光的水平方向
+	const FVector Side(-Hd.Y, Hd.X, 0.0);                          // 和它垂直（灰盒 side = (−h.z, 0, h.x) 换成 UE 的轴）
+	constexpr double Half = 95.0;
+	const FVector Top = FVector(-Hd.X * A, -Hd.Y * A, IrisZ1), Bot = FVector(Hd.X * A, Hd.Y * A, IrisZ0);
+	const FVector Corners[4] = { Top - Side * Half, Top + Side * Half, Bot - Side * Half, Bot + Side * Half };
+	SetGreyboxFrame(Corners, L, 35.0, -30.0, false, 0.0);
+	Lit = 1.0;
+	Need = (IrisZ1 - F3Z) / FMath::Max(0.05, -double(L.Z)) - 50.0;
+	double MinEdge = FrameEdge[0];
+	for (int32 i = 1; i < 7; ++i) MinEdge = FMath::Min(MinEdge, FrameEdge[i]);
+	bClean = MinEdge >= Need;
+	Done();
+}
+
 bool ADysisBeamActor::ComputeGreyboxWalkable() const
 {
-	const FGreyboxWindow& W = GWindows[GreyboxIndex];
-	if (!bFrameValid || !bClean || !W.bCanWalk) return false;
+	if (bGreyboxOculus)
+	{
+		if (!bFrameValid || !bClean) return false;
+	}
+	else
+	{
+		const FGreyboxWindow& W0 = GWindows[GreyboxIndex];
+		if (!bFrameValid || !bClean || !W0.bCanWalk) return false;
+	}
 	const UDysisWorldState* State = UDysisWorldState::Get(this);
 	if (!State) return false;
 	if (GreyboxIndex == 0 && State->IsleGrowK < 1.0f) return false;   // 开场的光还在往岛上伸
@@ -580,7 +634,7 @@ void ADysisBeamActor::ApplyGreyboxComponents()
 		const double Ht = FMath::Abs(FVector::DotProduct(FrameV, Z));
 		Visual->SetWorldLocationAndRotation(FrameO + (FrameU + FrameV) * 0.5 + X * (Len * 0.5), FRotationMatrix::MakeFromXY(X, Y).ToQuat());
 		Visual->SetWorldScale3D(FVector(Len, Wd, FMath::Max(Ht, 1.0)) / 100.0);
-		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * GWindows[GreyboxIndex].Gain * (bWalkable ? 1.0f : 0.55f));
+		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * (bGreyboxOculus ? 1.1f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f));
 	}
 
 	// 能踩的面：光的下表面，从 s0 到 s1，两侧各宽 0.35 m。用一块 4 cm 厚的板，顶面就是那个面。

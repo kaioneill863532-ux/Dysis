@@ -1,29 +1,32 @@
 ﻿#include "DysisDirector.h"
 #include "DysisGreybox.h"
 #include "World/DysisWorldState.h"
+#include "Sky/DysisTimeComponent.h"
 #include "UI/DysisCopy.h"
 #include "UI/DysisHUD.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
 {
 	// ───── 灰盒 v0.12 的数（厘米 / 度） ─────
 	// 水闸：水庭东边的石台上（SLUICE az 113.8°、r 11.64 m，石台面 0.9 m）
-	const FVector SluicePos(-469.73, 1065.01, 90.0);
+	const FVector DirSluicePos(-469.73, 1065.01, 90.0);
 	// L1 的机关：原来 A 在西南（az 226°）、B 在伊莉丝浮雕旁（az 71°），现在合成一个，
 	// 立在两处沿回廊走的正中间（接缝那一段不通，所以是经西、北这一侧：az 328.5°），贴着外墙（r 15.05 m）。
-	constexpr float LeverAz = 328.5f, LeverR = 1505.0f, LeverZ = 600.0f;
+	constexpr float DirLeverAz = 328.5f, DirLeverR = 1505.0f, DirLeverZ = 600.0f;
 	// 两块推拉石板（sliderSpecs）：贴着外墙面滑，r = R_OUT + 0.1 m
-	struct FPanelSpec { const TCHAR* Piece; float Az, Shift, Z; bool bOpenAt; };
-	const FPanelSpec PanelSpecs[] = {
+	struct FDirPanelSpec { const TCHAR* Piece; float Az, Shift, Z; bool bOpenAt; };
+	const FDirPanelSpec DirPanelSpecs[] = {
 		{ TEXT("SM_Mech_Slider_Panel_b2"),   245.72f, 8.55f, 1985.0f, true  },   // 西边“上升的窗”：开局关着
 		{ TEXT("SM_Mech_Slider_Panel_iris"), 171.43f, 8.35f, 1905.0f, false },   // 南边“虹的窗”：开局开着
 	};
-	constexpr float SliderSeconds = 1.6f;
+	constexpr float DirSliderSeconds = 1.6f;
 }
 
 ADysisDirector::ADysisDirector()
@@ -31,13 +34,21 @@ ADysisDirector::ADysisDirector()
 	PrimaryActorTick.bCanEverTick = true;
 	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+
 	SluiceMarker = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SluiceMarker"));
 	SluiceMarker->SetupAttachment(RootComponent);
 	SluiceMarker->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cylinder(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	if (Cylinder.Succeeded()) SluiceMarker->SetStaticMesh(Cylinder.Object);
-	SluiceMarker->SetRelativeLocation(SluicePos + FVector(0.0, 0.0, 45.0));
+	SluiceMarker->SetRelativeLocation(DirSluicePos + FVector(0.0, 0.0, 45.0));
 	SluiceMarker->SetRelativeScale3D(FVector(0.25, 0.25, 0.9));
+
+	Apple = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Apple"));
+	Apple->SetupAttachment(RootComponent);
+	Apple->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (Sphere.Succeeded()) Apple->SetStaticMesh(Sphere.Object);
+	Apple->SetRelativeScale3D(FVector(0.24));   // 灰盒：半径 0.12 m
 }
 
 ADysisDirector* ADysisDirector::Get(const UObject* WorldContext)
@@ -48,13 +59,27 @@ ADysisDirector* ADysisDirector::Get(const UObject* WorldContext)
 	return It ? *It : nullptr;
 }
 
+UDysisTimeComponent* ADysisDirector::PlayerTime() const
+{
+	const UWorld* World = GetWorld();
+	const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	return Pawn ? Pawn->FindComponentByClass<UDysisTimeComponent>() : nullptr;
+}
+
+bool ADysisDirector::GameStarted() const
+{
+	const ADysisHUD* Hud = ADysisHUD::Get(this);
+	return !Hud || !Hud->IsMenuOpen();
+}
+
 void ADysisDirector::BeginPlay()
 {
 	Super::BeginPlay();
 	CollectPieces();
 
 	// 推拉石板：记下开局的位置和朝向（模型摆的就是开局状态）
-	for (const FPanelSpec& Spec : PanelSpecs)
+	for (const FDirPanelSpec& Spec : DirPanelSpecs)
 	{
 		FSliderPanel P;
 		P.Actor = Piece(Spec.Piece);
@@ -79,6 +104,7 @@ void ADysisDirector::BeginPlay()
 	}
 	PlaceSlider();
 	UpdateWaterfall();
+	SetupRoof();
 	BuildInteracts();
 }
 
@@ -105,7 +131,9 @@ void ADysisDirector::BuildInteracts()
 		// 水闸：只能开，不能关；开了以后就不能再互动了（2026-10-08 定的）
 		FDysisInteract I;
 		I.Id = TEXT("sluice");
-		I.PosCm = SluicePos; I.Z0 = 60.0f; I.Z1 = 270.0f; I.RadiusCm = 190.0f;
+		I.Pos = []() { return DirSluicePos; };
+		I.ZRange = []() { return FVector2D(60.0, 270.0); };
+		I.RadiusCm = 190.0f;
 		I.When = [this]() { const UDysisWorldState* S = UDysisWorldState::Get(this); return S && !S->bSluiceOpen; };
 		I.Label = []() { return FText::FromString(DysisCopy::PromptWaterGate); };
 		I.Act = [this]() { ToggleSluice(); };
@@ -114,9 +142,23 @@ void ADysisDirector::BuildInteracts()
 	{
 		FDysisInteract I;
 		I.Id = TEXT("lever");
-		I.PosCm = DysisGB::PolarCm(LeverAz, LeverR, LeverZ); I.Z0 = LeverZ - 30.0f; I.Z1 = LeverZ + 180.0f; I.RadiusCm = 160.0f;
+		I.Pos = []() { return DysisGB::PolarCm(DirLeverAz, DirLeverR, DirLeverZ); };
+		I.ZRange = []() { return FVector2D(DirLeverZ - 30.0, DirLeverZ + 180.0); };
+		I.RadiusCm = 160.0f;
 		I.Label = []() { return FText::FromString(TEXT("拉动机关")); };
 		I.Act = [this]() { PullLever(); };
+		Interacts.Add(MoveTemp(I));
+	}
+	{
+		// 取下金苹果（接住最后一缕光）：站在屋顶最高一级的浑天仪旁边
+		FDysisInteract I;
+		I.Id = TEXT("takeApple");
+		I.Pos = [this]() { return ArmTopCm(); };
+		I.ZRange = [this]() { const double Z = ArmTopCm().Z; return FVector2D(Z - 220.0, Z + 20.0); };
+		I.RadiusCm = 180.0f;
+		I.When = [this]() { return !bCaught; };
+		I.Label = []() { return FText::FromString(DysisCopy::PromptTakeApple); };
+		I.Act = [this]() { CatchLight(); };
 		Interacts.Add(MoveTemp(I));
 	}
 }
@@ -127,9 +169,10 @@ const FDysisInteract* ADysisDirector::NearestInteract(const FVector& Foot) const
 	float BestDist = 1.0e9f;
 	for (const FDysisInteract& I : Interacts)
 	{
-		if (Foot.Z < I.Z0 || Foot.Z > I.Z1) continue;
+		const FVector2D ZR = I.ZRange();
+		if (Foot.Z < ZR.X || Foot.Z > ZR.Y) continue;
 		if (I.When && !I.When()) continue;
-		const float D = FVector::Dist2D(Foot, I.PosCm);
+		const float D = FVector::Dist2D(Foot, I.Pos());
 		if (D < I.RadiusCm && D < BestDist) { Best = &I; BestDist = D; }
 	}
 	return Best;
@@ -155,8 +198,7 @@ bool ADysisDirector::DebugInteract(FName Id)
 void ADysisDirector::ToggleSluice()
 {
 	UDysisWorldState* S = UDysisWorldState::Get(this);
-	if (!S) return;
-	if (S->bSluiceOpen) return;
+	if (!S || S->bSluiceOpen) return;
 	S->SetSluiceOpen(true);
 	ADysisHUD::Notify(GetWorld(), DysisCopy::WaterGateOpened, 5.6f);
 }
@@ -185,7 +227,7 @@ void ADysisDirector::PullLever()
 void ADysisDirector::UpdateSlider(float Dt)
 {
 	const float Before = SliderPos;
-	SliderPos = DysisGB::Toward(SliderPos, SliderTarget, 1.0f / SliderSeconds, Dt);
+	SliderPos = DysisGB::Toward(SliderPos, SliderTarget, 1.0f / DirSliderSeconds, Dt);
 	if (SliderPos != Before)
 	{
 		PlaceSlider();
@@ -214,4 +256,6 @@ void ADysisDirector::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	UpdateSlider(DeltaTime);
 	UpdateWaterfall();
+	UpdateCrown(DeltaTime);
+	UpdateCatch(DeltaTime);
 }
