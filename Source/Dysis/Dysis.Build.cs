@@ -22,6 +22,7 @@ public class Dysis : ModuleRules
 			"SlateCore",
 			"DeveloperSettings",   // 音效设置页（Audio/DysisSfxSettings：Project Settings → Game → Dysis 音效）
 			"AssetRegistry",       // 殿内混响资产一键生成（Audio/DysisSfxReverb.cpp，编辑器里用）
+			"AnimGraphRuntime",    // 主角的动作（Player/DysisHeroAnimInstance：不用动画蓝图，自己搭的播放和混合）
 		});
 		
 		// Uncomment if you are using online features

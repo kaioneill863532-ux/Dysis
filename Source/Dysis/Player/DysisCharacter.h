@@ -40,7 +40,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis")
 	TObjectPtr<UCameraComponent> Camera;
 
-	/** 临时外形：圆锥身子、球脑袋。正式模型来了换掉这两个。 */
+	/** 备用外形：圆锥身子、球脑袋。主角模型（GetMesh()）找得到的时候不用它，找不到（资产没导入）才显出来。 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis")
 	TObjectPtr<UStaticMeshComponent> AvatarBody;
 
@@ -141,6 +141,28 @@ public:
 	virtual void PawnClientRestart() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+	// ───── 主角模型和动作（美术 2026-10-09 给的模型；哪种状态放哪段动作见 UDysisHeroAnimInstance） ─────
+	/** 刚落地的那一小会儿还剩多少秒（放落地动作用）。 */
+	float GetLandingSeconds() const { return LandingSeconds; }
+	/** 正踩着台阶 / 斜着的光往上走。 */
+	bool IsAscendingSteps() const { return bAscendingSteps; }
+	/** 正在做“伸手”的动作（互动成功后放一遍，一走动就停）。 */
+	bool IsTouching() const { return TouchSeconds > 0.0f; }
+	/** 每伸一次手加一（动作那边靠它知道“再放一遍”）。 */
+	int32 GetTouchSerial() const { return TouchSerial; }
+	/** 互动成功：人站着的话伸一下手。 */
+	void PlayTouch();
+	/** 按下互动键（E）时走的就是它（测试里也直接叫它）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Player")
+	void InteractPressed() { TryInteractPressed(); }
+	/** 用的是正式的主角模型（不是备用的圆锥）。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Player")
+	bool HasHeroMesh() const { return bHeroMesh; }
+	/** 现在放的是哪一段动作（A_Idle、A_Run……；没有主角模型时是空）。测试用。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Player")
+	FName GetHeroClipName() const;
+	virtual void Landed(const FHitResult& Hit) override;
+
 	// ───── 刚踏空还能跳（coyote） ─────
 	virtual void Falling() override;
 	virtual bool CanJumpInternal_Implementation() const override;
@@ -161,6 +183,8 @@ private:
 	void ApplyMovementNumbers();
 	void UpdateCamera(float Dt);
 	void SetAvatarShown(bool bShown);
+	void SetupHeroMesh();
+	void UpdateHeroState(float Dt);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> Mapping;
@@ -197,6 +221,11 @@ private:
 	bool bDialogueLookLocked = false;   // 过剧情时让控制器不收“转镜头”的输入（开始 / 结束各叫一次，成对）
 	bool bStartPitchApplied = false;
 	bool bAvatarShown = true;
+	bool bHeroMesh = false;
+	bool bAscendingSteps = false;
+	float LandingSeconds = 0.0f, StepHoldSeconds = 0.0f, TouchSeconds = 0.0f;
+	int32 TouchSerial = 0;
+	FVector PrevHeroLocation = FVector::ZeroVector;
 	float CamTun = 0.0f;   // 0 = 在开阔处，1 = 在墙里的楼梯上（镜头收紧）
 
 	/** coyote 窗口标志（离地起表、跳了即灭）。 */

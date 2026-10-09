@@ -1,5 +1,6 @@
 ﻿#include "DysisCharacter.h"
 #include "DysisCharacterMovement.h"
+#include "DysisHeroAnimInstance.h"
 #include "DysisGreybox.h"
 #include "Sky/DysisTimeComponent.h"
 #include "Sky/DysisSkyLibrary.h"
@@ -9,7 +10,10 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Animation/AnimSequence.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -53,7 +57,7 @@ ADysisCharacter::ADysisCharacter(const FObjectInitializer& ObjectInitializer)
 	Camera->SetupAttachment(CameraArm, USpringArmComponent::SocketName);
 	Camera->bUsePawnControlRotation = false;
 
-	// 临时外形（灰盒的袍子：底半径 0.33 m、高 1.43 m，头在 1.56 m）
+	// 备用外形（灰盒的袍子：底半径 0.33 m、高 1.43 m，头在 1.56 m）：主角模型找不到的时候才用
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cone(TEXT("/Engine/BasicShapes/Cone.Cone"));
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Sphere(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	auto MakePart = [this](FName Name, UStaticMesh* InMesh, const FVector& Location, const FVector& Scale)
@@ -72,6 +76,14 @@ ADysisCharacter::ADysisCharacter(const FObjectInitializer& ObjectInitializer)
 	};
 	AvatarBody = MakePart(TEXT("AvatarBody"), Cone.Succeeded() ? Cone.Object : nullptr, FVector(0.f, 0.f, -CapsuleHalfHeight + 71.5f), FVector(0.66f, 0.66f, 1.43f));
 	AvatarHead = MakePart(TEXT("AvatarHead"), Sphere.Succeeded() ? Sphere.Object : nullptr, FVector(0.f, 0.f, -CapsuleHalfHeight + 156.f), FVector(0.25f));
+
+	// 正式的主角模型：资产到 BeginPlay 再找。脚踩在胶囊底；模型导出时脸朝 +Y，转 −90° 朝前
+	GetMesh()->SetRelativeLocation(FVector(0.f, 0.f, -CapsuleHalfHeight));
+	GetMesh()->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	GetMesh()->SetGenerateOverlapEvents(false);
+	GetMesh()->SetCanEverAffectNavigation(false);
+	GetMesh()->bCastHiddenShadow = true;   // 第一人称时人藏起来，影子留着
 
 	Time = CreateDefaultSubobject<UDysisTimeComponent>(TEXT("DysisTime"));
 	Interact = CreateDefaultSubobject<UDysisInteractComponent>(TEXT("DysisInteract"));
@@ -107,7 +119,70 @@ void ADysisCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 	ApplyMovementNumbers();   // 属性可能在编辑器里改过
+	SetupHeroMesh();
 	SetViewMode(ViewMode);
+}
+
+// ───────────────────────── 主角模型和动作 ─────────────────────────
+
+void ADysisCharacter::SetupHeroMesh()
+{
+	// 模型由 Art/Characters/ue_import_hero.py 导入；用到时再找（不在构造函数里攥着，导入脚本重跑时引擎要能换掉它）
+	USkeletalMesh* Hero = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Dysis/Characters/Hero/SK_DysisHero.SK_DysisHero"));
+	bHeroMesh = Hero != nullptr;
+	PrevHeroLocation = GetActorLocation();
+	if (!bHeroMesh)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Dysis 主角：找不到 /Game/Dysis/Characters/Hero/SK_DysisHero，先用圆锥（跑一遍 Art/Characters/ue_import_hero.py）"));
+		return;
+	}
+	GetMesh()->SetSkeletalMeshAsset(Hero);
+	GetMesh()->SetAnimInstanceClass(UDysisHeroAnimInstance::StaticClass());
+	// 圆锥用不着了：不画，也不留影子
+	for (UStaticMeshComponent* Part : { AvatarBody.Get(), AvatarHead.Get() })
+		if (Part)
+		{
+			Part->SetVisibility(false);
+			Part->SetCastShadow(false);
+		}
+}
+
+void ADysisCharacter::UpdateHeroState(float Dt)
+{
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	const FVector Loc = GetActorLocation(), Delta = Loc - PrevHeroLocation;
+	PrevHeroLocation = Loc;
+	const float Speed = float(GetVelocity().Size2D());
+	const bool bGround = Move && Move->IsMovingOnGround();
+	// 踩着台阶（或斜着的光）往上：人在地上、在走，而且这一帧在升高。留 0.18 秒，免得一级和一级之间动作来回换
+	if (bGround && Speed > 40.f && Dt > 1.0e-4f && Delta.Z / Dt > 45.0 && Delta.Z < 60.0) StepHoldSeconds = 0.18f;
+	else StepHoldSeconds = FMath::Max(0.f, StepHoldSeconds - Dt);
+	bAscendingSteps = StepHoldSeconds > 0.f && Speed > 40.f && bGround;
+	LandingSeconds = FMath::Max(0.f, LandingSeconds - Dt);
+	// 伸手：一走动、一离地就停
+	TouchSeconds = (Speed > 35.f || !bGround) ? 0.f : FMath::Max(0.f, TouchSeconds - Dt);
+}
+
+void ADysisCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+	LandingSeconds = 0.25f;
+}
+
+void ADysisCharacter::PlayTouch()
+{
+	const UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (!bHeroMesh || !Move || !Move->IsMovingOnGround() || GetVelocity().Size2D() > 35.0) return;
+	const UDysisHeroAnimInstance* Anim = Cast<UDysisHeroAnimInstance>(GetMesh()->GetAnimInstance());
+	const UAnimSequence* Clip = Anim && Anim->Clips.IsValidIndex(int32(EDysisHeroClip::TouchForward)) ? Anim->Clips[int32(EDysisHeroClip::TouchForward)].Get() : nullptr;
+	TouchSeconds = Clip ? Clip->GetPlayLength() : 0.0f;
+	++TouchSerial;
+}
+
+FName ADysisCharacter::GetHeroClipName() const
+{
+	const UDysisHeroAnimInstance* Anim = bHeroMesh ? Cast<UDysisHeroAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+	return Anim ? Anim->GetActiveClipName() : NAME_None;
 }
 
 void ADysisCharacter::PostInitializeComponents()
@@ -221,7 +296,7 @@ void ADysisCharacter::JumpPressed()
 void ADysisCharacter::TryInteractPressed()
 {
 	if (UiBlocksInput() || InDialogue()) return;
-	if (Interact) Interact->TryInteract();
+	if (Interact && Interact->TryInteract()) PlayTouch();   // 互动成功：伸一下手
 }
 
 void ADysisCharacter::ToggleViewPressed()
@@ -281,6 +356,11 @@ void ADysisCharacter::SetAvatarShown(bool bShown)
 	if (bAvatarShown == bShown) return;
 	bAvatarShown = bShown;
 	// 藏起来但影子留着（bCastHiddenShadow）
+	if (bHeroMesh)
+	{
+		GetMesh()->SetHiddenInGame(!bShown);
+		return;
+	}
 	if (AvatarBody) AvatarBody->SetHiddenInGame(!bShown);
 	if (AvatarHead) AvatarHead->SetHiddenInGame(!bShown);
 }
@@ -288,6 +368,7 @@ void ADysisCharacter::SetAvatarShown(bool bShown)
 void ADysisCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateHeroState(DeltaSeconds);
 	// 过剧情时镜头定住：在控制器那一层关掉“转镜头”的输入（鼠标、手柄都算），对话结束再放开
 	if (const bool bTalking = InDialogue(); bTalking != bDialogueLookLocked)
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))
