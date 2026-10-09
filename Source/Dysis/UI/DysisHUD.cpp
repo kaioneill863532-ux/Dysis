@@ -319,13 +319,20 @@ void ADysisHUD::HoldMenuView(float RealDt)
 	}
 	if (MenuCamera && PC->GetViewTarget() != MenuCamera) PC->SetViewTarget(MenuCamera);
 
-	// 主界面的天自己往前走（H 每 360 是一天）；太阳落山以后走快一点
-	const float SunAlt = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(float(UDysisSkyLibrary::DysisSunDir(MenuTimeH + MenuTurn).Z), -1.0f, 1.0f)));
-	const float Rate = MenuDaySeconds > KINDA_SMALL_NUMBER ? 360.0f / MenuDaySeconds : 0.0f;
-	MenuTurn = FMath::Fmod(MenuTurn + Rate * (SunAlt < -1.0f ? MenuNightSpeed : 1.0f) * RealDt, 360.0f);
-	if (APawn* Pawn = PC->GetPawn())
-		if (UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>())
-			Time->SetForcedTime(MenuTimeH + MenuTurn);
+	// 主界面的天自己往前走：日月沿着主界面专用的那个圆转（ADysisSkyActor::SetMenuOrbit），昼夜一样长；
+	// 夜里可以走快一点，但快慢是跟着太阳的高度慢慢变的，不跳。时刻本身钉在 MenuTimeH 不动（殿里的光路不跟着主界面的天跑）。
+	UDysisTimeComponent* MenuTimeComp = PC->GetPawn() ? PC->GetPawn()->FindComponentByClass<UDysisTimeComponent>() : nullptr;
+	ADysisSkyActor* MenuSky = MenuTimeComp ? MenuTimeComp->SkyActor.Get() : nullptr;
+	float SunAlt = 10.0f, MoonAlt = -10.0f;
+	if (MenuSky)
+	{
+		MenuSky->SetMenuOrbit(MenuOrbitStartPhase + MenuTurn);
+		MenuSky->GetAltitudes(SunAlt, MoonAlt);
+	}
+	const float NightT = FMath::Clamp((SunAlt - 3.0f) / (-5.0f - 3.0f), 0.0f, 1.0f);
+	const float Rate = (MenuDaySeconds > KINDA_SMALL_NUMBER ? 360.0f / MenuDaySeconds : 0.0f) * FMath::Lerp(1.0f, MenuNightSpeed, NightT * NightT * (3.0f - 2.0f * NightT));
+	MenuTurn = FMath::Fmod(MenuTurn + Rate * RealDt, 360.0f);
+	if (MenuTimeComp) MenuTimeComp->SetForcedTime(MenuTimeH);
 
 	// 固定曝光：自动曝光会把月夜提亮得和白天一样，主界面上就看不出昼夜了
 	if (UCameraComponent* Cam = MenuCamera ? MenuCamera->GetCameraComponent() : nullptr)
@@ -339,10 +346,10 @@ void ADysisHUD::HoldMenuView(float RealDt)
 		PP.AutoExposureApplyPhysicalCameraExposure = false;
 		PP.bOverride_AutoExposureBias = true;
 		PP.AutoExposureBias = MenuExposureBias + MenuNightExposureBoost * Dusk;
-		// 黄昏的调子：颜色照搬游戏里的，压暗只用一半（主界面本来就是固定曝光，落日时已经不亮）
+		// 黄昏的调子：只用游戏里的颜色，不再压暗（主界面是固定曝光，日月交接的时候再压暗画面会黑一下）
 		if (APawn* MenuPawn = PC->GetPawn())
 			if (const UDysisTimeComponent* MenuTime = MenuPawn->FindComponentByClass<UDysisTimeComponent>())
-				if (const ADysisSkyActor* Sky = MenuTime->SkyActor.Get()) PP.AutoExposureBias += 0.5f * Sky->ApplyDuskLook(PP);
+				if (const ADysisSkyActor* Sky = MenuTime->SkyActor.Get()) Sky->ApplyDuskLook(PP);
 	}
 }
 
@@ -626,9 +633,11 @@ void ADysisHUD::DrawDialogue()
 	if (!Speaker.IsEmpty())
 	{
 		const float NamePx = 37.0f * FontK;
-		FontTracking = 0.20f;
+		// 四个字的名字（赫利俄斯）：字距收紧、整体往左挪一点，不然右边贴着立绘
+		const bool bLongName = Speaker.Len() >= 4;
+		FontTracking = bLongName ? 0.05f : 0.20f;
 		const float NameH = float(MeasureText(Speaker, MakeFont(NamePx, true)).Y);
-		DrawUIText(Speaker, Ink, 4903.0f * S, BoxY + 191.0f * S - NameH * 0.5f, NamePx, 0.5f, true);
+		DrawUIText(Speaker, Ink, (bLongName ? 4830.0f : 4903.0f) * S, BoxY + 191.0f * S - NameH * 0.5f, NamePx, 0.5f, true);
 	}
 	// 正文：从 x 678 写起，一行 34 个字（写到 x 5200 换行）；第一行的中线在 y 588，行距 202；字距拉开一点
 	const float BodyPx = 35.5f * FontK;
@@ -730,7 +739,11 @@ void ADysisHUD::DrawHUD()
 			if (APawn* Pawn = PC->GetPawn())
 			{
 				PC->SetViewTarget(Pawn);
-				if (UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>()) Time->ClearForcedTime();
+				if (UDysisTimeComponent* Time = Pawn->FindComponentByClass<UDysisTimeComponent>())
+				{
+					if (ADysisSkyActor* Sky = Time->SkyActor.Get()) Sky->ClearMenuOrbit();   // 天回到游戏里那条真的轨道
+					Time->ClearForcedTime();
+				}
 			}
 		}
 		if (MenuCamera) { MenuCamera->Destroy(); MenuCamera = nullptr; }

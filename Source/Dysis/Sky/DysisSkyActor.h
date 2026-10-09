@@ -169,6 +169,33 @@ public:
 	/** 把黄昏的颜色写进一台镜头的后期设置；返回曝光该加多少（由镜头自己加到它的曝光上）。 */
 	float ApplyDuskLook(struct FPostProcessSettings& PP) const;
 
+	// ───── 主界面专用的日月轨迹（2026-10-09 用户：主界面上日月变幻要平滑，沿着一条好看的轨迹走，像一件艺术品） ─────
+	// 游戏里那条真的轨道在主界面上不好看：日落在镜头背后、夜比昼长（以前靠“夜里走快一倍”补，快慢会跳一下）。
+	// 主界面上改成：日月在镜头正前方的一个圆上一前一后地转——太阳从左边升起、划一道弧、落进右边的海平线，
+	// 它落下去的那一刻月亮正好从左边升起来，走同一道弧。昼夜一样长，一圈走下来没有任何地方要跳。
+
+	/** 那个圆的圆心在哪个方位（度；镜头朝着 70°）、圆心的高度（度，0 = 在地平线上）、圆有多大（度 = 日月最高升到多高）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|主界面")
+	float MenuOrbitAzDeg = 52.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|主界面")
+	float MenuOrbitCenterAltDeg = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|主界面")
+	float MenuOrbitRadiusDeg = 30.0f;
+
+	/** 按主界面的轨迹摆天：Phase（度）0 = 太阳在左边的地平线上刚升起，90 = 最高，180 = 落进右边的地平线；月亮总是差半圈。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky|主界面")
+	void SetMenuOrbit(float PhaseDeg);
+
+	/** 离开主界面：回到游戏里按时刻摆的那条轨道。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky|主界面")
+	void ClearMenuOrbit();
+
+	/** 让满天的星星绕着头顶正上方再多转这么多度（结局里星空慢慢转用）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky")
+	void SetStarSpin(float Degrees);
+
 	/** 游戏里接住最后一缕光的那一刻叫一下（时间组件会叫）：从这一刻起天由夜空的球来画、暮色的环境光亮起来。
 	 *  没叫过的时候（比如主界面的延时摄影）按太阳的高度自己判断：落到地平线下 1.2°–2° 之间换过去。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky")
@@ -234,6 +261,8 @@ private:
 	void ApplyMoonDisc();
 	void BuildStars();
 	void ApplyNightSky();
+	void ApplyLights();
+	void ApplyStarRotation();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> MoonDiscMID;
@@ -248,6 +277,8 @@ private:
 	float StarOpacity = 0.f;
 	bool bTimeSet = false;
 	bool bAfterSunset = false;
+	bool bMenuOrbit = false;
+	float MenuPhase = 0.f, StarSpinDeg = 0.f;
 	float AfterSunsetK() const;
 	void ApplyDuskAtmosphere();
 	TWeakObjectPtr<class USkyAtmosphereComponent> Atmosphere;

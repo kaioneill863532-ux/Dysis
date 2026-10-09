@@ -17,6 +17,7 @@ def shoot(w, tag):
         if new: say("截图 %s = %s" % (tag, os.path.basename(new[-1]))); return
     say("截图 %s 没生成" % tag)
 
+STEP, TOTAL = 6.0, 140.0
 def main():
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_begin_play()
     for _ in range(6000):
@@ -26,14 +27,16 @@ def main():
     w = gw(); pawn = unreal.GameplayStatics.get_player_pawn(w, 0)
     for m in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DysisMusicManager): m.stop_music(0.0)
     tc = pawn.get_component_by_class(unreal.DysisTimeComponent)
+    sky = unreal.GameplayStatics.get_all_actors_of_class(w, unreal.DysisSkyActor)[0]
     t0 = unreal.GameplayStatics.get_real_time_seconds(w); nxt = 3.0
     while True:
         yield
         t = unreal.GameplayStatics.get_real_time_seconds(w) - t0
         if t >= nxt:
-            nxt += 7.0
-            yield from shoot(w, "%3.0f 秒 %s" % (t, str(tc.describe_state())[9:42]))
-        if t > 120.0: break
+            nxt += STEP
+            alt = sky.get_altitudes()
+            yield from shoot(w, "%3.0f 秒 太阳高 %.0f° 月亮高 %.0f°" % (t, alt[0], alt[1]))
+        if t > TOTAL: break
 
 class R:
     def __init__(s): s.g = main(); s.h = None

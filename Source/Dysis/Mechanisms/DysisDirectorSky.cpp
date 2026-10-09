@@ -4,6 +4,7 @@
 #include "DysisConstellations.generated.h"
 #include "World/DysisWorldState.h"
 #include "Sky/DysisSkyLibrary.h"
+#include "Sky/DysisSkyActor.h"
 #include "Sky/DysisTimeComponent.h"
 #include "UI/DysisDialogueComponent.h"
 #include "Camera/CameraActor.h"
@@ -33,7 +34,8 @@ namespace
 
 	// 结局的星座
 	constexpr float ConDistCm = 420000.0f;                   // 在月亮圆盘后面、满天的星星前面
-	constexpr float ConCamUp = 270.0f, ConCamFov = 80.0f;    // 镜头：人头顶上方，朝天
+	constexpr float ConCamZ = 400.0f, ConCamFov = 94.0f;     // 镜头：殿心正上方、水亭顶上（亭顶 3.7 m），笔直朝天——圆眼在画面正中，占画面高的四分之三
+	constexpr float ConSpinDegPerSec = 1.1f;                 // 星座和满天的星一起绕着头顶慢慢转
 	constexpr float ConCamSeconds = 3.0f;                    // 镜头抬起来用多久
 	constexpr float ConStarsAt = 1.2f, ConStarEach = 0.07f, ConStarFade = 1.2f;   // 星一颗接一颗亮起来
 	constexpr float ConLinesAt = 3.4f, ConLineSeconds = 0.36f;                    // 线一条接一条画出来
@@ -53,6 +55,7 @@ namespace
 		C->SetTranslucentSortPriority(SortPriority);
 		C->SetStaticMesh(Mesh);
 		C->RegisterComponent();
+		C->SetWorldLocationAndRotation(FVector::ZeroVector, FQuat::Identity);   // 摆在殿心：里面每颗星的位置就是它在天上的方向 × 距离，整组绕竖轴转就是星空在转
 		C->SetVisibility(false);
 		return C;
 	}
@@ -187,10 +190,10 @@ void ADysisDirector::StartStarShow()
 	if (!PC || !Time || !ConStars || !ConLines || StarShowT >= 0.0f) return;
 	StarShowT = 0.0f;
 
-	// 镜头：从人头顶上方朝天看。画面的上边朝着月亮那一侧，两个星座一左一右摆在圆眼里
+	// 镜头：在殿心正上方（水亭顶上）笔直朝天看，圆眼正好在画面正中。画面的上边朝着月亮那一侧，两个星座一左一右摆在圆眼里
 	const FVector Moon = UDysisSkyLibrary::DysisMoonDir(Time->H);
-	const FVector CamLoc = Time->FootCm + FVector(0.0, 0.0, ConCamUp);
-	const FRotator CamRot(89.5f, FMath::RadiansToDegrees(FMath::Atan2(Moon.Y, Moon.X)) + 180.0f, 0.0f);
+	const FVector CamLoc(0.0, 0.0, ConCamZ);
+	const FRotator CamRot(89.99f, FMath::RadiansToDegrees(FMath::Atan2(Moon.Y, Moon.X)) + 180.0f, 0.0f);
 	if (!EndingCamera)
 	{
 		EndingCamera = World->SpawnActor<ACameraActor>(CamLoc, CamRot);
@@ -240,7 +243,7 @@ void ADysisDirector::StartStarShow()
 			S.Gain = FMath::Lerp(0.9f, 2.4f, Bright);
 			S.At = ConStarsAt + ConStarEach * ConStarInfo.Num();
 			const double Size = 2.0 * ConDistCm * FMath::Tan(FMath::DegreesToRadians(FMath::Lerp(0.42f, 0.95f, Bright) * 0.5f));
-			ConStars->AddInstance(FTransform(FRotationMatrix::MakeFromZ(-S.Dir).Rotator(), S.Dir * ConDistCm, FVector(Size / 100.0)), /*bWorldSpace*/ true);
+			ConStars->AddInstance(FTransform(FRotationMatrix::MakeFromZ(-S.Dir).Rotator(), S.Dir * ConDistCm, FVector(Size / 100.0)), /*bWorldSpace*/ false);
 			ConStarInfo.Add(S);
 		}
 		for (int32 i = 0; i < NumLines; ++i)
@@ -249,7 +252,7 @@ void ADysisDirector::StartStarShow()
 			L.A = Base + Lines[i].A; L.B = Base + Lines[i].B;
 			L.At = LineAt; LineAt += ConLineSeconds;
 			ConStarInfo[L.B].PulseAt = FMath::Min(ConStarInfo[L.B].PulseAt, L.At + ConLineSeconds);
-			ConLines->AddInstance(FTransform(FQuat::Identity, ConStarInfo[L.A].Dir * ConDistCm, FVector::ZeroVector), /*bWorldSpace*/ true);
+			ConLines->AddInstance(FTransform(FQuat::Identity, ConStarInfo[L.A].Dir * ConDistCm, FVector::ZeroVector), /*bWorldSpace*/ false);
 			ConLineInfo.Add(L);
 		}
 	};
@@ -287,10 +290,19 @@ void ADysisDirector::UpdateEndingStars(float Dt)
 		const double Len = FVector::Dist(From, To);
 		// 线：一条细长的片，本地 X 沿着线，面朝天空中心；从第一颗星朝第二颗星长出去
 		const FTransform Xf(FRotationMatrix::MakeFromXZ(Dir, -Mid).Rotator(), Mid, P > 0.001f ? FVector(Len / 100.0, Width / 100.0, 1.0) : FVector::ZeroVector);
-		ConLines->UpdateInstanceTransform(i, Xf, /*bWorldSpace*/ true, /*bMarkRenderStateDirty*/ i == ConLineInfo.Num() - 1, /*bTeleport*/ true);
+		ConLines->UpdateInstanceTransform(i, Xf, /*bWorldSpace*/ false, /*bMarkRenderStateDirty*/ i == ConLineInfo.Num() - 1, /*bTeleport*/ true);
 		const float G = 0.55f * (1.0f + 0.08f * FMath::Sin(T * 1.3f + i));
 		const float Data[3] = { ConLineColor.R * G, ConLineColor.G * G, ConLineColor.B * G };
 		ConLines->SetCustomData(i, MakeArrayView(Data, 3), i == ConLineInfo.Num() - 1);
+	}
+	// 星座和满天的星一起绕着头顶慢慢转（开头一两秒慢慢转起来）
+	{
+		const float Spin = ConSpinDegPerSec * (T - 1.5f * (1.0f - FMath::Exp(-T / 1.5f)));
+		const FQuat Rot(FVector::UpVector, FMath::DegreesToRadians(Spin));
+		ConStars->SetWorldRotation(Rot);
+		ConLines->SetWorldRotation(Rot);
+		if (const UDysisTimeComponent* Time = PlayerTime())
+			if (ADysisSkyActor* Sky = Time->SkyActor.Get()) Sky->SetStarSpin(Spin);
 	}
 	// 亮度的换算和满天的星星用同一个数（ADysisSkyActor::StarGain）
 	const float Glow = 6.0f;

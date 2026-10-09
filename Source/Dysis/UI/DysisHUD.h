@@ -61,17 +61,21 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面")
 	FRotator MenuCameraRotation = FRotator(12.0, 70.0, 0.0);
 
-	/** 主界面开始时的时刻（时角，度）：傍晚，太阳还在天上，几秒后日落（示意图是日落那一刻）。 */
+	/** 主界面开着的时候钉住的时刻（时角，度）。主界面上日月走的是专用的轨迹（见 MenuOrbitStartPhase），不跟这个数走。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面")
 	float MenuTimeH = 56.0f;
 
-	/** 主界面上时间自己往前走（傍晚 → 日落 → 夜 → 天亮 → 白天）：按白天的流速转一整圈要多少秒。0 = 不走。 */
+	/** 主界面一打开日月转到哪了（度）：0 = 太阳刚从左边升起，90 = 最高，180 = 落进右边的海平线。135 = 下午，太阳在右上方往下落。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|HUD|主界面")
+	float MenuOrbitStartPhase = 135.0f;
+
+	/** 主界面上日月自己往前走：按白天的流速转一整圈要多少秒。0 = 不走。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面", meta = (ClampMin = "0.0"))
 	float MenuDaySeconds = 144.0f;
 
-	/** 太阳落山以后流速乘上这个数（这里夜比昼长，让夜走快一点）。 */
-	UPROPERTY(EditAnywhere, Category = "Dysis|HUD|主界面", meta = (ClampMin = "0.1"))
-	float MenuNightSpeed = 2.0f;
+	/** 太阳落山以后流速乘上这个数（跟着太阳的高度慢慢变过去，不跳）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|HUD|主界面", meta = (ClampMin = "0.1"))
+	float MenuNightSpeed = 1.3f;
 
 	/** 主界面镜头用固定曝光（EV）：不让引擎自动把夜晚提亮成白天的样子。后一个数是入夜以后再加的量
 	 *  （负数 = 夜里暗下来：0.6 − 1.0 = −0.4，比游戏里的夜（ADysisCharacter::NightExposureBias = −1.0）稍亮一点，看得清殿顶）。 */

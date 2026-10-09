@@ -157,13 +157,65 @@ void ADysisSkyActor::ApplyDuskAtmosphere()
 
 float ADysisSkyActor::AfterSunsetK() const
 {
+	// 主界面：太阳就在镜头前面落下去，让引擎的大气自己画那片晚霞，不用暮色把天盖住
+	if (bMenuOrbit) return 0.f;
 	return bAfterSunset ? 1.f : Smooth(-1.2f, -2.f, SunAlt);
 }
 
 void ADysisSkyActor::RefreshSky()
 {
+	if (bMenuOrbit) { SetMenuOrbit(MenuPhase); return; }
 	bTimeSet = false;   // 让 SetTime 不走“没变就不动”的那条近路
 	SetTime(CurrentH);
+}
+
+void ADysisSkyActor::SetMenuOrbit(float PhaseDeg)
+{
+	bMenuOrbit = true;
+	MenuPhase = PhaseDeg;
+	// 圆心的方向 A、它左边（方位小的那一边）的水平方向 L、垂直于 A 朝上的方向 V；太阳 = A 偏开一个“圆的大小”，绕着 A 从 L 转向 V
+	const float Az = FMath::DegreesToRadians(MenuOrbitAzDeg), Alt = FMath::DegreesToRadians(MenuOrbitCenterAltDeg);
+	const FVector A(FMath::Cos(Alt) * FMath::Cos(Az), FMath::Cos(Alt) * FMath::Sin(Az), FMath::Sin(Alt));
+	const FVector L(FMath::Sin(Az), -FMath::Cos(Az), 0.0);
+	const FVector V = FVector::CrossProduct(L, A).GetSafeNormal() * (FVector::CrossProduct(L, A).Z < 0.0 ? -1.0 : 1.0);
+	const float R = FMath::DegreesToRadians(MenuOrbitRadiusDeg), P = FMath::DegreesToRadians(PhaseDeg);
+	const FVector Off = (L * FMath::Cos(P) + V * FMath::Sin(P)) * FMath::Sin(R);
+	SunDir = (A * FMath::Cos(R) + Off).GetSafeNormal();
+	MoonDir = (A * FMath::Cos(R) - Off).GetSafeNormal();
+	ApplyLights();
+}
+
+void ADysisSkyActor::ClearMenuOrbit()
+{
+	if (!bMenuOrbit) return;
+	bMenuOrbit = false;
+	bTimeSet = false;
+	SetTime(CurrentH);
+}
+
+void ADysisSkyActor::SetStarSpin(float Degrees)
+{
+	StarSpinDeg = Degrees;
+	ApplyStarRotation();
+}
+
+void ADysisSkyActor::ApplyStarRotation()
+{
+	if (!Stars) return;
+	FQuat Base;
+	if (bMenuOrbit)
+	{
+		// 主界面：星星跟着月亮一起绕那个圆的圆心转
+		const float Az = FMath::DegreesToRadians(MenuOrbitAzDeg), Alt = FMath::DegreesToRadians(MenuOrbitCenterAltDeg);
+		Base = FQuat(FVector(FMath::Cos(Alt) * FMath::Cos(Az), FMath::Cos(Alt) * FMath::Sin(Az), FMath::Sin(Alt)), -FMath::DegreesToRadians(MenuPhase));
+	}
+	else
+	{
+		const float Lat = FMath::DegreesToRadians(UDysisSkyLibrary::DysisConst(TEXT("LAT")));
+		// 北天极：朝北、仰起一个纬度的角。灰盒是绕它转 −H；这里的坐标是左手的，同一个转法写出来是 +H
+		Base = FQuat(FVector(FMath::Cos(Lat), 0.0, FMath::Sin(Lat)), FMath::DegreesToRadians(CurrentH));
+	}
+	Stars->SetRelativeRotation(FQuat(FVector::UpVector, FMath::DegreesToRadians(StarSpinDeg)) * Base);
 }
 
 void ADysisSkyActor::BuildStars()
@@ -200,6 +252,11 @@ void ADysisSkyActor::SetTime(float H)
 {
 	// P1-9（调研 §15.8）：H 没变就别碰灯——时间组件每帧都调本函数，但只在 H 变化时广播，
 	// 早退不漏任何真变化；省掉的是每帧灯光全量重设（VSM 重建的触发器）。PreviewH 拖动值每帧不同，不受影响。
+	if (bMenuOrbit)
+	{
+		CurrentH = H;   // 主界面：天由 SetMenuOrbit 摆，这里只把时刻记下来
+		return;
+	}
 	if (bTimeSet && FMath::IsNearlyEqual(CurrentH, H, 1e-6f))
 	{
 		return;
@@ -209,6 +266,12 @@ void ADysisSkyActor::SetTime(float H)
 	CurrentH = H;
 	SunDir = UDysisSkyLibrary::DysisSunDir(H);
 	MoonDir = UDysisSkyLibrary::DysisMoonDir(H);
+	ApplyLights();
+}
+
+void ADysisSkyActor::ApplyLights()
+{
+	// 日月的方向已经定好了（按时刻，或者按主界面的轨迹）：摆灯、亮度、颜色、月亮圆盘、夜空
 	SunAlt = AltOf(SunDir);
 	MoonAlt = AltOf(MoonDir);
 	const float K = Smooth(2.f, 25.f, SunAlt);
@@ -267,7 +330,8 @@ void ADysisSkyActor::ApplyNightSky()
 	// 先是灰蒙蒙的暮色（跟着太阳往下走越来越暗），再按上面那个比例换成夜空
 	if (NightDome)
 	{
-		const float NightK = Smooth(-2.f, -10.f, SunAlt);
+		// 主界面：太阳一落到地平线就开始换成夜空（不然日月交接的那几秒天是黑的，画面会暗一下）
+		const float NightK = bMenuOrbit ? Smooth(1.f, -5.f, SunAlt) : Smooth(-2.f, -10.f, SunAlt);
 		const float Opacity = FMath::Max(NightK, AfterSunsetK());
 		const float Twilight = Smooth(-10.f, -1.f, SunAlt) * (1.f - NightK) * AfterSunsetK();
 		NightDome->SetRelativeScale3D(FVector(2.f * NightDomeRadiusCm / 100.f));   // 引擎的 Sphere 直径 100 cm
@@ -292,7 +356,7 @@ void ADysisSkyActor::ApplyNightSky()
 	// 星星（灰盒 stars.opacity = smoothstep(-4, -13, 太阳高度)；整片绕北天极转）
 	if (Stars)
 	{
-		StarOpacity = Smooth(-4.f, -13.f, SunAlt);
+		StarOpacity = bMenuOrbit ? Smooth(-1.f, -7.f, SunAlt) : Smooth(-4.f, -13.f, SunAlt);
 		if (StarMaterial && (!StarMID || StarMID->Parent != StarMaterial))
 		{
 			StarMID = UMaterialInstanceDynamic::Create(StarMaterial, this);
@@ -303,9 +367,7 @@ void ADysisSkyActor::ApplyNightSky()
 			StarMID->SetScalarParameterValue(TEXT("Opacity"), StarOpacity);
 			StarMID->SetScalarParameterValue(TEXT("Glow"), StarGain);
 		}
-		const float Lat = FMath::DegreesToRadians(UDysisSkyLibrary::DysisConst(TEXT("LAT")));
-		// 北天极：朝北、仰起一个纬度的角。灰盒是绕它转 −H；这里的坐标是左手的，同一个转法写出来是 +H
-		Stars->SetRelativeRotation(FQuat(FVector(FMath::Cos(Lat), 0.0, FMath::Sin(Lat)), FMath::DegreesToRadians(CurrentH)));
+		ApplyStarRotation();
 		Stars->SetVisibility(StarMID && StarOpacity > 0.001f);
 	}
 }

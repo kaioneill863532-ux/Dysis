@@ -431,10 +431,9 @@ void ADysisDirector::UpdateCatch(float Dt)
 			const FVector Held = Time->FootCm + Right * 35.0 + FVector(0.0, 0.0, 125.0);
 			Apple->SetWorldLocation(FMath::Lerp(Apple->GetComponentLocation(), Held, FMath::Min(1.0f, Dt * 6.0f)));
 		}
-	// 5 秒后：入夜的标题和提示
+	// 5 秒后：狄西斯说一句（“日落之后 / 入夜”那行标题 2026-10-09 用户让去掉了）
 	if (Before <= 5.0f && CineSeconds > 5.0f)
 	{
-		if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->ShowTitle(TEXT("日落之后"), TEXT("入夜"), 2.4f);
 		// 狄西斯自己说的那一句：用剧情对话框（有她的立绘），不放在提示条里
 		if (!NightDialogue)
 		{
