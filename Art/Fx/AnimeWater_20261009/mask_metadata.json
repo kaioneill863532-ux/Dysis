@@ -1,0 +1,18 @@
+{
+  "source": "actual UE LOD0 world-space triangles",
+  "water_vertices": 192,
+  "water_triangles": 192,
+  "boundary_edges": 192,
+  "extent_min_cm": [
+    -1100.0,
+    -1100.0
+  ],
+  "extent_span_cm": 2200.0,
+  "water_z_cm": -45,
+  "mask_R": "distance to real annulus boundary / 200cm, clamped",
+  "mask_G": "art-directed shallow region, not measured water depth",
+  "mask_B": "localized peach reflection envelope near pavilion",
+  "mask_A": "actual water coverage for inspection; mesh owns visible range",
+  "flow_RG": "linear data, decoded [-1,1], translation + 90cm shoreline tangent blend",
+  "pattern_repeat_cm": 400
+}

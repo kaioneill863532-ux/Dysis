@@ -97,12 +97,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	float MoonDiscAngularDiameterDeg = 1.36f;
 
-	/** 灰盒的颜色：SUN_LO → SUN_HI 按 smoothstep(2, 25, 太阳高度) 过渡；月光 MOON_COL。 */
-	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
-	FLinearColor SunColorLow = FLinearColor(1.0f, 0.52f, 0.26f);
+	/** 太阳光的颜色：低 → 高按 smoothstep(2, 25, 太阳高度) 过渡（过渡的规则是灰盒的）；月光 MOON_COL。
+	 *  颜色本身 2026-10-09 换成了场景美术那版外景的夕照：整个下午都是偏金的暖光，快落山时更橙
+	 *  （灰盒原来是 SUN_LO (1, 0.52, 0.26) → SUN_HI (1, 0.94, 0.84)，太阳高的时候接近白光；美术定的主光是 (1, 0.59, 0.14)）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	FLinearColor SunColorLow = FLinearColor(1.0f, 0.45f, 0.15f);
 
-	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
-	FLinearColor SunColorHigh = FLinearColor(1.0f, 0.94f, 0.84f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	FLinearColor SunColorHigh = FLinearColor(1.0f, 0.70f, 0.34f);
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	FLinearColor MoonColor = FLinearColor(0.62f, 0.72f, 0.95f);
@@ -147,13 +149,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
 	float DuskExposureBias = -1.2f;
 
-	/** 最浓时整个画面乘上的颜色（偏橙红）。 */
+	/** 最浓时整个画面乘上的颜色（偏橙红）。2026-10-09 起太阳光和天本身就是夕照的橙红了，这一层只留很轻的一点
+	 *  （原来是 (1.06, 0.87, 0.72)、浓度 1.08，叠在新的光色上整个画面会糊成一片橙褐）。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
-	FLinearColor DuskTint = FLinearColor(1.06f, 0.87f, 0.72f);
+	FLinearColor DuskTint = FLinearColor(1.03f, 0.94f, 0.88f);
 
 	/** 最浓时颜色的浓度（1 = 不变）。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
-	float DuskSaturation = 1.08f;
+	float DuskSaturation = 1.0f;
 
 	/** 最浓时大气把蓝光散掉多少倍（越大落日越红、天边的橙红越浓）、空气里的尘雾多几倍（越大太阳周围那一片亮晕越大）。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|黄昏")
@@ -168,6 +171,70 @@ public:
 
 	/** 把黄昏的颜色写进一台镜头的后期设置；返回曝光该加多少（由镜头自己加到它的曝光上）。 */
 	float ApplyDuskLook(struct FPostProcessSettings& PP) const;
+
+	// ───── 夕照的天（2026-10-09：场景美术那版外景的天色合进来） ─────
+
+	/** 白天到黄昏的天：罩在最外面的大球朝里的一面（材质 /Game/Dysis/Sky/M_DysisSunsetSky，由 Art/Scenery/ue_make_scenery_materials.py 建）。
+	 *  朝着太阳的那半边是桃粉到橙金，背着太阳的半边是蓝到粉紫，贴着地平线颜色最浓；日盘和它周围的亮晕也是它画的。
+	 *  材质勾了“是天空”：引擎的天光只拍它（不再拍引擎自己算的那片蓝天），所以背光的面、阴影里跟着它偏蓝紫。
+	 *  入夜以后它黑掉，夜空还是由 NightDome 画在它前面。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky|夕照")
+	TObjectPtr<UStaticMeshComponent> DayDome;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> DayDomeMaterial;
+
+	/** 这个球有多大（厘米；要比夜空的球还远）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Sky|夕照")
+	float DayDomeRadiusCm = 480000.f;
+
+	/** 天有多亮：太阳光每 1 勒克斯，天上“颜色 1”算多少尼特。0.1235 是美术那版的比例（他的天是颜色 × 12000，主光 97200 勒克斯）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	float SkyNitsPerLux = 0.1235f;
+
+	/** 天的四个颜色，各两档：太阳还高（25° 以上）/ 快落山（2° 以下），中间跟着太阳的高度过渡。
+	 *  Zenith 头顶；Horizon 背着太阳那半边的地平线；WarmUp 朝着太阳那半边的高处；WarmDown 朝着太阳那半边的地平线。
+	 *  “还高”的一档取自美术那版的天（他只有一个时刻；头顶的蓝比他的 (0.15, 0.36, 0.90) 收了一点——我们的曝光比他那版暗一档左右，
+	 *  原数放进来蓝得发硬，朝上的背光面也跟着发蓝）；“快落山”的一档是顺着它往红、往紫推的。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyZenithDay = FLinearColor(0.24f, 0.36f, 0.80f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyZenithDusk = FLinearColor(0.17f, 0.22f, 0.60f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyHorizonDay = FLinearColor(0.50f, 0.40f, 0.62f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyHorizonDusk = FLinearColor(0.58f, 0.34f, 0.52f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyWarmUpDay = FLinearColor(0.95f, 0.50f, 0.32f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyWarmUpDusk = FLinearColor(1.00f, 0.40f, 0.30f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyWarmDownDay = FLinearColor(1.90f, 0.80f, 0.20f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyWarmDownDusk = FLinearColor(2.30f, 0.62f, 0.12f);
+
+	/** 太阳周围亮晕的颜色、日盘的颜色、日盘的半径（度；真的太阳是 0.27，美术那版是 0.48——他用的是长焦镜头，我们的视角宽，所以再画大一倍，看得清）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyGlowColor = FLinearColor(1.60f, 0.80f, 0.30f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	FLinearColor SkyDiscColor = FLinearColor(3.00f, 2.40f, 1.00f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	float SkyDiscDeg = 1.0f;
+
+	/** 主界面上的天：整片天压暗到这个比例（日盘和它周围的亮晕不压），颜色一直用“快落山”的那一档。
+	 *  主界面是固定曝光、标题是淡金色的字：天按游戏里的亮度画的话是一片亮奶油色，标题和按钮压在上面看不清。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	float MenuSkyDim = 0.28f;
+
+	/** 海平线上那层雾的颜色（只在游戏里改关卡的雾）：= 背着太阳那半边地平线的颜色 × 天的亮度 × FogGain；朝着太阳的那一边再加“暖的地平线”× FogSunGain。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	float FogGain = 0.6f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|夕照")
+	float FogSunGain = 0.5f;
+
+	/** 现在天有多亮（“颜色 1”等于多少尼特）：云、别的要和天配得上的东西用。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Sky|夕照")
+	float GetSkyGain() const { return SkyGain; }
 
 	// ───── 主界面专用的日月轨迹（2026-10-09 用户：主界面上日月变幻要平滑，沿着一条好看的轨迹走，像一件艺术品） ─────
 	// 游戏里那条真的轨道在主界面上不好看：日落在镜头背后、夜比昼长（以前靠“夜里走快一倍”补，快慢会跳一下）。
@@ -263,6 +330,12 @@ private:
 	void ApplyNightSky();
 	void ApplyLights();
 	void ApplyStarRotation();
+	void ApplyDaySky();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> DayDomeMID;
+	float SkyGain = 0.f;
+	TWeakObjectPtr<class UExponentialHeightFogComponent> HeightFog;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> MoonDiscMID;

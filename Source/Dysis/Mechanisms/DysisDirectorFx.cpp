@@ -113,7 +113,9 @@ void ADysisDirector::SetupFx()
 {
 	// 海、水庭的水、瀑布、月桥：换材质
 	SeaMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Sea")), TEXT("/Game/Dysis/Fx/M_DysisSea.M_DysisSea"));
-	PoolMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Pool")), TEXT("/Game/Dysis/Fx/M_DysisPool.M_DysisPool"));
+	// 水庭的水：场景美术 2026-10-09 的动画水面（大色块、断线、岸边的波纹）；找不到就退回原来那个
+	const bool bAnimeWater = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater"), nullptr, LOAD_NoWarn | LOAD_Quiet) != nullptr;
+	PoolMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Pool")), bAnimeWater ? TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater") : TEXT("/Game/Dysis/Fx/M_DysisPool.M_DysisPool"));
 	FallMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Waterfall")), TEXT("/Game/Dysis/Fx/M_DysisWaterfall.M_DysisWaterfall"));
 	const int32 MoonN = UE_ARRAY_COUNT(GDysisMoonBridgePts);
 	if (AActor* Deck = MoonDeck.Get())
@@ -236,11 +238,20 @@ void ADysisDirector::UpdateFx(float Dt)
 	const float Night = DysisGB::Smoothstep(-2.0f, -10.0f, SunAlt);
 	const float MoonUp = DysisGB::Smoothstep(0.0f, 12.0f, MoonAlt);
 
-	// 水面映出的天色：白天淡蓝、黄昏橙红、夜里是带一点月色的深蓝
-	const FLinearColor SkyTint = FxLerp3(FLinearColor(0.40f, 0.58f, 0.86f), FLinearColor(1.0f, 0.50f, 0.28f), Dusk) * (Daylight * 0.9f)
+	// 水面映出的天色：白天淡蓝、黄昏桃红（比天边的橙淡一些：海映的是大半个天，不只是日落的那一边）、夜里是带一点月色的深蓝
+	const FLinearColor SkyTint = FxLerp3(FLinearColor(0.40f, 0.58f, 0.86f), FLinearColor(0.92f, 0.54f, 0.44f), Dusk) * (Daylight * 0.9f)
 		+ FLinearColor(0.035f, 0.055f, 0.12f) * (Night * (0.7f + 0.9f * MoonUp));
 	if (SeaMID) SeaMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint);
-	if (PoolMID) PoolMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint * 0.8f);
+	if (PoolMID)
+	{
+		PoolMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint * 0.8f);          // 原来那个水面用的；动画水面没有这个参数
+		// 动画水面：瀑布开了水就流得快一些、断线密一些（美术定的 Flow / Ripple 两个状态）；
+		// 底色垫多亮（屏幕上的亮度）：白天殿里亮，垫得多；入夜只留一点，剩下的靠月光照
+		const float PoolFlow = State ? State->FlowK : 0.0f;
+		PoolMID->SetScalarParameterValue(TEXT("FlowState"), PoolFlow);
+		PoolMID->SetScalarParameterValue(TEXT("RippleState"), PoolFlow);
+		PoolMID->SetScalarParameterValue(TEXT("Lift"), PoolLiftDay * Daylight + PoolLiftNight * Night);
+	}
 
 	// 瀑布和脚下的水雾：白天是亮的水白，黄昏偏暖，夜里只剩月光下的一点银蓝
 	const float Flow = State ? State->FlowK : 0.0f;

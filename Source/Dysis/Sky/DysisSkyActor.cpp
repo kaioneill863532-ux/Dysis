@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SkyAtmosphereComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/Scene.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
@@ -81,6 +82,14 @@ ADysisSkyActor::ADysisSkyActor()
 	NightDome->bUseAsOccluder = false;
 	NightDome->SetTranslucentSortPriority(-100);   // 最先画：星星、月亮、别的半透明都盖在它上面
 	if (Sphere.Succeeded()) NightDome->SetStaticMesh(Sphere.Object);
+
+	DayDome = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DayDome"));
+	DayDome->SetupAttachment(RootComponent);
+	DayDome->SetMobility(EComponentMobility::Movable);
+	DayDome->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DayDome->SetCastShadow(false);
+	DayDome->bUseAsOccluder = false;
+	if (Sphere.Succeeded()) DayDome->SetStaticMesh(Sphere.Object);
 
 	Stars = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Stars"));
 	Stars->SetupAttachment(RootComponent);
@@ -318,7 +327,55 @@ void ADysisSkyActor::ApplyLights()
 	MoonDiscOpacity = Smooth(-1.5f, 1.f, MoonAlt) * Smooth(4.f, -2.f, SunAlt);
 	ApplyMoonDisc();
 	ApplyNightSky();
+	ApplyDaySky();
 	if (GetWorld() && GetWorld()->IsGameWorld()) ApplyDuskAtmosphere();   // 只在游戏里动大气（编辑器里拖时间预览时不改关卡里的那个大气）
+}
+
+void ADysisSkyActor::ApplyDaySky()
+{
+	if (!DayDomeMaterial) DayDomeMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Sky/M_DysisSunsetSky.M_DysisSunsetSky"));
+	const float K = Smooth(2.f, 25.f, SunAlt);
+	// 主界面：颜色一直用“快落山”的那一档，整片天压暗（见头文件 MenuSkyDim）
+	const float PaletteK = bMenuOrbit ? 0.f : K, Dim = bMenuOrbit ? MenuSkyDim : 1.f;
+	auto Mix = [PaletteK](const FLinearColor& Day, const FLinearColor& Dusk) { return Dusk + (Day - Dusk) * PaletteK; };
+	// 天的亮度和“太阳照亮天空的那一盏”（SunSkyGlow）走同一条曲线：白天和太阳光成比例，落日以后慢慢暗到 TwilightEndAltDeg
+	SkyGain = FMath::Lerp(2.4f, 3.6f, K) * Smooth(TwilightEndAltDeg, 1.2f, SunAlt) * SunLuxPerGreyboxUnit * SkyNitsPerLux;
+	if (DayDome)
+	{
+		DayDome->SetRelativeScale3D(FVector(2.f * DayDomeRadiusCm / 100.f));   // 引擎的 Sphere 直径 100 cm
+		if (DayDomeMaterial && (!DayDomeMID || DayDomeMID->Parent != DayDomeMaterial))
+		{
+			DayDomeMID = UMaterialInstanceDynamic::Create(DayDomeMaterial, this);
+			DayDome->SetMaterial(0, DayDomeMID);
+		}
+		if (DayDomeMID)
+		{
+			DayDomeMID->SetVectorParameterValue(TEXT("SunDir"), FLinearColor(float(SunDir.X), float(SunDir.Y), float(SunDir.Z), 0.f));
+			DayDomeMID->SetScalarParameterValue(TEXT("Gain"), SkyGain);
+			DayDomeMID->SetScalarParameterValue(TEXT("Dim"), Dim);
+			DayDomeMID->SetVectorParameterValue(TEXT("Zenith"), Mix(SkyZenithDay, SkyZenithDusk));
+			DayDomeMID->SetVectorParameterValue(TEXT("HorizonCool"), Mix(SkyHorizonDay, SkyHorizonDusk));
+			DayDomeMID->SetVectorParameterValue(TEXT("WarmHigh"), Mix(SkyWarmUpDay, SkyWarmUpDusk));
+			DayDomeMID->SetVectorParameterValue(TEXT("WarmLow"), Mix(SkyWarmDownDay, SkyWarmDownDusk));
+			DayDomeMID->SetVectorParameterValue(TEXT("Glow"), SkyGlowColor);
+			DayDomeMID->SetVectorParameterValue(TEXT("Disc"), SkyDiscColor);
+			DayDomeMID->SetScalarParameterValue(TEXT("DiscDeg"), SkyDiscDeg);
+		}
+		DayDome->SetVisibility(DayDomeMID != nullptr);
+	}
+	// 关卡里的雾跟着天的颜色走（只在游戏里动；编辑器里拖时间预览时不改关卡里的那个雾）
+	if (GetWorld() && GetWorld()->IsGameWorld())
+	{
+		if (!HeightFog.IsValid())
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+				if (UExponentialHeightFogComponent* C = It->FindComponentByClass<UExponentialHeightFogComponent>()) { HeightFog = C; break; }
+		if (UExponentialHeightFogComponent* C = HeightFog.Get())
+		{
+			C->SetSkyAtmosphereAmbientContributionColorScale(FLinearColor::Black);   // 不再用引擎那片蓝天的颜色
+			C->SetFogInscatteringColor(Mix(SkyHorizonDay, SkyHorizonDusk) * (SkyGain * Dim * FogGain));
+			C->SetDirectionalInscatteringColor(Mix(SkyWarmDownDay, SkyWarmDownDusk) * (SkyGain * Dim * FogSunGain));
+		}
+	}
 }
 
 void ADysisSkyActor::ApplyNightSky()

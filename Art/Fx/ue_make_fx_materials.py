@@ -585,3 +585,56 @@ if want("M_DysisSea"):
 if want("M_DysisPool"):
     # 水庭里四面都是亮的墙，镜子一样的水面会映成一片白：糙一点、反光弱一点，让水自己的青蓝透出来；波纹只留细的两层
     make_water("M_DysisPool", 70.0, 5.0, 0.7, (0.022, 0.115, 0.160), (0.075, 0.27, 0.31), 0.22, 0.08, 0.0, (300.0, 1020.0))
+
+# ───────────────────────── 水庭的水：场景美术的动画水面 ─────────────────────────
+# 场景美术 2026-10-09 的风格化水面（原名 M_DYSIS_AnimeWater）：雾蓝、青绿、蓝紫的大色块，稀疏的断线，岸边断续的波纹，水亭旁一片桃金色的反光。
+# 着色的那段代码和三张数据贴图照搬他的源文件（Art/Fx/AnimeWater_20261009/water_shader.hlsl、T_DYSIS_*.png，贴图由同目录的 build_data_textures.py 从水面的真实轮廓算出来）：
+#   PoolShore   R = 离水边多远（÷200 cm）、G = 浅水区（手画的，不是真的水深）、B = 水亭旁那片暖色反光的范围
+#   PoolFlow    RG = 水往哪边流（大体朝一个方向，贴着岸 90 cm 以内顺着岸弯）
+#   WaterShapes R = 三档深浅的大色块、G = 一道一道的断线、B = 扭动用的
+# 和他那份不一样的地方（我们的光是另一套：自动曝光、勒克斯数很小、会走到夜里）：
+#   · 他用“颜色 ×180”的自发光给水垫一个底色，那是配他固定曝光的数；这里改成“屏幕上看着多亮”（Lift，代码按白天 / 夜里给），
+#     受光的那一份只留三成多（LitShare）——所以太阳照进来的那几块水面会亮一些、夜里跟着暗下去，但颜色不会被殿里的暖光照灰；
+#   · 他的“流动 / 起波纹”两个状态是从一张全局参数表读的，这里是两个普通参数 FlowState、RippleState，代码按瀑布开了多少写。
+# 参数（名字和他的一样）：RepeatCm、MainSpeedCm、SecondSpeedCm、CycleSeconds、ShoreWidthCm、LineDensity、WarpStrength、WarmReflectionStrength、LocalFlowStrength、
+#   MainColor、ShallowColor、DeepColor、LineColor、WarmColor、FlowDirection；数值是他最后定的那一组。
+ANIME_DIR = PROJ + "Art/Fx/AnimeWater_20261009/"
+def import_data_texture(name, wrap):
+    # 数据贴图：不按颜色解码（sRGB 关）、按“遮罩”压缩；大色块那张要能平铺，另外两张是整池一张、边上夹住
+    path = "/Game/Dysis/Fx/Textures/" + name
+    task = unreal.AssetImportTask()
+    task.set_editor_property("filename", ANIME_DIR + name.replace("T_Dysis", "T_DYSIS_") + ".png")
+    task.set_editor_property("destination_path", "/Game/Dysis/Fx/Textures"); task.set_editor_property("destination_name", name)
+    task.set_editor_property("automated", True); task.set_editor_property("replace_existing", True); task.set_editor_property("save", False)
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    tex = unreal.load_asset(path)
+    tex.set_editor_property("srgb", False)
+    tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+    addr = unreal.TextureAddress.TA_WRAP if wrap else unreal.TextureAddress.TA_CLAMP
+    tex.set_editor_property("address_x", addr); tex.set_editor_property("address_y", addr)
+    print(name, "saved:", eal.save_asset(path, only_if_is_dirty=False))
+    return tex
+
+if want("M_DysisAnimeWater"):
+    T_SHORE, T_FLOW, T_SHAPES = import_data_texture("T_DysisPoolShore", False), import_data_texture("T_DysisPoolFlow", False), import_data_texture("T_DysisWaterShapes", True)
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisAnimeWater", unreal.BlendMode.BLEND_OPAQUE, unlit=False, two_sided=False)
+    def texobj(tex, x, y): return node(mat, unreal.MaterialExpressionTextureObject, x, y, texture=tex, sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    wp, time = node(mat, unreal.MaterialExpressionWorldPosition, -1500, -300), node(mat, unreal.MaterialExpressionTime, -1500, -200)
+    S = [scalar(mat, n, v, -1500, 300 + 90 * i) for i, (n, v) in enumerate([("RepeatCm", 400.0), ("MainSpeedCm", 5.0), ("SecondSpeedCm", 2.5), ("CycleSeconds", 8.0), ("ShoreWidthCm", 24.0),
+        ("LineDensity", 0.52), ("WarpStrength", 0.012), ("WarmReflectionStrength", 0.65), ("LocalFlowStrength", 0.65), ("FlowState", 0.0), ("RippleState", 0.0)])]
+    V = [vector(mat, n, v, -1800, 300 + 160 * i) for i, (n, v) in enumerate([("MainColor", (0.25, 0.45, 0.52)), ("ShallowColor", (0.39, 0.66, 0.54)), ("DeepColor", (0.20, 0.26, 0.40)),
+        ("LineColor", (0.73, 0.90, 0.81)), ("WarmColor", (0.95, 0.67, 0.35)), ("FlowDirection", (0.85, 0.52, 0.0))])]
+    code = open(ANIME_DIR + "water_shader.hlsl", encoding="utf-8").read()
+    color = custom(mat, code, [("P", wp), ("T", time), ("Shore", texobj(T_SHORE, -1500, -100)), ("Flow", texobj(T_FLOW, -1500, 0)), ("Shapes", texobj(T_SHAPES, -1500, 100))] + named(S) + named(V), F3, -900, 0)
+    lift = node(mat, unreal.MaterialExpressionMultiply, -500, 200)
+    mel.connect_material_expressions(color, "", lift, "A"); mel.connect_material_expressions(scalar(mat, "Lift", 0.10, -700, 320), "", lift, "B")
+    # 受光的那一份只留一部分（LitShare）：殿里的光是暖的，整份受光的话青绿和蓝紫会被照成发灰的米色；水自己的颜色主要靠上面垫的那一层
+    lit = node(mat, unreal.MaterialExpressionMultiply, -500, -100)
+    mel.connect_material_expressions(color, "", lit, "A"); mel.connect_material_expressions(scalar(mat, "LitShare", 0.35, -700, -40), "", lit, "B")
+    mel.connect_material_property(lit, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    emissive(mat, lift)
+    for prop, name, val, y in ((unreal.MaterialProperty.MP_ROUGHNESS, "Roughness", 0.70, 480), (unreal.MaterialProperty.MP_SPECULAR, "Specular", 0.16, 570), (unreal.MaterialProperty.MP_METALLIC, "Metallic", 0.0, 660)):
+        mel.connect_material_property(scalar(mat, name, val, -350, y), "", prop)
+    # FxMaterial 会给每个换上去的材质写一个 Pivot；这个材质用不上，留一个同名的参数接着（不接出去）
+    vector(mat, "Pivot", (0.0, 0.0, 0.0), -1800, 1300)
+    finish(mat, full)

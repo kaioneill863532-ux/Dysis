@@ -1,0 +1,2031 @@
+{
+  "map": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001",
+  "actor_placements": [
+    {
+      "name": "CameraActor_4",
+      "label": "CAM_DYSIS_ReferenceMatch",
+      "location_cm": [
+        19908.074981573667,
+        3510.330753218614,
+        4000.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -1.0008608802694797e-16,
+        -6.75,
+        -170.0478973388672
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Engine/EditorMeshes/MatineeCam_SM.MatineeCam_SM",
+      "materials": [
+        "/Engine/EditorMaterials/MatineeCam_mat.MatineeCam_mat"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_326",
+      "label": "MATCH_TerrainShell",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        90.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_TerrainShell.SM_MATCH_TerrainShell",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/M_MATCH_Ground.M_MATCH_Ground",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/M_MATCH_Ground.M_MATCH_Ground",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/M_MATCH_Ground.M_MATCH_Ground"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_327",
+      "label": "MATCH_FarMountain_00",
+      "location_cm": [
+        -19457.39453125,
+        6738.677734375,
+        -1500.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -86.9410400390625
+      ],
+      "scale": [
+        48.0,
+        35.0,
+        22.8
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far.MI_MATCH_Far",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_1.MI_MATCH_Far_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_2.MI_MATCH_Far_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_328",
+      "label": "MATCH_FarMountain_01",
+      "location_cm": [
+        -19699.201171875,
+        2330.55712890625,
+        -1800.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        172.42604064941406
+      ],
+      "scale": [
+        42.0,
+        35.0,
+        25.2
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far.MI_MATCH_Far",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_1.MI_MATCH_Far_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_2.MI_MATCH_Far_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_329",
+      "label": "MATCH_FarMountain_02",
+      "location_cm": [
+        -21807.216796875,
+        -3014.18505859375,
+        -2500.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -55.263641357421875
+      ],
+      "scale": [
+        52.0,
+        35.0,
+        25.2
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far.MI_MATCH_Far",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_1.MI_MATCH_Far_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_2.MI_MATCH_Far_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_330",
+      "label": "MATCH_FarMountain_03",
+      "location_cm": [
+        -18783.078125,
+        -8676.74609375,
+        -2400.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        78.30809020996094
+      ],
+      "scale": [
+        55.0,
+        35.0,
+        30.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far.MI_MATCH_Far",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_1.MI_MATCH_Far_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_2.MI_MATCH_Far_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_331",
+      "label": "MATCH_FarMountain_04",
+      "location_cm": [
+        -15741.66015625,
+        -14437.8017578125,
+        -2200.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -44.07305908203125
+      ],
+      "scale": [
+        60.0,
+        35.0,
+        27.599999999999998
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far.MI_MATCH_Far",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_1.MI_MATCH_Far_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Far_2.MI_MATCH_Far_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_332",
+      "label": "MATCH_MidMountain_00",
+      "location_cm": [
+        -7456.423828125,
+        4884.8486328125,
+        -1900.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -163.6077117919922
+      ],
+      "scale": [
+        18.2,
+        17.0,
+        22.36
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_333",
+      "label": "MATCH_MidMountain_01",
+      "location_cm": [
+        -9046.11328125,
+        2372.3037109375,
+        -2000.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        169.78761291503906
+      ],
+      "scale": [
+        18.2,
+        17.0,
+        20.28
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_334",
+      "label": "MATCH_MidMountain_02",
+      "location_cm": [
+        -9495.3095703125,
+        -853.8741455078125,
+        -1900.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        49.05044174194336
+      ],
+      "scale": [
+        16.099999999999998,
+        17.0,
+        14.950000000000001
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_335",
+      "label": "MATCH_MidMountain_03",
+      "location_cm": [
+        -7853.6220703125,
+        -4423.869140625,
+        -1900.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -119.65707397460938
+      ],
+      "scale": [
+        21.0,
+        17.0,
+        27.3
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_336",
+      "label": "MATCH_MidMountain_04",
+      "location_cm": [
+        -3939.6611328125,
+        -6478.353515625,
+        -2400.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        90.81468200683594
+      ],
+      "scale": [
+        18.2,
+        17.0,
+        40.300000000000004
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_337",
+      "label": "MATCH_MidMountain_05",
+      "location_cm": [
+        -6108.240234375,
+        -8584.8349609375,
+        -2200.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -150.4086456298828
+      ],
+      "scale": [
+        28.0,
+        17.0,
+        29.25
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_338",
+      "label": "MATCH_RightMonolith",
+      "location_cm": [
+        -4924.613712402168,
+        -6651.178826615666,
+        -2100.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -150.36338806152344
+      ],
+      "scale": [
+        26.0,
+        25.0,
+        46.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Ivory.MI_MATCH_Ivory",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Ivory_1.MI_MATCH_Ivory_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Ivory_2.MI_MATCH_Ivory_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_339",
+      "label": "MATCH_ForeRock_00",
+      "location_cm": [
+        -3180.284912109375,
+        2856.91650390625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -140.8581085205078
+      ],
+      "scale": [
+        6.7633185097782675,
+        4.18512593493822,
+        4.637166925852565
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_340",
+      "label": "MATCH_ForeRock_01",
+      "location_cm": [
+        -1678.68505859375,
+        -4063.72607421875,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        158.1405792236328
+      ],
+      "scale": [
+        3.1523464401815686,
+        3.977425152829873,
+        4.8402958741993976
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_341",
+      "label": "MATCH_ForeRock_02",
+      "location_cm": [
+        1507.6312255859375,
+        4710.7607421875,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -177.13450622558594
+      ],
+      "scale": [
+        3.0182420902878584,
+        6.22619569001241,
+        7.737574942848512
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_342",
+      "label": "MATCH_ForeRock_03",
+      "location_cm": [
+        3169.76171875,
+        -3916.64013671875,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        153.22027587890625
+      ],
+      "scale": [
+        4.937977569841386,
+        6.182666297761814,
+        6.742386520951002
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_343",
+      "label": "MATCH_ForeRock_04",
+      "location_cm": [
+        -3448.93115234375,
+        3069.668212890625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -36.4046630859375
+      ],
+      "scale": [
+        5.22001653470952,
+        4.579784879890789,
+        4.373280398106149
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_344",
+      "label": "MATCH_ForeRock_05",
+      "location_cm": [
+        1101.637939453125,
+        -5892.11865234375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        46.52763366699219
+      ],
+      "scale": [
+        4.377079560695649,
+        6.565724013806359,
+        8.229950080522707
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_345",
+      "label": "MATCH_ForeRock_06",
+      "location_cm": [
+        1115.701171875,
+        4919.26025390625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        125.9242172241211
+      ],
+      "scale": [
+        5.583853405082136,
+        6.942173250221175,
+        6.707888939836307
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_346",
+      "label": "MATCH_ForeRock_07",
+      "location_cm": [
+        -302.17950439453125,
+        -4060.39306640625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        103.35194396972656
+      ],
+      "scale": [
+        2.8432737813036892,
+        4.881694626627061,
+        3.64011287739811
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_347",
+      "label": "MATCH_ForeRock_08",
+      "location_cm": [
+        47.3153076171875,
+        5433.98486328125,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -65.0806884765625
+      ],
+      "scale": [
+        4.403657494343452,
+        4.32301647163523,
+        6.5088651676464915
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_348",
+      "label": "MATCH_ForeRock_09",
+      "location_cm": [
+        -719.8514404296875,
+        -2564.996826171875,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        7.570162773132324
+      ],
+      "scale": [
+        3.5163183034617886,
+        4.656958376286948,
+        3.4474308060665835
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_349",
+      "label": "MATCH_ForeRock_10",
+      "location_cm": [
+        -342.64501953125,
+        3108.695068359375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -133.50375366210938
+      ],
+      "scale": [
+        6.698967959031331,
+        4.894079185462695,
+        5.949559785046433
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_350",
+      "label": "MATCH_ForeRock_11",
+      "location_cm": [
+        -1137.42529296875,
+        -3478.885986328125,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -38.911895751953125
+      ],
+      "scale": [
+        6.382949066738929,
+        3.6630860749157352,
+        4.68696031098917
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_351",
+      "label": "MATCH_ForeRock_12",
+      "location_cm": [
+        763.6948852539062,
+        5233.06591796875,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -121.3797607421875
+      ],
+      "scale": [
+        4.307413655181542,
+        3.548945970374409,
+        6.322395736075914
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_352",
+      "label": "MATCH_ForeRock_13",
+      "location_cm": [
+        2359.75830078125,
+        -4501.3037109375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        136.82981872558594
+      ],
+      "scale": [
+        5.0164908243688675,
+        4.012260096781165,
+        3.9021350219210427
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_353",
+      "label": "MATCH_ForeRock_14",
+      "location_cm": [
+        -2158.51806640625,
+        2536.33251953125,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -122.72372436523438
+      ],
+      "scale": [
+        5.688307076599147,
+        6.817103220419101,
+        5.743203551547972
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_354",
+      "label": "MATCH_ForeRock_15",
+      "location_cm": [
+        863.3557739257812,
+        -3709.1337890625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        125.32459259033203
+      ],
+      "scale": [
+        7.348103059326167,
+        5.068755624000609,
+        6.969417741960915
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_355",
+      "label": "MATCH_ForeRock_16",
+      "location_cm": [
+        968.506103515625,
+        3967.881103515625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -95.07479858398438
+      ],
+      "scale": [
+        3.2777276833275613,
+        3.672335118227396,
+        4.499977086863163
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_356",
+      "label": "MATCH_ForeRock_17",
+      "location_cm": [
+        834.8681030273438,
+        -4130.17333984375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        10.482793807983398
+      ],
+      "scale": [
+        2.8750449539864245,
+        6.763795190360326,
+        5.2575794554933815
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_358",
+      "label": "MATCH_ForeRock_18",
+      "location_cm": [
+        -2985.384765625,
+        2059.044677734375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        172.81033325195312
+      ],
+      "scale": [
+        3.71657328468488,
+        3.4524720639949837,
+        7.110532210139336
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_359",
+      "label": "MATCH_ForeRock_19",
+      "location_cm": [
+        -983.3089599609375,
+        -4221.2021484375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -166.8070068359375
+      ],
+      "scale": [
+        3.1492611205885463,
+        3.7831127400623172,
+        6.686317072682016
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_360",
+      "label": "MATCH_ForeRock_20",
+      "location_cm": [
+        462.025146484375,
+        4104.1591796875,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        114.02228546142578
+      ],
+      "scale": [
+        6.688480844529101,
+        3.515350471954075,
+        8.075313885561199
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_361",
+      "label": "MATCH_ForeRock_21",
+      "location_cm": [
+        854.4634399414062,
+        -4973.95068359375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -155.21554565429688
+      ],
+      "scale": [
+        4.75008460221369,
+        5.290782917788732,
+        3.2514347988516556
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_362",
+      "label": "MATCH_ForeRock_22",
+      "location_cm": [
+        -1490.8895263671875,
+        2242.64453125,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        56.0296516418457
+      ],
+      "scale": [
+        4.610113352836195,
+        3.920478348237451,
+        7.578686682387066
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_363",
+      "label": "MATCH_ForeRock_23",
+      "location_cm": [
+        805.4689331054688,
+        -2832.6708984375,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -171.7958221435547
+      ],
+      "scale": [
+        6.69670751025408,
+        6.013392536187245,
+        6.918900692050463
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_364",
+      "label": "MATCH_ForeRock_24",
+      "location_cm": [
+        -3266.863037109375,
+        4673.7275390625,
+        -120.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -11.62725830078125
+      ],
+      "scale": [
+        5.73440741397894,
+        6.877042684636006,
+        5.0215431771127985
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_365",
+      "label": "MATCH_GrassBank_00",
+      "location_cm": [
+        -536.3729248046875,
+        -2635.573486328125,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        44.909278869628906
+      ],
+      "scale": [
+        8.664247456024269,
+        3.800721488798385,
+        0.89256943737262
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_366",
+      "label": "MATCH_GrassBank_01",
+      "location_cm": [
+        133.35427856445312,
+        2838.0390625,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        178.5563201904297
+      ],
+      "scale": [
+        5.658113951387254,
+        6.162787641507448,
+        1.2051600062731496
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_367",
+      "label": "MATCH_GrassBank_02",
+      "location_cm": [
+        343.07257080078125,
+        -4033.03564453125,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        160.87503051757812
+      ],
+      "scale": [
+        8.081979071925119,
+        6.075127280952151,
+        0.6739319559735244
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_368",
+      "label": "MATCH_GrassBank_03",
+      "location_cm": [
+        1445.716796875,
+        3394.66162109375,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -169.2704315185547
+      ],
+      "scale": [
+        5.713338293364876,
+        6.439956255117479,
+        0.5194001405971218
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_369",
+      "label": "MATCH_GrassBank_04",
+      "location_cm": [
+        2287.637939453125,
+        -4746.6357421875,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        118.22986602783203
+      ],
+      "scale": [
+        7.040950040250285,
+        6.269529196794556,
+        1.288156984104327
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_370",
+      "label": "MATCH_GrassBank_05",
+      "location_cm": [
+        1430.732421875,
+        4473.041015625,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -106.97442626953125
+      ],
+      "scale": [
+        10.145567628301725,
+        5.826002595596589,
+        1.0768288689086685
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_371",
+      "label": "MATCH_GrassBank_06",
+      "location_cm": [
+        1285.940185546875,
+        -4627.4111328125,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -102.888916015625
+      ],
+      "scale": [
+        6.64759566379683,
+        7.526665473834635,
+        0.49032154801668826
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_372",
+      "label": "MATCH_GrassBank_07",
+      "location_cm": [
+        -1188.265869140625,
+        4106.26123046875,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -62.693084716796875
+      ],
+      "scale": [
+        6.953514528017543,
+        3.7045174896669444,
+        0.5198473002394209
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_373",
+      "label": "MATCH_GrassBank_08",
+      "location_cm": [
+        2948.810546875,
+        -3944.247314453125,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -121.01490783691406
+      ],
+      "scale": [
+        7.756164261085657,
+        5.044770029566638,
+        0.6975218500827184
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_374",
+      "label": "MATCH_GrassBank_09",
+      "location_cm": [
+        761.809326171875,
+        4971.06201171875,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        72.32785034179688
+      ],
+      "scale": [
+        5.360529325495879,
+        7.769729568158539,
+        0.8993172995650595
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_375",
+      "label": "MATCH_GrassBank_10",
+      "location_cm": [
+        3372.45947265625,
+        -3719.4814453125,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        32.31990051269531
+      ],
+      "scale": [
+        8.110823069497503,
+        5.01345512235942,
+        0.6886607399134367
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_376",
+      "label": "MATCH_GrassBank_11",
+      "location_cm": [
+        909.2625732421875,
+        3583.27587890625,
+        -130.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        144.1440887451172
+      ],
+      "scale": [
+        11.627145077679847,
+        7.84247980537788,
+        0.6566419106957123
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_377",
+      "label": "MATCH_Cloud_00",
+      "location_cm": [
+        -31363.238180364817,
+        5157.256134972041,
+        3500.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        99.95210266113281
+      ],
+      "scale": [
+        20.0,
+        36.0,
+        22.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_0.MI_MATCH_CloudScattering_0",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_1.MI_MATCH_CloudScattering_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_2.MI_MATCH_CloudScattering_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_378",
+      "label": "MATCH_Cloud_01",
+      "location_cm": [
+        -30585.52630132397,
+        724.9695655816131,
+        2600.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        99.95210266113281
+      ],
+      "scale": [
+        20.0,
+        46.0,
+        14.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_0.MI_MATCH_CloudScattering_0",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_1.MI_MATCH_CloudScattering_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_2.MI_MATCH_CloudScattering_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_379",
+      "label": "MATCH_Cloud_02",
+      "location_cm": [
+        -35942.20216874883,
+        -3463.827833594927,
+        4100.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        99.95210266113281
+      ],
+      "scale": [
+        20.0,
+        36.0,
+        14.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_0.MI_MATCH_CloudScattering_0",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_1.MI_MATCH_CloudScattering_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_2.MI_MATCH_CloudScattering_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_380",
+      "label": "MATCH_Cloud_03",
+      "location_cm": [
+        -30792.617850782695,
+        -9667.196382388174,
+        2000.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        99.95210266113281
+      ],
+      "scale": [
+        20.0,
+        46.0,
+        14.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_0.MI_MATCH_CloudScattering_0",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_1.MI_MATCH_CloudScattering_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_2.MI_MATCH_CloudScattering_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_381",
+      "label": "MATCH_Cloud_04",
+      "location_cm": [
+        -32071.223544697692,
+        -13952.65639030893,
+        3100.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        99.95210266113281
+      ],
+      "scale": [
+        20.0,
+        36.0,
+        22.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_0.MI_MATCH_CloudScattering_0",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_1.MI_MATCH_CloudScattering_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_2.MI_MATCH_CloudScattering_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_382",
+      "label": "MATCH_Cloud_05",
+      "location_cm": [
+        -44150.040831895196,
+        -8762.071361384085,
+        4300.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        99.95210266113281
+      ],
+      "scale": [
+        20.0,
+        46.0,
+        14.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_0.MI_MATCH_CloudScattering_0",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_1.MI_MATCH_CloudScattering_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Sky/MI_MATCH_CloudScattering_2.MI_MATCH_CloudScattering_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "DirectionalLight_1",
+      "label": "DYSIS_MATCH_Key",
+      "location_cm": [
+        0.0,
+        0.0,
+        10000.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        3.384675682834167e-15,
+        -20.0,
+        -97.5
+      ],
+      "scale": [
+        2.5,
+        2.5,
+        2.5
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel"
+    },
+    {
+      "name": "StaticMeshActor_383",
+      "label": "DYSIS_MATCH_Sky",
+      "location_cm": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        8000.0,
+        8000.0,
+        8000.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Engine/BasicShapes/Sphere.Sphere",
+      "materials": [
+        "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel.DysisSkyActor_0.MID_M_MATCH_Sky_0"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "PointLight_0",
+      "label": "DYSIS_MATCH_InteriorBounce_0",
+      "location_cm": [
+        970.0734749999999,
+        401.81757,
+        450.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel"
+    },
+    {
+      "name": "PointLight_1",
+      "label": "DYSIS_MATCH_InteriorBounce_1",
+      "location_cm": [
+        970.0734749999999,
+        401.81757,
+        1330.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel"
+    },
+    {
+      "name": "StaticMeshActor_384",
+      "label": "MATCH_NearRock_0",
+      "location_cm": [
+        2145.264008478167,
+        4437.528349115126,
+        0.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        9.0,
+        6.0,
+        10.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_385",
+      "label": "MATCH_NearRock_1",
+      "location_cm": [
+        2335.371356688151,
+        3354.0805210419107,
+        0.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        79.0
+      ],
+      "scale": [
+        9.0,
+        6.0,
+        7.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_386",
+      "label": "MATCH_NearRock_2",
+      "location_cm": [
+        3337.7555563407936,
+        -2358.644390616862,
+        0.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        158.0
+      ],
+      "scale": [
+        9.0,
+        6.0,
+        10.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender.MI_MATCH_Lavender",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_1.MI_MATCH_Lavender_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Lavender_2.MI_MATCH_Lavender_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_387",
+      "label": "MATCH_NearRock_3",
+      "location_cm": [
+        3562.427876952593,
+        -3639.0827328852074,
+        0.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        -123.0
+      ],
+      "scale": [
+        9.0,
+        6.0,
+        7.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach.MI_MATCH_Peach",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_1.MI_MATCH_Peach_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Peach_2.MI_MATCH_Peach_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "CameraActor_5",
+      "label": "CAM_DYSIS_DetailReference",
+      "location_cm": [
+        4988.9493,
+        2066.4903600000002,
+        570.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -2.4851868917463592e-17,
+        -1.0,
+        -157.5
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Engine/EditorMeshes/MatineeCam_SM.MatineeCam_SM",
+      "materials": [
+        "/Engine/EditorMaterials/MatineeCam_mat.MatineeCam_mat"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_388",
+      "label": "MATCH_EdgeGrassBank_0",
+      "location_cm": [
+        3067.1193019948087,
+        2771.7826731781984,
+        -150.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        12.0,
+        8.0,
+        4.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    },
+    {
+      "name": "StaticMeshActor_389",
+      "label": "MATCH_EdgeGrassBank_1",
+      "location_cm": [
+        3827.5486948347443,
+        -1562.0086391146638,
+        -150.0
+      ],
+      "rotation_rotator_roll_pitch_yaw": [
+        -0.0,
+        0.0,
+        71.0
+      ],
+      "scale": [
+        12.0,
+        8.0,
+        4.0
+      ],
+      "level": "/Game/Dysis/Maps/Dysis_Temple_LowPoly_v001.Dysis_Temple_LowPoly_v001:PersistentLevel",
+      "mesh": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "materials": [
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass.MI_MATCH_Grass",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_1.MI_MATCH_Grass_1",
+        "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Grass_2.MI_MATCH_Grass_2"
+      ],
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "navigation_affect": false
+    }
+  ],
+  "mesh_build": {
+    "RockA": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockA.SM_MATCH_RockA",
+      "triangles_LOD0": 20,
+      "recompute_normals": false,
+      "recompute_tangents": true
+    },
+    "RockB": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_RockB.SM_MATCH_RockB",
+      "triangles_LOD0": 20,
+      "recompute_normals": false,
+      "recompute_tangents": true
+    },
+    "Mountain": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Mountain.SM_MATCH_Mountain",
+      "triangles_LOD0": 80,
+      "recompute_normals": false,
+      "recompute_tangents": true
+    },
+    "Cloud": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_Cloud.SM_MATCH_Cloud",
+      "triangles_LOD0": 20,
+      "recompute_normals": false,
+      "recompute_tangents": true
+    },
+    "TerrainShell": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Meshes/SM_MATCH_TerrainShell.SM_MATCH_TerrainShell",
+      "triangles_LOD0": 192,
+      "recompute_normals": false,
+      "recompute_tangents": true
+    }
+  },
+  "palette": {
+    "WarmWhite": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_WarmWhite.MI_MATCH_WarmWhite",
+      "BaseColor_linear": [
+        0.7200000286102295,
+        0.6000000238418579,
+        0.4399999976158142,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "Sand": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Sand.MI_MATCH_Sand",
+      "BaseColor_linear": [
+        0.7200000286102295,
+        0.5299999713897705,
+        0.3799999952316284,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "Ochre": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Ochre.MI_MATCH_Ochre",
+      "BaseColor_linear": [
+        0.699999988079071,
+        0.38999998569488525,
+        0.0949999988079071,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "BlueGrey": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_BlueGrey.MI_MATCH_BlueGrey",
+      "BaseColor_linear": [
+        0.3700000047683716,
+        0.38999998569488525,
+        0.550000011920929,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "Shadow": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Shadow.MI_MATCH_Shadow",
+      "BaseColor_linear": [
+        0.10000000149011612,
+        0.10999999940395355,
+        0.20999999344348907,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "Clay": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_Clay.MI_MATCH_Clay",
+      "BaseColor_linear": [
+        0.550000011920929,
+        0.46000000834465027,
+        0.4699999988079071,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "InteriorFloor": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_InteriorFloor.MI_MATCH_InteriorFloor",
+      "BaseColor_linear": [
+        0.4399999976158142,
+        0.4000000059604645,
+        0.41999998688697815,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "InteriorStone": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_InteriorStone.MI_MATCH_InteriorStone",
+      "BaseColor_linear": [
+        0.5,
+        0.4699999988079071,
+        0.5,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    },
+    "PedimentStone": {
+      "asset": "/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_PedimentStone.MI_MATCH_PedimentStone",
+      "BaseColor_linear": [
+        0.36000001430511475,
+        0.3199999928474426,
+        0.36000001430511475,
+        1.0
+      ],
+      "Roughness": 0.9200000166893005,
+      "Metallic": 0
+    }
+  },
+  "editor_display": {
+    "pilot_reference_camera": true,
+    "game_view": true
+  },
+  "restored_temporary_settings": {
+    "background_throttle": true,
+    "maxfps": 0.0,
+    "Slate_throttle": 1
+  },
+  "saved_actual_map": true,
+  "all_assets_saved_before_reopen": true,
+  "startup_default_unchanged": "/Game/Dysis/Maps/Dysis_Temple",
+  "final_saved_source_PP_verified_after_diagnostic_PIE_discard": {
+    "bloom": 0.05999999865889549,
+    "method": "<AutoExposureMethod.AEM_MANUAL: 2>",
+    "f": 8.0,
+    "shutter_inverse_seconds": 125.0,
+    "ISO": 100.0
+  }
+}

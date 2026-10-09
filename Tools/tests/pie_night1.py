@@ -95,8 +95,12 @@ def main():
     n = ok = 0; notes = []
     for r in G["swan"]:
         tc.set_forced_time(r["H"]); director.debug_set_swan(r["k"], 1.0)
-        yield from wait(3)
-        s = night()["swan"]; director.debug_set_swan(r["k"], 1.0)
+        # 等她转到位再比（编辑器在前台时帧率高，3 帧不一定够；最多等 40 帧）
+        for _ in range(40):
+            yield
+            s = night()["swan"]
+            if _ >= 2 and math.dist(s["head"], r["head"]) < 1.5: break
+        director.debug_set_swan(r["k"], 1.0)
         miss_same = abs(s["miss"] - r["miss"]) < 3.0 or (s["miss"] > 800 and r["miss"] > 800)
         good = abs(s["lit"] - r["lit"]) < 0.01 and miss_same and math.dist(s["head"], r["head"]) < 1.5
         n += 1; ok += 1 if good else 0
@@ -158,6 +162,10 @@ def main():
     fm = {f["step"]: f for f in G["flowMrel"]}
     go(fm["arrive"]["foot"]); look(120.0, 0.0)
     yield from wait(120)
+    # 时刻是跟着人站的位置慢慢走过去的：帧率高的时候 120 帧还差一点没走到，等它到了再比（最多再等 300 帧）
+    for _ in range(300):
+        if abs(H() - fm["arrive"]["H"]) < 0.02: break
+        yield
     m = mirror()
     check(zone() == "L2" and abs(H() - fm["arrive"]["H"]) < 0.02 and m["slot"] == fm["arrive"]["slot"] and m["form"] == FORM[fm["arrive"]["form"]], "夜里站到三相像旁边：%s，镜子还在白天那一格，已经是月相" % state()[:40])
     seq = []

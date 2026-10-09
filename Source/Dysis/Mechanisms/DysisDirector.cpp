@@ -115,6 +115,7 @@ void ADysisDirector::BeginPlay()
 	SetupSkyFx();
 	SetupFx();
 	SetupLowPolySkin();
+	SetupScenery();
 	BuildInteracts();
 }
 
@@ -312,6 +313,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateMoonbow(DeltaTime);
 	UpdateEndingStars(DeltaTime);
 	UpdateFx(DeltaTime);
+	UpdateScenery();
 	UpdateViews();
 	UpdateSfx();
 }

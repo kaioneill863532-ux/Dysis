@@ -270,6 +270,43 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DescribeSkin() const;
 
+	// ───── 殿外的配景（山、石、草坡、云）—— DysisDirectorScenery.cpp ─────
+
+	/** 远山、巨岩和云整体绕殿心转多少度（相对美术摆的位置）。−50：山从“正挡着日落的方向”挪到东南到正南那一段，日落（方位 204°–244°）和月出（62°–100°）都让出来。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float SceneryFarTurnDeg = -50.0f;
+
+	/** 台地外面的石头沉到海里当礁石：石头的中心比海面高出“半高 × 这个数”（0 = 正好一半在水下）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float ScenerySeaRockRise = 0.3f;
+
+	/** 云：高度、大小各乘多少（相对美术摆的位置），亮度相对天空乘多少。
+	 *  美术那版的云是给一台长焦的固定镜头摆的（六朵挤在一小段天边、离地平线很近）；我们的镜头是人自己转的、视角宽得多，所以抬高、放大了一些。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float SceneryCloudLift = 1.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float SceneryCloudScale = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float SceneryCloudGain = 1.0f;
+
+	/** 水庭的动画水面底色垫多亮（屏幕上的亮度，0 = 完全靠受光）：白天 / 入夜。
+	 *  0.30 是对着美术那版的画面定的：水比四周的墙暗一截，青绿和蓝紫是它自己的颜色（垫少了会被殿里的暖光照成发灰的米色）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float PoolLiftDay = 0.30f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|配景")
+	float PoolLiftNight = 0.035f;
+
+	/** 按上面的数把配景重摆一遍（调过以后叫）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|配景")
+	void RebuildScenery();
+
+	/** 测试用：配景的状态（放了几件、台地上几件、礁石几块、几件挡人、有没有哪件会挡光、建筑换了几个面的配色）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|配景")
+	FString DescribeScenery() const;
+
 	/** 测试用：脚站在这里时旁边会浮出哪个互动（它的名字；没有就是空）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DebugPromptAt(FVector FootCm) const;
@@ -475,6 +512,16 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMeshComponent>> SkinOrigs;      // 对应的原模型组件（管碰撞）
 	bool bLowPolyShown = false;
+
+	// 殿外的配景和夕照的配色：山、石、草坡、云；建筑换上美术那版外景的调色板 —— DysisDirectorScenery.cpp
+	void SetupScenery();
+	void UpdateScenery();
+	void ApplyPalette();
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> SceneryComps;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> CloudMIDs;   // 云的三档颜色
+	int32 SceneryOnTerrace = 0, ScenerySeaRocks = 0, ScenerySkipped = 0, ScenerySolid = 0, PaletteSlots = 0;
 
 	// “光和水”的样子：虹桥 / 月桥 / 瀑布 / 海 / 水庭的材质，光粒，瀑布脚下的水雾 —— DysisDirectorFx.cpp
 	void SetupFx();
