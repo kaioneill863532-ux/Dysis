@@ -1,5 +1,6 @@
 ﻿#include "DysisBeamActor.h"
 #include "DysisGreybox.h"
+#include "Fx/DysisMoteField.h"
 #include "World/DysisWorldState.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/Character.h"
@@ -81,6 +82,10 @@ ADysisBeamActor::ADysisBeamActor()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (Cube.Succeeded()) Visual->SetStaticMesh(Cube.Object);
 
+	// 浮尘挂在光柱上：光柱多长多宽它就撒多大一片
+	Motes = CreateDefaultSubobject<UDysisMoteField>(TEXT("Motes"));
+	Motes->SetupAttachment(Visual);
+
 	Collision = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Collision"));
 	Collision->ComponentTags.Add(TEXT("DysisOneWay"));   // 光只托脚、不挡头（见 UDysisCharacterMovement::UpdateOneWayFloors）
 	Collision->SetupAttachment(RootComponent);
@@ -148,6 +153,8 @@ void ADysisBeamActor::BeginPlay()
 			Visual->SetVisibility(false);
 			if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Beams/M_DysisBeam.M_DysisBeam")))
 				VisualMID = Visual->CreateDynamicMaterialInstance(0, Mat);
+			Motes->Build(160, GetUniqueID());
+			Motes->SetOpacity(0.0f);
 		}
 	}
 	// 打区域 Tag：时间组件踩到本 Actor 会读 Tag "DysisZone=beam:b1"，和墙体 Tag 同一套机制。
@@ -736,8 +743,30 @@ void ADysisBeamActor::ApplyGreyboxComponents()
 		const double Ht = FMath::Abs(FVector::DotProduct(FrameV, Z));
 		Visual->SetWorldLocationAndRotation(FrameO + (FrameU + FrameV) * 0.5 + X * ((ShowS0 + ShowS1) * 0.5), FRotationMatrix::MakeFromXY(X, Y).ToQuat());
 		Visual->SetWorldScale3D(FVector(ShowS1 - ShowS0, Wd, FMath::Max(Ht, 1.0)) / 100.0);
-		if (VisualMID) VisualMID->SetScalarParameterValue(TEXT("Intensity"), float(Lit) * (bGreyboxOculus ? 1.1f : GreyboxMirror == 1 ? 0.85f : GreyboxMirror == 2 ? 0.6f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f) * MistLook);
+		const float Look = float(Lit) * (bGreyboxOculus ? 1.1f : GreyboxMirror == 1 ? 0.85f : GreyboxMirror == 2 ? 0.6f : GWindows[GreyboxIndex].Gain) * (bWalkable ? 1.0f : 0.55f) * MistLook;
+		// 日光是暖的，月光（反射的月光、夜里的窗光）是银蓝的
+		const UDysisWorldState* LookState = UDysisWorldState::Get(this);
+		const bool bMoonLight = GreyboxMirror == 2 || (LookState && LookState->IsNight());
+		const FLinearColor LightColor = bMoonLight ? FLinearColor(0.60f, 0.74f, 1.0f) : FLinearColor(1.0f, 0.84f, 0.58f);
+		if (VisualMID)
+		{
+			VisualMID->SetScalarParameterValue(TEXT("Intensity"), Look);
+			VisualMID->SetVectorParameterValue(TEXT("Color"), LightColor);
+			// 日光：迎着光看亮、背着光看淡（月光不分）。日光穿过瀑布的水沫时，背对太阳 42° 的方向上立着一段虹
+			// （灰盒：虹的亮度 = 这束光多亮 × 水量；材质里要知道光柱在世界里的位置才能算出哪一段在水沫里）
+			const FVector Cn = Visual->GetComponentLocation();
+			VisualMID->SetVectorParameterValue(TEXT("Center"), FLinearColor(float(Cn.X), float(Cn.Y), float(Cn.Z), 0.0f));
+			VisualMID->SetScalarParameterValue(TEXT("Phase"), bMoonLight ? 0.0f : 1.0f);
+			VisualMID->SetScalarParameterValue(TEXT("SprayK"), (bMoonLight || !LookState || MistLook <= 0.01f) ? 0.0f : LookState->FlowK * Look / MistLook);
+		}
+		if (Motes)
+		{
+			// 浮尘：顺着光慢慢往下飘（约一分半钟飘完一整束），轻轻晃
+			Motes->SetLook(LightColor, 6.5f, FVector(0.011, 0.0, 0.0), 0.02f, 4.0f);
+			Motes->SetOpacity(FMath::Clamp(Look * 1.4f, 0.0f, 1.0f));
+		}
 	}
+	else if (Motes) Motes->SetOpacity(0.0f);
 
 	// 能踩的面：光的下表面，从 s0 到 s1，两侧各宽 0.35 m。用一块 4 cm 厚的板，顶面就是那个面。
 	const bool bGrace = GetWorld() && GetWorld()->GetTimerManager().IsTimerActive(GraceTimer);

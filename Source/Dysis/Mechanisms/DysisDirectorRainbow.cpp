@@ -512,7 +512,7 @@ void ADysisDirector::UpdateRainbow(float Dt)
 		if (BridgeMID)
 		{
 			BridgeMID->SetScalarParameterValue(TEXT("Reveal"), BridgeK);
-			BridgeMID->SetScalarParameterValue(TEXT("Opacity"), 0.62f + 0.12f * FMath::Sin(Now * 1.7f));
+			BridgeMID->SetScalarParameterValue(TEXT("Opacity"), 0.86f + 0.08f * FMath::Sin(Now * 1.7f));
 		}
 		// 虹快到对岸的时候，南窗下探出一道石沿，窗洞西边的墙上露出虹之龛
 		const float Ks = DysisGB::Smoothstep(2.4f, 4.2f, RainbowT);

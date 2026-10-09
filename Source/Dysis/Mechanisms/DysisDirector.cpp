@@ -113,6 +113,7 @@ void ADysisDirector::BeginPlay()
 	SetupTwins();
 	SetupFinale();
 	SetupSkyFx();
+	SetupFx();
 	BuildInteracts();
 }
 
@@ -309,6 +310,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateAppleLight(DeltaTime);
 	UpdateMoonbow(DeltaTime);
 	UpdateEndingStars(DeltaTime);
+	UpdateFx(DeltaTime);
 	UpdateViews();
 	UpdateSfx();
 }

@@ -137,6 +137,9 @@ public:
 	/** 这束光此刻有没有（灰盒 beam.valid）：窗被照亮了、光射得出去。 */
 	bool HasLight() const { return IsGreybox() && bFrameValid; }
 
+	/** 窗被照亮了几成（灰盒 beam.lit，0–1）。 */
+	double GetLit() const { return Lit; }
+
 	/** 这一点在不在光柱里（灰盒 insidePrism）。TolCm：比光照到的地方再往前多算多少。 */
 	bool ContainsPoint(const FVector& PointCm, double TolCm = 15.0) const;
 
@@ -212,6 +215,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<class UMaterialInstanceDynamic> VisualMID;
+
+	/** 光柱里慢慢飘的浮尘（光粒）。 */
+	UPROPERTY(VisibleAnywhere, Category = "Dysis|Beam")
+	TObjectPtr<class UDysisMoteField> Motes;
 
 	int32 GreyboxIndex = -1;       // 内置窗表里的下标；−1 = 不是灰盒窗光
 	bool bGreyboxOculus = false;   // 圆眼光柱（也按灰盒算，但不是窗光）

@@ -248,6 +248,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DescribeSkyFx() const;
 
+	/** 拍照用：另放一台镜头在 EyeCm、看向 LookAtCm（人不动，时刻还是按人站的地方算；曝光照搬人的镜头）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugCamera(FVector EyeCm, FVector LookAtCm, float FovDeg = 75.0f);
+
+	/** 拍照用：镜头还给人。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugCameraOff();
+
 	/** 测试用：脚站在这里时旁边会浮出哪个互动（它的名字；没有就是空）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DebugPromptAt(FVector FootCm) const;
@@ -445,6 +453,55 @@ private:
 	/** 入夜以后狄西斯自己说的那一句，用剧情对话框放。 */
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> NightDialogue;
+
+	// “光和水”的样子：虹桥 / 月桥 / 瀑布 / 海 / 水庭的材质，光粒，瀑布脚下的水雾 —— DysisDirectorFx.cpp
+	void SetupFx();
+	void UpdateFx(float Dt);
+	class UMaterialInstanceDynamic* FxMaterial(AActor* A, const TCHAR* Path);
+	class UDysisMoteField* FxMotes(const FVector& Center, const FQuat& Rot, const FVector& SizeCm, int32 Count);
+	UStaticMeshComponent* FxShape(const TCHAR* MeshPath, const TCHAR* MatPath, const FVector& Center, const FQuat& Rot, const FVector& SizeCm, TObjectPtr<class UMaterialInstanceDynamic>& OutMID);
+	void FxGlow(const FVector& At, const FVector& Along, const FVector2D& SizeCm, const FLinearColor& Color);
+	// 夜里月光打到瀑布上、把水帘照透的那一块（灰盒 FALLHOLE）：中心、透开多少
+	FVector FallHole = FVector(0.0, 0.0, -9900.0);
+	float FallHoleK = 0.0f;
+	// 水沫里的虹：伊莉丝浮雕前的水帘、殿顶虹门的喷泉（各一个装着水沫的盒子 + 水珠）
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> ReliefSpray;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> ReliefSprayMID;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> GateSpray;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> GateSprayMID;
+	UPROPERTY()
+	TObjectPtr<class UDysisMoteField> ReliefDrops;
+	UPROPERTY()
+	TObjectPtr<class UDysisMoteField> GateDrops;
+	// 光做的桥落在石头上的那几汪光：虹桥头、虹桥尾、月桥头、月桥尾
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> GlowPools;
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> GlowMIDs;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> SeaMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> PoolMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> FallMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> MoonDeckMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> FallMistMID;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> FallMist;
+	UPROPERTY()
+	TObjectPtr<class UDysisMoteField> BridgeMotes;
+	UPROPERTY()
+	TObjectPtr<class UDysisMoteField> FallMotes;
+	UPROPERTY()
+	TArray<TObjectPtr<class UDysisMoteField>> MoonMotes;
+	UPROPERTY()
+	TObjectPtr<class ACameraActor> DebugCam;
 
 	// 金苹果的光、月虹、结局的星座 —— DysisDirectorSky.cpp
 	void SetupSkyFx();
