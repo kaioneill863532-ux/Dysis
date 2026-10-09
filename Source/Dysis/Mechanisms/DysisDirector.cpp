@@ -114,6 +114,7 @@ void ADysisDirector::BeginPlay()
 	SetupFinale();
 	SetupSkyFx();
 	SetupFx();
+	SetupLowPolySkin();
 	BuildInteracts();
 }
 

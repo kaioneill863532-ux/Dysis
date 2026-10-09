@@ -172,16 +172,23 @@ def main():
     director.debug_set_night(True)
     tc.set_forced_time(125.42837)
     n = ok = 0; notes = []
+    # 月亮浮雕是“被反射的月光扫到一下就永久打开”的（灰盒也是）：转镜子时光斑会从它上面扫过，赶不赶得上
+    # 0.08 秒一次的判定看时机；它一打开，后面那几束光就比标准答案多照出去 1.7 m。所以每次比之前先把它摆回去
+    # （此刻真被照着的话 0.2 秒内会照常重新打开，和标准答案一致）。
+    def settle():
+        yield from wait(260)
+        director.debug_reset_moonstone("moonRelief")
+        yield from wait(60)
     for r in G["night"]:
         director.debug_set_mirror_slot(r["slot"])
-        yield from wait(260)
+        yield from settle()
         e1 = mirror_same(r["mirror"], mirror()); e2 = beam_same(r["beam"], json.loads(beams["mmoon"].debug_solve(r["H"])), walk=False)
         n += 1; ok += 1 if not (e1 or e2) else 0
         if e1 or e2: notes.append("第 %d 格：%s %s" % (r["slot"], e1, e2))
     check(ok == n, "夜里转四格：%d/%d 格的月相和反射的月光和灰盒一致" % (ok, n))
     for x in notes: say("     " + x)
     director.debug_set_mirror_slot(1)
-    yield from wait(260)
+    yield from settle()
     n = ok = 0; notes = []
     for r in G["nightSweep"]:
         e = beam_same(r["beam"], json.loads(beams["mmoon"].debug_solve(r["H"])), walk=False)

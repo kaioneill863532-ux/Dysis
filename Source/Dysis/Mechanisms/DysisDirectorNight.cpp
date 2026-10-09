@@ -411,6 +411,17 @@ void ADysisDirector::UpdateMoonstones(float Dt)
 
 // ───────────────────────── 测试用 ─────────────────────────
 
+void ADysisDirector::DebugResetMoonstone(FName Id)
+{
+	for (FMoonstone& Ms : Moonstones)
+		if (Ms.Id == Id)
+		{
+			Ms.bPerm = Ms.bLit = false;
+			Ms.LitFrac = 0.0f;
+			SetMoonstoneState(Ms, 0.0f);
+		}
+}
+
 FString ADysisDirector::DebugMoonstoneLit(FName Id) const
 {
 	FString S;

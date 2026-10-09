@@ -135,10 +135,10 @@ def main():
     check(hidden_fp and not mesh.get_editor_property("hidden_in_game"), "第一人称时人藏起来，切回第三人称又出来")
 
     # 7 在殿里的样子（镜头的位置写死，不跟人的朝向）
-    go(polar(300.0, 1330.0, 0.0), 8.0)
+    go(polar(285.0, 1250.0, 0.0), 8.0)      # 两根柱子之间（方位 300° 那里正好是柱子）
     yield from wait(60)
     f = foot()
-    director.debug_camera(unreal.Vector(*polar(302.0, 1000.0, 150.0)), unreal.Vector(f[0], f[1], f[2] + 95.0), 50.0)
+    director.debug_camera(unreal.Vector(*polar(287.0, 900.0, 150.0)), unreal.Vector(f[0], f[1], f[2] + 95.0), 50.0)
     yield from wait(30)
     yield from shoot(w, "主角_在水庭")
     director.debug_camera_off()

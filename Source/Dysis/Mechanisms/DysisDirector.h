@@ -180,6 +180,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DebugMoonstoneLit(FName Id) const;
 
+	/** 测试用：把一块月石摆回“从没被照到过”的样子（一照到就永久打开的那种也收回去）。
+	 *  夜里转镜子时反射的月光会从月亮浮雕上扫过，赶上 0.08 秒一次的判定它就永久打开了——赶不赶得上看时机；
+	 *  要和灰盒比光路的测试先叫它，免得结果看运气。之后要是它此刻确实被照着，会照常重新打开。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugResetMoonstone(FName Id);
+
 	// ───── 夜里第二段：月之龛、双子、月桥 —— DysisDirectorTwins.cpp ─────
 
 	/** 双子并肩站在月光里了：月桥出现。 */
@@ -255,6 +261,14 @@ public:
 	/** 拍照用：镜头还给人。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	void DebugCameraOff();
+
+	/** 建筑画低模（true）还是原模型（false）。只切“画不画”，碰撞一直是原模型的。控制台 Dysis.LowPoly 0|1 叫的就是它。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugSetLowPoly(bool bShown);
+
+	/** 测试用：低模外观的状态（换了几个部件、现在画的是哪一套、原模型的碰撞还在不在）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeSkin() const;
 
 	/** 测试用：脚站在这里时旁边会浮出哪个互动（它的名字；没有就是空）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
@@ -453,6 +467,14 @@ private:
 	/** 入夜以后狄西斯自己说的那一句，用剧情对话框放。 */
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> NightDialogue;
+
+	// 低模外观：建筑部件各挂一个只管看的低模，原模型不画但碰撞照旧 —— DysisDirectorSkin.cpp
+	void SetupLowPolySkin();
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> SkinComps;      // 低模（只管看）
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> SkinOrigs;      // 对应的原模型组件（管碰撞）
+	bool bLowPolyShown = false;
 
 	// “光和水”的样子：虹桥 / 月桥 / 瀑布 / 海 / 水庭的材质，光粒，瀑布脚下的水雾 —— DysisDirectorFx.cpp
 	void SetupFx();
