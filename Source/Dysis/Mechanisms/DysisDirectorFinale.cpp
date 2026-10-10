@@ -162,12 +162,61 @@ FString ADysisDirector::DebugGoddessLit() const
 		for (int32 i = 0; i < 5; ++i)
 		{
 			const TCHAR* Why = TEXT("?");
-			MoonSampleLit(Probe, Pts[i], &Why);
+			MoonSampleLit(Probe, GodPoint(Pts[i]), &Why);
 			if (i) S += TEXT(",");
 			S += Why;
 		}
 	}
 	return S;
+}
+
+namespace
+{
+	FVector FinShifted(const FVector& P, float DeltaAzDeg, float DeltaRCm)
+	{
+		const FVector Q = FQuat(FVector::UpVector, FMath::DegreesToRadians(DeltaAzDeg)).RotateVector(P);
+		return Q + Q.GetSafeNormal2D() * DeltaRCm;
+	}
+}
+
+FVector ADysisDirector::GodPoint(const FVector& P) const
+{
+	return FinShifted(P, GodShiftAz, GodShiftR);
+}
+
+FString ADysisDirector::DebugGoddessShift(float DeltaAzDeg, float DeltaRCm) const
+{
+	// 测算用：要是女神像（连她怀里的月亮）从灰盒的位置绕殿心转过 DeltaAzDeg 度、再往墙那边挪 DeltaRCm，
+	// 现在这一刻三相像反过来的月光还照得到那轮月亮吗——五个点里照到几个、各是什么情况
+	FMoonstone Probe; Probe.Source = 2;
+	int32 N = 0;
+	FString S;
+	for (const FVector& P : GDysisGoddessSamples)
+	{
+		const TCHAR* Why = TEXT("?");
+		if (MoonSampleLit(Probe, FinShifted(P, DeltaAzDeg, DeltaRCm), &Why)) ++N;
+		S += Why; S += TEXT(",");
+	}
+	return FString::Printf(TEXT("%d|%s"), N, *S);
+}
+
+void ADysisDirector::DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm)
+{
+	AActor* St = Piece(TEXT("SM_Mech_Goddess_Statue"));
+	AActor* Pl = Piece(TEXT("SM_Mech_Goddess_Plinth"));
+	if (!bGodBase)
+	{
+		if (St) { GodStatueBase = St->GetActorLocation(); GodStatueRot = St->GetActorRotation(); }
+		if (Pl) GodPlinthBase = Pl->GetActorLocation();
+		bGodBase = true;
+	}
+	GodShiftAz = DeltaAzDeg; GodShiftR = DeltaRCm;
+	for (AActor* A : { St, Pl })
+		if (A)
+			if (USceneComponent* Root = A->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
+	if (St) St->SetActorLocationAndRotation(FinShifted(GodStatueBase, DeltaAzDeg, DeltaRCm), GodStatueRot + FRotator(0.0f, DeltaAzDeg, 0.0f));
+	if (Pl) Pl->SetActorLocation(FinShifted(GodPlinthBase, DeltaAzDeg, DeltaRCm));
+	if (UDysisWorldState* S = UDysisWorldState::Get(this)) S->BumpLight();
 }
 
 void ADysisDirector::UpdateGoddess(float Dt)
@@ -177,8 +226,8 @@ void ADysisDirector::UpdateGoddess(float Dt)
 	if (bCaught)
 	{
 		FMoonstone Probe; Probe.Source = 2;
-		for (const FVector& P : GDysisGoddessSamples) if (MoonSampleLit(Probe, P)) Lit += 0.2f;
-		for (const FVector& P : GDysisGoddessSweep) if (MoonSampleLit(Probe, P)) Sweep += 0.2f;
+		for (const FVector& P : GDysisGoddessSamples) if (MoonSampleLit(Probe, GodPoint(P))) Lit += 0.2f;
+		for (const FVector& P : GDysisGoddessSweep) if (MoonSampleLit(Probe, GodPoint(P))) Sweep += 0.2f;
 	}
 	GoddessLit = Lit; GoddessSweep = Sweep;
 	// 要让月光整个罩住那轮月亮，并且停在那里 1 秒（走过去的时候只会亮一下）：人得在月桥上找到那一步、站住
@@ -272,9 +321,27 @@ void ADysisDirector::UpdateShadowBridge(float Dt)
 	const FQuat Rot = FRotationMatrix::MakeFromXY(Dir, Side).ToQuat();
 	if (ShadowPlane)
 	{
-		ShadowPlane->SetVisibility(true);
-		ShadowPlane->SetWorldLocationAndRotation(Mid + FVector(0.0, 0.0, 1.0), Rot);
-		ShadowPlane->SetWorldScale3D(FVector(Len / 100.0, HalfW * 2.0 / 100.0, 1.0));
+		// 看得见的那一片只铺到半桥的尽头：半桥伸出来以后，影子落在它身上的那一段不再盖一层白（2026-10-10 用户：影桥的白不要延伸到半桥上，两者相接就好）。
+		// 能站的那块看不见的地面还是整条影子那么长。
+		FVector VisFrom = From, VisTo = To;
+		bool bAny = true;
+		if (HalfBridgeExt > 0.01f)
+		{
+			const FVector HalfDir = DysisGB::PolarCm(FinHalfAz, 1.0f, 0.0f);
+			const double Tip = FMath::Lerp(double(FinHalfR0), double(FinHalfR1), double(DysisGB::Smoothstep(0.0f, 1.0f, HalfBridgeExt))) + 1.0;      // 半桥现在伸到哪（搭上 1 cm）
+			const FVector TipAt = HalfDir * Tip;
+			if (FMath::Abs(FVector::DotProduct(FVector(TipAt.X - C.X, TipAt.Y - C.Y, 0.0), Side)) < FinHalfW + HalfW)      // 影子确实落在半桥这一线上
+			{
+				const double S0 = From.X * HalfDir.X + From.Y * HalfDir.Y, S1 = To.X * HalfDir.X + To.Y * HalfDir.Y;
+				if (S0 > Tip && S1 > Tip) bAny = false;
+				else if (S0 > Tip) VisFrom = FMath::Lerp(From, To, (S0 - Tip) / (S0 - S1));
+				else if (S1 > Tip) VisTo = FMath::Lerp(From, To, (Tip - S0) / (S1 - S0));
+			}
+		}
+		const FVector VisMid = (VisFrom + VisTo) * 0.5;
+		ShadowPlane->SetVisibility(bAny);
+		ShadowPlane->SetWorldLocationAndRotation(VisMid + FVector(0.0, 0.0, 1.0), Rot);
+		ShadowPlane->SetWorldScale3D(FVector(FMath::Max(1.0, FVector::Dist(VisFrom, VisTo)) / 100.0, HalfW * 2.0 / 100.0, 1.0));
 		if (ShadowMID)
 		{
 			// 没接上是一片暗影；接上了亮成月白色

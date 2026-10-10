@@ -56,7 +56,7 @@ def main():
     tgt = (f[0] - math.sin(yaw) * 55, f[1] + math.cos(yaw) * 55, f[2] + 150)
     d = math.dist((c.x, c.y, c.z), tgt)
     check(abs(d - 460) < 8, "第三人称：镜头离瞄点 %.0f cm（应 460）" % d)
-    check(pawn.get_editor_property("walk_speed") == 190 and pawn.get_editor_property("run_speed") == 520, "走 190 / 跑 520 cm/s（走：2026-10-10 用户要真正走路的动作，从灰盒的 310 降到 160，试玩后又要快一点）")
+    check(pawn.get_editor_property("walk_speed") == 160 and pawn.get_editor_property("run_speed") == 520, "走 160 / 跑 520 cm/s（走：2026-10-10 用户要真正走路的动作，从灰盒的 310 降到 160；试过 190（步子太碎）、195（步子迈得太大），最后回到 160）")
     yield from shoot(w, "第三人称_出生点")
 
     # 3 走：在岛上横着走 1 秒，量速度（正前方是开场那束光，先不往上撞）
@@ -65,7 +65,7 @@ def main():
     for i in range(50):
         pawn.add_movement_input(fwd, 1.0, False); yield
         if i > 20: sp = max(sp, pawn.get_velocity().length_2d() if hasattr(pawn.get_velocity(), "length_2d") else math.hypot(pawn.get_velocity().x, pawn.get_velocity().y))
-    check(abs(sp - 190) < 6, "走的速度 %.0f cm/s（应 190）" % sp)
+    check(abs(sp - 160) < 6, "走的速度 %.0f cm/s（应 160）" % sp)
     yield from wait(20)
 
     # 4 跳：最高点应为 v²/2g = 760²/(2×2200) = 131 cm；在岛上跳不应该被送回落脚点

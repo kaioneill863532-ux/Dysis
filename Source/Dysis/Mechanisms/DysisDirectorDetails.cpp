@@ -1,5 +1,8 @@
 ﻿// 机关总管 · 建筑上的小修补（2026-10-10 第七轮试玩反馈）。都是在原模型上“添”，不改模型，也不动灰盒核对过的光路：
-//   · 暗门和墙里楼梯的窗：方洞的两个上角补成半圆拱（只管看，不挡人不挡光；门、窗关着的时候它们整个埋在门板 / 窗石里）；
+//   · 暗门和墙里楼梯的窗：方洞的两个上角补成半圆拱（只管看，不挡人不挡光）。
+//     2026-10-10 第八轮：头一版是一圈小方块拼的、比墙面退进去 3 mm，用户看得出是补的，楼梯里有的地方还露出一截；
+//     现在按每个洞口在低模上实量的尺寸现做网格：朝外的面就在墙面上、四边正好卡在洞口里，一丝不多。
+//     暗门的门板、月之龛的盖板也照这个办法做成和墙面齐平的（原来那几块方石板比洞口大一圈、凸出墙面 1 cm）；
 //   · 各层栏杆：光路从栏杆上越过去的那几段，灰盒只留了 0.95 m 的矮栏杆（高护栏拿掉了，人才能顺着光走过去）——
 //     可人一跳有 1.3 m，从这几段能直接跳进中庭、掉到下面一层。补一道护栏：人踩在光 / 虹桥 / 夜里的楼梯上时它不在，别的时候都拦着；
 //   · 岛边：岛缩小、挪到殿心以后，关卡里原来那一圈护栏还在老地方（在岛外面），新的岛边、台基的边上补一圈；
@@ -11,6 +14,7 @@
 #include "Audio/DysisSfxSubsystem.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -37,15 +41,27 @@ namespace
 	};
 	constexpr float DtlGuardTopCm = 500.0f;      // 护栏从地面往上多高（下一层的石台、楼板都在这以上）
 
-	// 这些数都是照着“画出来的那层低模墙”量的（碰撞用的原模型和它在门洞边上不完全一样：把低模临时变成能被射线打到的，按三角面量）。
-	// 暗门（开在内墙皮上，半径 15.5–15.8 m）：洞口中线的方位、洞顶多高。
-	// 低模的门洞是“通到楼梯的洞 1.19 m + 靠楼梯尽头那一侧一条 9.5 cm 的门框槽”，合起来在墙面上看是 1.28 m 宽、中线就是门板的中线。
-	struct FDtlOpening { float Az, TopZ; };
-	const FDtlOpening DtlDoors[] = { { 112.0f, 840.0f }, { 178.7f, 1690.0f }, { 321.725f, 1690.0f }, { 259.725f, 2540.0f } };
-	constexpr float DtlDoorW = 128.5f;
-	// 楼梯的窗（开在外墙皮上）：洞宽 0.97 m。窗在外立面的盲拱里，那里的外墙面退到了半径 16.96 m——这一段墙皮只有 16 cm 厚（16.80–16.96 m）
-	const FDtlOpening DtlWindows[] = { { 127.5f, 985.0f }, { 142.5f, 1223.3f }, { 277.5f, 2185.0f }, { 292.5f, 2016.7f }, { 307.5f, 1845.0f } };
-	constexpr float DtlWindowW = 98.0f, DtlWindowY0 = 1680.3f, DtlWindowY1 = 1695.9f;
+	// 这些数都是照着“画出来的那层低模墙”量的（碰撞用的原模型和它在门洞边上不完全一样：把低模临时变成能被射线打到的，按三角面量，洞边用二分法逼到万分之一度）。
+	// 暗门（开在内墙里，墙厚 30 cm）。A0–A1：回廊这一面洞口两边的方位；T0–T1：通到楼梯的那个洞——比洞口窄，靠楼梯尽头那一侧有一条 9.5 cm 的门框槽
+	// （槽从回廊的墙面一直凹到半径 DtlRebateR，比楼梯那一面的墙皮还深 5 cm）；TopZ：洞顶；FaceR / BackR：回廊那一面、楼梯那一面的墙面各在多大的半径上；
+	// Leaf：堵着这个洞的门板是哪个部件（月亮浮雕那一处是美术做的月门，不在这里做）。门洞都是 2.4 m 高。
+	struct FDtlDoor { float A0, A1, T0, T1, TopZ, FaceR, BackR; const TCHAR* Leaf; };
+	const FDtlDoor DtlDoors[] = {
+		{ 109.6203f, 114.3797f, 110.0000f, 114.3797f,  840.0f, 1550.00f, 1579.93f, TEXT("SM_Mech_StairSeal_TR") },   // 楼梯 TR 的下口（二层）
+		{ 176.3255f, 181.0849f, 176.3255f, 180.7052f, 1690.0f, 1549.95f, 1579.91f, nullptr },                        // TR 的上口（三层，月门）
+		{ 319.3483f, 324.1077f, 319.3483f, 323.7280f, 1690.0f, 1549.95f, 1579.96f, TEXT("SM_Mech_StairSeal_TS") },   // 楼梯 TS 的下口（三层）
+		{ 257.3483f, 262.1077f, 257.7280f, 262.1077f, 2540.0f, 1549.95f, 1579.93f, TEXT("SM_Mech_Swan_Door") },      // TS 的上口（四层，天鹅浮雕后面）
+	};
+	constexpr float DtlRebateR = 1584.95f, DtlDoorH = 240.0f;
+	// 楼梯的窗（开在外墙里）。窗在外立面的盲拱里：楼梯这一面的墙是圆的（半径 DtlWinInR），外面那一面是盲拱的底——一块平的面，正对着窗的地方离殿心 DtlWinOutD。
+	// 最后一扇两面的洞顶不一样高（里面 18.6 m、外面 18.45 m）。
+	struct FDtlWindow { float A0, A1, TopIn, TopOut; };
+	const FDtlWindow DtlWindows[] = {
+		{ 125.8099f, 129.1901f, 985.0f, 985.0f }, { 140.8099f, 144.1901f, 1223.333f, 1223.333f },
+		{ 275.8099f, 279.1901f, 2185.0f, 2185.0f }, { 290.8099f, 294.1901f, 2016.667f, 2016.667f }, { 305.8099f, 309.1901f, 1860.0f, 1845.0f } };
+	constexpr float DtlWinInR = 1679.96f, DtlWinOutD = 1695.37f;
+	// 月之龛的盖板（一层墙上，原来是一块 0.92 × 0.9 m 的平石板）：方位、宽、高
+	constexpr float DtlLidAz = 6.577f, DtlLidHalfDeg = 1.70f, DtlLidZ0 = 1604.7f, DtlLidZ1 = 1694.7f, DtlLidProud = 0.4f;
 
 	// 月桥口（栏杆断开的那一段）
 	constexpr float DtlGapA0 = 253.8f, DtlGapA1 = 259.738f;
@@ -53,6 +69,88 @@ namespace
 	// 岛边、台基边（和 DysisDirectorScenery.cpp 里的数一致：岛半径 32 m；台基正面离殿心 32.05 m、两侧 ±17.75 m；柱廊朝 22.5°）
 	constexpr float DtlIsleR = 3188.0f, DtlPorticoAz = 22.5f, DtlBaseD = 3215.0f, DtlBaseS = 1785.0f;
 	constexpr float DtlLaneHalfDeg = 5.0f;       // 开场那道光落上来的地方：柱廊轴线两边各 5° 不拦
+
+	// ── 现做的网格 ──
+	struct FDtlMesh
+	{
+		TArray<FVector> V, N;
+		TArray<int32> I;
+		// 一个四边形（A→B→C→D 绕一圈）和四个角的法线。引擎里“正面”是按顶点顺序算出来的叉积的反方向：照给的法线定顺序
+		void Quad(const FVector& A, const FVector& B, const FVector& C, const FVector& D, const FVector& NA, const FVector& NB, const FVector& NC, const FVector& ND)
+		{
+			const int32 k = V.Num();
+			V.Append({ A, B, C, D }); N.Append({ NA, NB, NC, ND });
+			const FVector Face = FVector::CrossProduct(B - A, C - A) + FVector::CrossProduct(C - A, D - A);
+			if (FVector::DotProduct(Face, NA + NB + NC + ND) > 0.0) I.Append({ k, k + 2, k + 1, k, k + 3, k + 2 });
+			else I.Append({ k, k + 1, k + 2, k, k + 2, k + 3 });
+		}
+	};
+	FVector DtlRad(float Az) { return DysisGB::PolarCm(Az, 1.0, 0.0); }                          // 从殿心朝外
+	FVector DtlTan(float Az) { const FVector O = DtlRad(Az); return FVector(-O.Y, O.X, 0.0); }   // 方位增大的方向
+
+	// 墙上的一个拱洞：在半径 RefR 的墙面上，洞口从方位 A0 到 A1、洞顶 TopZ；拱是这个面上的半圆（半径 = 半个洞宽，拱顶正好顶到洞顶）。
+	struct FDtlArch
+	{
+		float Mid, HalfDeg, Hw, Zc;
+		FDtlArch(float A0, float A1, float TopZ, float RefR)
+			: Mid((A0 + A1) * 0.5f), HalfDeg((A1 - A0) * 0.5f), Hw(FMath::DegreesToRadians((A1 - A0) * 0.5f) * RefR), Zc(TopZ - FMath::DegreesToRadians((A1 - A0) * 0.5f) * RefR) {}
+		float U(float Az) const { return FMath::Clamp((Az - Mid) / HalfDeg, -1.0f, 1.0f); }
+		float ArcZ(float Az) const { const float u = U(Az); return Zc + Hw * FMath::Sqrt(FMath::Max(0.0f, 1.0f - u * u)); }
+		// 拱面上这一点朝洞里的方向
+		FVector In(float Az) const { const float u = U(Az); return -(DtlTan(Az) * u + FVector(0.0, 0.0, FMath::Sqrt(FMath::Max(0.0f, 1.0f - u * u)))); }
+		// 从 From 到 To 取样：拱的两头（陡的地方）密、中间疏
+		TArray<float> Samples(float From, float To, int32 Segs) const
+		{
+			TArray<float> S;
+			S.Add(From);
+			for (int32 i = 1; i < Segs; ++i)
+			{
+				const float Az = Mid - HalfDeg * FMath::Cos(PI * i / Segs);
+				if (Az > From + 1.0e-4f && Az < To - 1.0e-4f) S.Add(Az);
+			}
+			S.Add(To);
+			return S;
+		}
+	};
+	enum : int32 { DtlFaceIn = 1, DtlFaceOut = 2, DtlFaceLo = 4, DtlFaceHi = 8, DtlFaceUnder = 16 };
+	// 拱上面的那一块石头（洞口的上角到拱之间）：方位 From–To，从半径 R0 到 R1（都可以随方位变：平的面离殿心的距离就是变的），高从拱面到 FillTop。
+	// Faces：做哪几个面——朝殿心的、朝外的、方位小的那一头、方位大的那一头、底下的拱面。贴着洞壁的面不用做。OutN：朝外的那个面是平的话，给它的法线。
+	void DtlSpandrel(FDtlMesh& M, const FDtlArch& Arch, float From, float To, TFunctionRef<float(float)> R0, TFunctionRef<float(float)> R1, float FillTop, int32 Faces, const FVector* OutN = nullptr, int32 Segs = 28)
+	{
+		const TArray<float> S = Arch.Samples(From, To, Segs);
+		for (int32 i = 0; i + 1 < S.Num(); ++i)
+		{
+			const float a = S[i], b = S[i + 1], za = Arch.ArcZ(a), zb = Arch.ArcZ(b);
+			const FVector Na = DtlRad(a), Nb = DtlRad(b);
+			if (Faces & DtlFaceIn)
+				M.Quad(DysisGB::PolarCm(a, R0(a), za), DysisGB::PolarCm(b, R0(b), zb), DysisGB::PolarCm(b, R0(b), FillTop), DysisGB::PolarCm(a, R0(a), FillTop), -Na, -Nb, -Nb, -Na);
+			if (Faces & DtlFaceOut)
+				M.Quad(DysisGB::PolarCm(a, R1(a), za), DysisGB::PolarCm(b, R1(b), zb), DysisGB::PolarCm(b, R1(b), FillTop), DysisGB::PolarCm(a, R1(a), FillTop),
+					OutN ? *OutN : Na, OutN ? *OutN : Nb, OutN ? *OutN : Nb, OutN ? *OutN : Na);
+			if (Faces & DtlFaceUnder)
+				M.Quad(DysisGB::PolarCm(a, R0(a), za), DysisGB::PolarCm(b, R0(b), zb), DysisGB::PolarCm(b, R1(b), zb), DysisGB::PolarCm(a, R1(a), za), Arch.In(a), Arch.In(b), Arch.In(b), Arch.In(a));
+		}
+		for (int32 Side = 0; Side < 2; ++Side)
+			if (Faces & (Side ? DtlFaceHi : DtlFaceLo))
+			{
+				const float a = Side ? To : From, za = Arch.ArcZ(a);
+				const FVector Nn = DtlTan(a) * (Side ? 1.0 : -1.0);
+				M.Quad(DysisGB::PolarCm(a, R0(a), za), DysisGB::PolarCm(a, R1(a), za), DysisGB::PolarCm(a, R1(a), FillTop), DysisGB::PolarCm(a, R0(a), FillTop), Nn, Nn, Nn, Nn);
+			}
+	}
+	// 堵着拱洞的门板：从地面到拱面，两面各在一个半径上；顶上那道拱形的边也做（门往下沉的时候看得见）
+	void DtlLeaf(FDtlMesh& M, const FDtlArch& Arch, float From, float To, float R0, float R1, float FloorZ, int32 Segs = 28)
+	{
+		const TArray<float> S = Arch.Samples(From, To, Segs);
+		for (int32 i = 0; i + 1 < S.Num(); ++i)
+		{
+			const float a = S[i], b = S[i + 1], za = Arch.ArcZ(a), zb = Arch.ArcZ(b);
+			const FVector Na = DtlRad(a), Nb = DtlRad(b);
+			M.Quad(DysisGB::PolarCm(a, R0, FloorZ), DysisGB::PolarCm(b, R0, FloorZ), DysisGB::PolarCm(b, R0, zb), DysisGB::PolarCm(a, R0, za), -Na, -Nb, -Nb, -Na);
+			M.Quad(DysisGB::PolarCm(a, R1, FloorZ), DysisGB::PolarCm(b, R1, FloorZ), DysisGB::PolarCm(b, R1, zb), DysisGB::PolarCm(a, R1, za), Na, Nb, Nb, Na);
+			M.Quad(DysisGB::PolarCm(a, R0, za), DysisGB::PolarCm(b, R0, zb), DysisGB::PolarCm(b, R1, zb), DysisGB::PolarCm(a, R1, za), -Arch.In(a), -Arch.In(b), -Arch.In(b), -Arch.In(a));
+		}
+	}
 
 	// 虹之龛前的石沿。窗洞在墙面上的口子（低模）是方位 162.65–169.30°：中线 166°、宽 1.8 m（西边那一侧是斜着收进去的窗套）。
 	// 石沿和这个口子一样宽；从墙面 15.5 m 探出来 0.64 m，顶面高 17.5 m、厚 0.35 m
@@ -62,7 +160,8 @@ namespace
 void ADysisDirector::SetupDetails()
 {
 	for (UStaticMeshComponent* C : DetailComps) if (C) C->DestroyComponent();
-	DetailComps.Reset(); GapSlab.Reset(); GapSlabT = 0.0f;
+	for (UProceduralMeshComponent* C : DetailMeshes) if (C) C->DestroyComponent();
+	DetailComps.Reset(); DetailMeshes.Reset(); GapSlab.Reset(); GapSlabT = 0.0f; DetailLeaves = 0;
 	for (const FJumpGuard& G : JumpGuards) if (UBoxComponent* B = G.Box.Get()) B->DestroyComponent();
 	JumpGuards.Reset();
 	DetailArches = DetailEdgeWalls = DetailLedgeParts = 0;
@@ -104,30 +203,90 @@ void ADysisDirector::SetupDetails()
 			if (const UStaticMeshComponent* C = Arm->FindComponentByClass<UStaticMeshComponent>())
 				if (UMaterialInterface* Bronze = C->GetMaterial(0)) SluiceMarker->SetMaterial(0, Bronze);
 
-	// ── 拱：方洞的两个上角补成半圆 ──
-	// 洞口中线的方位 AzMid，洞宽 W、洞顶 TopZ；拱心在洞顶往下半个洞宽。把半圆切成 Segs 段弦，每段弦外面贴一块方块（弦是它朝洞里的那个面）：
-	// 方块都在弦的外侧，所以不会伸进洞里；伸出洞口上角以外的部分埋在墙皮里看不见（Y0–Y1 是它在墙皮里从哪个半径到哪个半径）。
-	// 每一块都顺着圆墙摆（横着的距离按弧长算、朝向跟着转）：这样它朝外的面处处只比墙面退进去 3 mm——
-	// 头一版是一整片平的、退进去 2 cm，洞口原来那个方框的边就留着一圈看得见的印子。
-	auto Arch = [&](float AzMid, float W, float TopZ, float Y0, float Y1, int32 Segs)
+	// ── 拱：方洞的两个上角补成半圆（按洞口实量的尺寸现做，面就在墙面上） ──
+	// 一块现做的石头。Parent 是别的 Actor 的部件时它就算那个 Actor 的（跟着挪、跟着藏）；顶点是按世界坐标算好的，Shift = 这个 Actor 现在离它“关着的位置”多远
+	auto Solid = [&](USceneComponent* Parent, const FDtlMesh& M, const FVector& Shift) -> UProceduralMeshComponent*
 	{
-		const float R = W * 0.5f, T = R * 0.5f + 2.0f, D = PI / Segs, Inner = R * FMath::Cos(D * 0.5f), Ym = (Y0 + Y1) * 0.5f;
-		const float Len = 2.0f * (Inner + T) * FMath::Tan(D * 0.5f) + 1.0f;            // 外沿那么长：相邻两块在外沿正好接上，里面叠着
-		for (int32 k = 0; k < Segs; ++k)
-		{
-			const float Th = (k + 0.5f) * D, Dist = Inner + T * 0.5f;                   // 这一块的中心：从拱心朝 Th 方向出去 Dist
-			const float Az = AzMid + FMath::RadiansToDegrees(Dist * FMath::Cos(Th) / Ym);
-			const FVector Out = DysisGB::PolarCm(Az, 1.0, 0.0), Tan(-Out.Y, Out.X, 0.0), Up(0.0, 0.0, 1.0);
-			const FVector N = Tan * FMath::Cos(Th) + Up * FMath::Sin(Th);              // 从拱心朝外
-			const FVector Along = Up * FMath::Cos(Th) - Tan * FMath::Sin(Th);          // 顺着弦
-			Block(nullptr, Out * Ym + Up * (TopZ - R + Dist * FMath::Sin(Th)), FRotationMatrix::MakeFromXZ(Along, N).ToQuat(), FVector(Len, Y1 - Y0, T), Warm, true);
-		}
-		++DetailArches;
+		if (M.I.Num() == 0) return nullptr;
+		UObject* Outer = Parent && Parent->GetOwner() ? static_cast<UObject*>(Parent->GetOwner()) : static_cast<UObject*>(this);
+		UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(Outer);
+		C->SetupAttachment(Parent ? Parent : RootComponent.Get());
+		C->SetMobility(EComponentMobility::Movable);
+		C->bUseAsyncCooking = false;
+		C->SetGenerateOverlapEvents(false);
+		C->SetCanEverAffectNavigation(false);
+		C->SetCastShadow(true);
+		C->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->RegisterComponent();
+		C->SetWorldLocationAndRotation(Shift, FQuat::Identity);
+		C->SetWorldScale3D(FVector::OneVector);
+		C->CreateMeshSection_LinearColor(0, M.V, M.I, M.N, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		if (Warm) C->SetMaterial(0, Warm);
+		DetailMeshes.Add(C);
+		return C;
 	};
-	// 暗门：内墙皮 15.5–15.8 m，两面都只比墙面退进去 3 mm
-	for (const FDtlOpening& O : DtlDoors) Arch(O.Az, DtlDoorW, O.TopZ, DysisGB::R_IN + 0.3f, DysisGB::R_IN + 29.7f, 12);
-	// 楼梯的窗：只在盲拱里那层薄墙皮的厚度以内，从外面看不鼓出来
-	for (const FDtlOpening& O : DtlWindows) Arch(O.Az, DtlWindowW, O.TopZ, DtlWindowY0, DtlWindowY1, 10);
+	// 一块机关石板原来的样子不画了（它的碰撞、挡光、会动的逻辑照旧），返回它现在离“关着的位置”多远
+	auto HideSlab = [this](AActor* A) -> FVector
+	{
+		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
+		for (UStaticMeshComponent* C : Comps) C->SetVisibility(false);
+		for (const FStairSet& Set : StairSets) if (Set.Seal.Get() == A) return A->GetActorLocation() - Set.SealBase;
+		if (SwanDoor.Get() == A) return A->GetActorLocation() - SwanDoorBase;
+		return FVector::ZeroVector;
+	};
+	for (const FDtlDoor& D : DtlDoors)
+	{
+		const FDtlArch Arch(D.A0, D.A1, D.TopZ, D.FaceR);
+		auto Face = [&D](float) { return D.FaceR; };
+		auto Back = [&D](float) { return D.BackR; };
+		auto Rebate = [](float) { return DtlRebateR; };
+		FDtlMesh M;
+		// 通到楼梯的那一段：回廊面、楼梯面、拱面
+		DtlSpandrel(M, Arch, D.T0, D.T1, Face, Back, D.TopZ, DtlFaceIn | DtlFaceOut | DtlFaceUnder);
+		// 门框槽那一条：一直填到槽底；朝着楼梯间的那一小条侧面也做
+		if (D.T0 > D.A0 + 0.001f) DtlSpandrel(M, Arch, D.A0, D.T0, Face, Rebate, D.TopZ, DtlFaceIn | DtlFaceUnder | DtlFaceHi);
+		if (D.T1 < D.A1 - 0.001f) DtlSpandrel(M, Arch, D.T1, D.A1, Face, Rebate, D.TopZ, DtlFaceIn | DtlFaceUnder | DtlFaceLo);
+		if (Solid(nullptr, M, FVector::ZeroVector)) ++DetailArches;
+		// 门板：照着拱洞做，两面都和墙面齐平（原来那块方石板比洞口大一圈、凸出墙面 1 cm，看着像墙上鼓出来一块）
+		if (AActor* Door = D.Leaf ? Piece(D.Leaf) : nullptr)
+		{
+			const FVector Shift = HideSlab(Door);
+			FDtlMesh L;
+			DtlLeaf(L, Arch, D.A0, D.A1, D.FaceR, D.BackR, D.TopZ - DtlDoorH);
+			if (Solid(Door->GetRootComponent(), L, Shift)) ++DetailLeaves;
+		}
+	}
+	for (const FDtlWindow& W : DtlWindows)
+	{
+		const FDtlArch Arch(W.A0, W.A1, FMath::Min(W.TopIn, W.TopOut), DtlWinInR);
+		const float Mid = Arch.Mid;
+		const FVector OutN = DtlRad(Mid);
+		auto In = [](float) { return DtlWinInR; };
+		auto Out = [Mid](float Az) { return DtlWinOutD / FMath::Cos(FMath::DegreesToRadians(Az - Mid)); };
+		FDtlMesh M;
+		DtlSpandrel(M, Arch, W.A0, W.A1, In, Out, FMath::Max(W.TopIn, W.TopOut), DtlFaceIn | DtlFaceOut | DtlFaceUnder, &OutN);
+		if (Solid(nullptr, M, FVector::ZeroVector)) ++DetailArches;
+	}
+	// 月之龛的盖板：一片顺着墙弯的薄石板，只比墙面凸出 4 mm（原来那块是平的：墙是弯的，平板中间就比两边多鼓出来 7 mm，再加上凸出的 1 cm）
+	if (AActor* Lid = Piece(TEXT("SM_Mech_MoonShrine_Block")))
+	{
+		HideSlab(Lid);
+		FDtlMesh M;
+		const float R = DysisGB::R_IN - DtlLidProud, A0 = DtlLidAz - DtlLidHalfDeg, A1 = DtlLidAz + DtlLidHalfDeg;
+		const int32 N = 8;
+		for (int32 i = 0; i < N; ++i)
+		{
+			const float a = A0 + (A1 - A0) * i / N, b = A0 + (A1 - A0) * (i + 1) / N;
+			M.Quad(DysisGB::PolarCm(a, R, DtlLidZ0), DysisGB::PolarCm(b, R, DtlLidZ0), DysisGB::PolarCm(b, R, DtlLidZ1), DysisGB::PolarCm(a, R, DtlLidZ1), -DtlRad(a), -DtlRad(b), -DtlRad(b), -DtlRad(a));
+		}
+		// 四条边（4 mm 厚）
+		M.Quad(DysisGB::PolarCm(A0, R, DtlLidZ0), DysisGB::PolarCm(A0, DysisGB::R_IN, DtlLidZ0), DysisGB::PolarCm(A0, DysisGB::R_IN, DtlLidZ1), DysisGB::PolarCm(A0, R, DtlLidZ1), -DtlTan(A0), -DtlTan(A0), -DtlTan(A0), -DtlTan(A0));
+		M.Quad(DysisGB::PolarCm(A1, R, DtlLidZ0), DysisGB::PolarCm(A1, DysisGB::R_IN, DtlLidZ0), DysisGB::PolarCm(A1, DysisGB::R_IN, DtlLidZ1), DysisGB::PolarCm(A1, R, DtlLidZ1), DtlTan(A1), DtlTan(A1), DtlTan(A1), DtlTan(A1));
+		const FVector Up(0.0, 0.0, 1.0);
+		M.Quad(DysisGB::PolarCm(A0, R, DtlLidZ1), DysisGB::PolarCm(A1, R, DtlLidZ1), DysisGB::PolarCm(A1, DysisGB::R_IN, DtlLidZ1), DysisGB::PolarCm(A0, DysisGB::R_IN, DtlLidZ1), Up, Up, Up, Up);
+		M.Quad(DysisGB::PolarCm(A0, R, DtlLidZ0), DysisGB::PolarCm(A1, R, DtlLidZ0), DysisGB::PolarCm(A1, DysisGB::R_IN, DtlLidZ0), DysisGB::PolarCm(A0, DysisGB::R_IN, DtlLidZ0), -Up, -Up, -Up, -Up);
+		if (Solid(Lid->GetRootComponent(), M, FVector::ZeroVector)) ++DetailLeaves;
+	}
 
 	// ── 栏杆上的护栏（跳不出去） ──
 	for (const FDtlArc& Arc : DtlOpenArcs)
@@ -239,7 +398,7 @@ void ADysisDirector::SetupDetails()
 		}
 
 	UpdateDetails(0.0f);
-	UE_LOG(LogTemp, Log, TEXT("Dysis 小修补：拱 %d 个、栏杆上的护栏 %d 段、岛边护栏 %d 段、石沿 %d 块"), DetailArches, JumpGuards.Num(), DetailEdgeWalls, DetailLedgeParts);
+	UE_LOG(LogTemp, Log, TEXT("Dysis 小修补：拱 %d 个、照洞口做的门板和盖板 %d 块、栏杆上的护栏 %d 段、岛边护栏 %d 段、石沿 %d 块"), DetailArches, DetailLeaves, JumpGuards.Num(), DetailEdgeWalls, DetailLedgeParts);
 }
 
 void ADysisDirector::UpdateDetails(float Dt)
@@ -281,9 +440,9 @@ FString ADysisDirector::DescribeDetails() const
 	// 现在响着哪几条循环的声音（瀑布近 / 远、水雾、推雕像、捧着苹果）
 	const UDysisSfxSubsystem* Loops = UDysisSfxSubsystem::Get(this);
 	auto Loop = [Loops](const TCHAR* Id) { return Loops && Loops->IsLoopActive(FName(Id)) ? TEXT("true") : TEXT("false"); };
-	return FString::Printf(TEXT("{\"arches\":%d,\"guards\":%d,\"guardsOn\":%d,\"edgeWalls\":%d,\"gapSlab\":%d,\"gapSlabShown\":%d,\"ledgeParts\":%d,\"leverChainHidden\":%s,\"zone\":\"%s\",")
+	return FString::Printf(TEXT("{\"arches\":%d,\"leaves\":%d,\"guards\":%d,\"guardsOn\":%d,\"edgeWalls\":%d,\"gapSlab\":%d,\"gapSlabShown\":%d,\"ledgeParts\":%d,\"leverChainHidden\":%s,\"zone\":\"%s\",")
 		TEXT("\"loops\":{\"fallNear\":%s,\"fallFar\":%s,\"mist\":%s,\"push\":%s,\"apple\":%s}}"),
-		DetailArches, JumpGuards.Num(), On, DetailEdgeWalls, GapSlab.Num(), SlabShown, DetailLedgeParts,
+		DetailArches, DetailLeaves, JumpGuards.Num(), On, DetailEdgeWalls, GapSlab.Num(), SlabShown, DetailLedgeParts,
 		Chain && Chain->IsHidden() ? TEXT("true") : TEXT("false"), PlayerTime() ? *PlayerTime()->Zone : TEXT(""),
 		Loop(TEXT("Amb.WaterfallNear")), Loop(TEXT("Amb.WaterfallFar")), Loop(TEXT("Amb.Mist")), Loop(TEXT("Director.StatuePush")), Loop(TEXT("Director.AppleHold")));
 }

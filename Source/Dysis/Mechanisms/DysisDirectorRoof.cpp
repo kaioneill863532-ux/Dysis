@@ -429,9 +429,20 @@ void ADysisDirector::UpdateCatch(float Dt)
 	if (const APlayerController* PC = (GetWorld() && !bApplePlaced) ? GetWorld()->GetFirstPlayerController() : nullptr)
 		if (Time)
 		{
-			const FVector Right = FRotationMatrix(FRotator(0.0f, PC->GetControlRotation().Yaw, 0.0f)).GetUnitAxis(EAxis::Y);
-			const FVector Held = Time->FootCm + Right * 35.0 + FVector(0.0, 0.0, 125.0);
-			Apple->SetWorldLocation(FMath::Lerp(Apple->GetComponentLocation(), Held, FMath::Min(1.0f, Dt * 6.0f)));
+			// 2026-10-10 用户：金苹果不要在人走动、站着的时候从人身上穿过去。——原来是按镜头的朝向放在“右边 35 cm”，镜头一转它就扫过人的身子。
+			// 现在按人自己的朝向放在右前方、齐胸高，离身子的中轴至少 44 cm：人转身时它绕着人过去，不走直线
+			const APawn* Pawn = PC->GetPawn();
+			const FRotationMatrix Face(FRotator(0.0f, Pawn ? Pawn->GetActorRotation().Yaw : PC->GetControlRotation().Yaw, 0.0f));
+			const float Bob = 2.5f * FMath::Sin(CineSeconds * 1.7f);
+			const FVector Foot = Time->FootCm, Held = Foot + Face.GetUnitAxis(EAxis::Y) * 46.0 + Face.GetUnitAxis(EAxis::X) * 22.0 + FVector(0.0, 0.0, 118.0 + Bob);
+			FVector P = FMath::Lerp(Apple->GetComponentLocation(), Held, FMath::Min(1.0f, Dt * 6.0f));
+			FVector2D Off(P.X - Foot.X, P.Y - Foot.Y);
+			if (Off.SizeSquared() < 44.0 * 44.0)
+			{
+				Off = Off.IsNearlyZero() ? FVector2D(Face.GetUnitAxis(EAxis::Y)) : Off.GetSafeNormal();
+				P.X = Foot.X + Off.X * 44.0; P.Y = Foot.Y + Off.Y * 44.0;
+			}
+			Apple->SetWorldLocation(P);
 		}
 	// 5 秒后：狄西斯说一句（“日落之后 / 入夜”那行标题 2026-10-09 用户让去掉了）
 	if (Before <= 5.0f && CineSeconds > 5.0f)

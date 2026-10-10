@@ -21,9 +21,19 @@
 #include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
+	// Dysis.FloorTone 0|1：殿里的地面和墙一个颜色（1，默认）还是美术原来单配的偏紫的灰（0）
+	FAutoConsoleCommandWithWorldAndArgs GDysisFloorTone(TEXT("Dysis.FloorTone"), TEXT("殿里各层的地面：Dysis.FloorTone 1 = 和墙一个颜色，0 = 原来偏紫的灰"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			for (TActorIterator<ADysisDirector> It(World); It; ++It) It->DebugSetFloorTone(Args.Num() == 0 || FCString::Atoi(*Args[0]) != 0);
+		}));
+	// 殿里各层的柱子（见 SetupScenery 里的说明）：画出来的那一层收细到多少、往墙那边挪多少厘米
+	constexpr float ScnColSlim = 0.86f, ScnColOut = 13.5f;
 	const TCHAR* ScnRoot = TEXT("/Game/Dysis/ReferenceMatch_20261009");
 	// 台地（SM_Terrain 的顶面）。模型本身是灰盒那版：圆心朝背着小岛的方向偏了 7 m、半径 39 m——神殿不在岛中间，背后空一大片，
 	// 门口柱廊的两个前角还悬在崖外面。2026-10-10 用户要整体调：改成以殿心为圆心、半径 32 m（游戏开始时把模型缩一下、挪一下），
@@ -134,6 +144,27 @@ void ADysisDirector::SetupScenery()
 			Skin->SetWorldTransform(FTransform(FRotator(0.0f, float(It->GetActorRotation().Yaw) + Turn, 0.0f), FVector(Moved.X, Moved.Y, 0.0), FVector(Slim, Slim, 1520.3 / 1544.0)));
 			break;
 		}
+	// 殿里各层的柱子（2026-10-10 第八轮，用户：柱廊有的地方凸出来一角、有的穿模）。在低模上量出来的：
+	//   · 一、二层柱头顶上的方板比上一层楼板的边（半径 12.19 m）还探出去 5–12 cm——从中庭看，楼板底下支出来一个角；
+	//   · 二、三、四层的柱础有 10–20 cm 埋在栏杆里（栏杆 12.19–12.49 m，柱础最里面到 12.27–12.41 m），二层的柱身也蹭进栏杆 4 cm。
+	// 画出来的那一层整根收细到 0.86、往墙那边挪 13.5 cm（四层用同一组数，上下还是一条线）：柱础正好让开栏杆，方板全在楼板底下。
+	// 原模型（挡人、挡光的）一点不动，光路还是灰盒的；收细、挪开以后画出来的柱子朝墙那一面只比原模型多出 5 cm，人蹭不进去。
+	InteriorColumnsFixed = 0;
+	for (UStaticMeshComponent* Skin : SkinComps)
+	{
+		const AActor* A = Skin ? Skin->GetOwner() : nullptr;
+		const USceneComponent* Root = A ? A->GetRootComponent() : nullptr;
+		if (!Root) continue;
+		bool bColumn = false;
+		for (const FName& Tag : A->Tags) if (Tag.ToString().StartsWith(TEXT("SM_Col_L"))) { bColumn = true; break; }
+		if (!bColumn) continue;
+		++InteriorColumnsFixed;
+		if (!FMath::IsNearlyEqual(Skin->GetComponentScale().X, 1.0)) continue;      // 已经摆过了（这个函数可能叫第二遍）
+		const FTransform Cur = Skin->GetComponentTransform();
+		const FVector2D Axis(Root->Bounds.Origin), Was(Cur.GetLocation());
+		const FVector2D Moved = Was * ScnColSlim + Axis * (1.0f - ScnColSlim) + Axis.GetSafeNormal() * ScnColOut;      // 以柱子自己的轴为中心收细，再顺着半径往外挪
+		Skin->SetWorldTransform(FTransform(Cur.GetRotation(), FVector(Moved.X, Moved.Y, Cur.GetLocation().Z), FVector(ScnColSlim, ScnColSlim, 1.0)));
+	}
 	// 岛：缩小、挪到以殿心为圆心
 	if (AActor* Terrain = Piece(TEXT("SM_Terrain")))
 	{
@@ -432,7 +463,11 @@ void ADysisDirector::ApplyPalette()
 			FString Name = Cur ? Cur->GetName() : FString();
 			if (!Name.RemoveFromStart(TEXT("LP_"))) continue;
 			Name = TEXT("MI_MATCH_") + Name;
-			if (Label.StartsWith(TEXT("SM_Floor_L"))) Name = TEXT("MI_MATCH_InteriorFloor");                              // 各层的地面
+			// 各层的地面：美术原来单配了一种偏紫的灰（MI_MATCH_InteriorFloor）。2026-10-10 用户：殿里的建筑在同样的光下有两种颜色，夜里尤其明显
+			// （夜里的环境光是蓝的：暖白的墙把它吃掉大半、看着是深灰；偏紫灰的地面照出来就是一片蓝）——改成和墙一样的暖白。Dysis.FloorTone 0 可以切回去对比
+			if (Label.StartsWith(TEXT("SM_Floor_L"))) Name = bFloorsLikeWalls ? TEXT("MI_MATCH_WarmWhite") : TEXT("MI_MATCH_InteriorFloor");
+			// 屋顶桥门前那几级固定的台阶：和那一圈会升降的台阶一个颜色（2026-10-10 用户：那一排阶梯颜色和别的不一样——美术给它配的是沙色）
+			else if (Label.StartsWith(TEXT("SM_Roof_Fix"))) Name = TEXT("MI_MATCH_WarmWhite");
 			else if (Label == TEXT("SM_Portico_Roof")) Name = Slot == 0 ? TEXT("MI_MATCH_PedimentStone") : TEXT("MI_MATCH_WarmWhite");   // 门廊的山花和屋面深一档，线脚还是浅的
 			else if (Label == TEXT("SM_Terrain")) Name = Slot == 0 ? TEXT("M_MATCH_Ground") : TEXT("MI_MATCH_Peach");      // 台地：顶上沙地 / 草 / 路，侧面的崖壁
 			else if (Label == TEXT("SM_Island")) Name = TEXT("MI_MATCH_Peach");                                             // 开局的小岛
@@ -465,6 +500,52 @@ void ADysisDirector::UpdateScenery()
 void ADysisDirector::RebuildScenery()
 {
 	SetupScenery();
+}
+
+void ADysisDirector::DebugSetFloorTone(bool bLikeWalls)
+{
+	bFloorsLikeWalls = bLikeWalls;
+	UMaterialInterface* M = ScnPalette(bLikeWalls ? TEXT("MI_MATCH_WarmWhite") : TEXT("MI_MATCH_InteriorFloor"));
+	if (!M) return;
+	for (UStaticMeshComponent* S : SkinComps)
+	{
+		const AActor* Part = S ? S->GetOwner() : nullptr;
+		if (!Part) continue;
+		for (const FName& Tag : Part->Tags)
+			if (Tag.ToString().StartsWith(TEXT("SM_Floor_L")))
+			{
+				for (int32 Slot = 0; Slot < S->GetNumMaterials(); ++Slot) S->SetMaterial(Slot, M);
+				break;
+			}
+	}
+}
+
+FString ADysisDirector::DescribeRound8() const
+{
+	// 地面现在用的材质；殿里的柱子（画出来的那一层）收细、挪开了几根，其中一根现在在哪
+	FString Floor, Col;
+	for (const UStaticMeshComponent* S : SkinComps)
+	{
+		const AActor* Part = S ? S->GetOwner() : nullptr;
+		if (!Part) continue;
+		for (const FName& Tag : Part->Tags)
+		{
+			const FString Label = Tag.ToString();
+			if (Floor.IsEmpty() && Label.StartsWith(TEXT("SM_Floor_L")) && S->GetMaterial(0)) Floor = S->GetMaterial(0)->GetName();
+			if (Col.IsEmpty() && Label.StartsWith(TEXT("SM_Col_L1_")) && Part->GetRootComponent())
+			{
+				const FVector2D Axis(Part->GetRootComponent()->Bounds.Origin), At(S->Bounds.Origin);
+				Col = FString::Printf(TEXT("{\"tag\":\"%s\",\"axisR\":%.1f,\"skinR\":%.1f,\"scale\":%.3f}"), *Label, Axis.Size(), At.Size(), S->GetComponentScale().X);
+			}
+		}
+	}
+	const UStaticMeshComponent* Sea = nullptr;
+	if (const AActor* A = Piece(TEXT("SM_Mech_Water_Sea"))) Sea = A->FindComponentByClass<UStaticMeshComponent>();
+	const UMaterialInstanceDynamic* SeaNow = Sea ? Cast<UMaterialInstanceDynamic>(Sea->GetMaterial(0)) : nullptr;
+	return FString::Printf(TEXT("{\"floor\":\"%s\",\"floorsLikeWalls\":%s,\"columns\":%d,\"column\":%s,\"inletWater\":%s,\"inletVisible\":%s,\"seaMirror\":%s,\"seaMaterial\":\"%s\"}"),
+		*Floor, bFloorsLikeWalls ? TEXT("true") : TEXT("false"), InteriorColumnsFixed, Col.IsEmpty() ? TEXT("null") : *Col,
+		InletWater ? TEXT("true") : TEXT("false"), InletWater && InletWater->IsVisible() ? TEXT("true") : TEXT("false"),
+		bSeaMirror ? TEXT("true") : TEXT("false"), SeaNow && SeaNow->Parent ? *SeaNow->Parent->GetName() : TEXT(""));
 }
 
 FString ADysisDirector::DescribeScenery() const

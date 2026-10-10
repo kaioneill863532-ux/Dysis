@@ -74,7 +74,7 @@ def main():
         if i == 28: director.debug_camera(unreal.Vector(foot()[0] + math.cos(yaw) * 380, foot()[1] + math.sin(yaw) * 380, foot()[2] + 110), unreal.Vector(foot()[0], foot()[1], foot()[2] + 95), 45.0)
         if i == 40: unreal.SystemLibrary.execute_console_command(w, "Shot")
     director.debug_camera_off()
-    check(len(seen) > 8 and set(seen) == {"A_Walk"} and abs(sp - 190) < 8, "走（%.0f cm/s）：放的是 %s（走的那一段动作，步幅放大、步子放快）" % (sp, sorted(set(seen))))
+    check(len(seen) > 8 and set(seen) == {"A_Walk"} and abs(sp - 160) < 8, "走（%.0f cm/s）：放的是 %s（走的那一段动作，步幅放大、步子放快）" % (sp, sorted(set(seen))))
     yield from wait(25)
     check(clip() == "A_Idle", "停下来回到 %s" % clip())
     # 慢慢走（手柄轻推）：应该是走路的动作
@@ -98,16 +98,19 @@ def main():
     # 4 上台阶：水庭去水闸的那几级石阶（方位 100°–112°），从下往上走
     go(polar(96.0, 1330.0, 0.0), 8.0)
     yield from wait(50)
-    seen = set(); z0 = foot()[2]
+    seen = set(); z0 = foot()[2]; slope = [0.0]
+    hero_anim = pawn.get_component_by_class(unreal.SkeletalMeshComponent).get_anim_instance()
     for i in range(160):
         f = foot(); az = math.atan2(f[1], f[0]) + math.radians(1.0)
         tgt = polar(math.degrees(az) + 6.0, 1330.0, 0.0)
         d = unreal.Vector(tgt[0] - f[0], tgt[1] - f[1], 0.0)
         pawn.add_movement_input(d, 1.0, False); yield
         seen.add(clip())
+        slope[0] = max(slope[0], json.loads(str(hero_anim.describe_gait())).get("slope", 0.0))
         if i == 50: yield from view("主角_上台阶", 30.0, -380.0, 150.0, frames=1)
     say("   上台阶这一段出现过的动作：%s，升高了 %.0f cm" % (sorted(seen), foot()[2] - z0))
-    check("A_RunUpstairs" in seen and foot()[2] - z0 > 60, "踩着台阶往上走时放 A_RunUpstairs")
+    # 第八轮起：上台阶不再换成美术“上台阶”那一段（按跑的速度做的，走着上楼时下半身看着怪），就用走路的动作，脚按坡度落
+    check("A_RunUpstairs" not in seen and "A_Walk" in seen and slope[0] > 0.12 and foot()[2] - z0 > 60, "踩着台阶往上走：还是走路的动作，脚按坡度落（量到的坡度最大 %.2f）" % slope[0])
     yield from wait(30)
 
     # 5 互动：站到水闸旁边按 E（和玩的时候一样走人身上的那个按键处理）→ 水闸开了，人伸一下手
@@ -186,7 +189,8 @@ def main():
     check(lag_idle < 2.0 and 0.5 < hair()["breeze"] < 2.5, "站着时头发只是轻轻飘（发梢 %.1f cm），没有被甩出去（%.1f cm）" % (hair()["breeze"], lag_idle))
     # 走、跑：脚踝最低时离地多高（脚踩平时是 14.6 cm；没修之前“跑”那一段最低也有 23 cm，人是悬着的）
     hh2 = pawn.get_component_by_class(unreal.CapsuleComponent).get_scaled_capsule_half_height()
-    for label, spd, want_stride, want_clip, back_cm in (("走", 190.0, 1.378, "A_Walk", 2.0), ("跑", 520.0, 1.202, "A_Run", 3.0)):
+    # 走 160：步幅 ×1.27、每秒 1.084 个循环（第八轮试过 195 / 步幅 1.54，用户说步子迈得太大，改回来了）
+    for label, spd, want_stride, want_clip, back_cm in (("走", 160.0, 1.265, "A_Walk", 1.5), ("跑", 520.0, 1.202, "A_Run", 3.0)):
         mv.set_editor_property("max_walk_speed", spd)
         go(polar(215.0, 1450.0, 0.0), 8.0)
         yield from wait(40)
@@ -209,7 +213,7 @@ def main():
             yield
             t += dt()
         check(hair()["lagCm"] < 1.5, "停下 2 秒后头发晃回原位（还偏 %.1f cm）" % hair()["lagCm"])
-    mv.set_editor_property("max_walk_speed", 190.0)
+    mv.set_editor_property("max_walk_speed", 160.0)
     # 脚步声跟着动作里脚落地的那一下：走 2 秒，数落地了几下（每分钟一百三十步 → 2 秒 4 下上下）
     go(polar(215.0, 1450.0, 0.0), 8.0)
     yield from wait(40)

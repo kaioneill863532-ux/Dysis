@@ -31,7 +31,7 @@ public:
 	FString DescribeGait();
 
 	/** 两段动作本身的速度：脚踩在地上那一段往后蹬得有多快（厘米/秒，从动作里量出来的）。
-	 *  游戏里走是 1.9 m/s、跑是 5.2 m/s：走的时候全是“走”那一段（步幅放大、步子放快来凑速度），
+	 *  游戏里走是 1.95 m/s、跑是 5.2 m/s：走的时候全是“走”那一段（步幅放大、步子放快来凑速度），
 	 *  速度过了 WalkBlendFromSpeed 才开始混进“跑”，到“跑”本身的速度以上全是“跑”。
 	 *  “跑”的 360 是在游戏里试出来的：按 300–380 各跑一遍，量踩地时脚掌在地上滑多快，360 时最小（走 3.1 m/s 时每秒约 20 cm）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
@@ -42,7 +42,14 @@ public:
 
 	/** 速度到这个数为止全是“走”那一段（比游戏里走的速度高一点，免得走着走着混进跑的样子）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
-	float WalkBlendFromSpeed = 220.0f;
+	float WalkBlendFromSpeed = 235.0f;
+
+	/** 走路的步子最快到多快：按“走这么快（厘米/秒）时的步频”封顶，再快的那部分全靠步子迈大。
+	 *  2026-10-10 用户：走 190 时步子太碎，要“步频回到走 160 时的样子，每一步迈远一些”。
+	 *  腿长 76.5 cm：这个步频下步幅放到 1.54 倍（一步 90 cm）就是极限了，再大要么脚在地上滑、要么人得蹲着走——试过走 195（步幅 1.54），
+	 *  用户看了说步子迈得太大、很怪，宁可慢一点：走的速度回到 160（步幅 1.27，正好就是这个步频）。这个封顶留着：以后再调快也不会把步子调碎。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float WalkCadenceSpeed = 160.0f;
 
 	/** 步幅放大以后腿要够得着，人得矮一点：步幅每放大三成，骨盆放低这么多厘米。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
@@ -65,7 +72,7 @@ public:
 	float StrideMin = 0.85f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
-	float StrideMax = 1.4f;
+	float StrideMax = 1.6f;
 
 	/** 人是一按键就到全速的；动作用的速度慢一拍跟上（每秒涨这么多厘米/秒），起步时先迈一小步再跑起来。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
@@ -74,6 +81,42 @@ public:
 	/** 修不修（还原骨盆的晃动、放低、步幅）。关掉就是美术动作的原样，对比用。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
 	bool bFixLegs = true;
+
+	/** 上半身修不修（2026-10-10 用户：走和上楼梯时上半身不动、上楼梯时手臂的姿势怪）。
+	 *  量出来的：“走”那一段手前后只摆 26 cm（腿摆 57 cm，游戏里还把步幅放大了五成），所以显得上半身是僵的；
+	 *  “上台阶”那一段两只手一直架在胸前、右手总在前面、和腿差着四分之一拍。
+	 *  修法：① 手臂的摆幅跟着步幅放大（ArmSwingBase + ArmSwingGain ×（步幅 − 1）倍），肩膀跟着手拧一点（TorsoTwistDeg），头不跟着拧；
+	 *        ② 上台阶时腿还用“上台阶”那一段，腰以上（spine_01 往上：身子、手臂、手指、头）换成“走”那一段的，时刻和腿对齐（UpstairsArmPhase），身子往前倾 UpstairsLeanDeg。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	bool bFixUpperBody = true;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float ArmSwingBase = 1.15f;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float ArmSwingGain = 1.6f;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float TorsoTwistDeg = 5.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float UpstairsLeanDeg = 8.0f;
+
+	/** “上台阶”放到一圈的哪儿时，“走”那一段该在一个循环的哪儿（两段的腿对齐：从动作里量出来两段左右脚前后差的相位，上台阶 106°、走 −82°）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float UpstairsArmPhase = 0.478f;
+
+	/** 上下台阶（或踩着斜的光）时的腿。美术“上台阶”那一段是按跑的速度做的，走着上楼时只能放慢了放——
+	 *  2026-10-10 用户：上半身好了，下半身看着怪。现在不用那一段了：就用平地上走 / 跑的动作，脚按脚下的坡度落
+	 *  （前脚落得高、后脚低；迈步时脚抬高到 StairLift 倍；步子收到 StairStride 倍），身子按坡度往前倾。bStairGait 关掉 = 回到用“上台阶”那一段。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	bool bStairGait = true;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float StairLift = 1.9f;
+
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float StairStride = 0.85f;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UAnimSequence>> Clips;
@@ -88,6 +131,10 @@ public:
 	float GaitSpeed = 0.0f;       // 动作用的速度（慢一拍跟上真的速度）
 	double GaitPhase = 0.0;       // 这一回起步以来迈了几个循环（和动作那边的相位一起走）
 	int32 StepCount = 0;          // 脚落地了多少下（一直往上加）
+	float GroundSlope = 0.0f;     // 脚下的坡度（升高 ÷ 往前走的距离；上台阶 0.4 上下，平地 0，下台阶是负的）
+	float SlopeRise = 0.0f, SlopeRun = 0.0f;    // 最近零点几秒里升了多少、走了多远（越早的占得越少）
+	FVector SlopePrev = FVector::ZeroVector;
+	bool bSlopePrev = false;
 
 protected:
 	virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;

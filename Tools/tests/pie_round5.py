@@ -238,8 +238,9 @@ def main():
         # 塞勒涅的是浮雕：齐平的是底板，眼睛的花纹还凸在墙面外 12 cm；银盘跟着月亮浮雕走
         inner = [f["inner"] for f in d["flush"] if f["tag"] not in ("SM_Mech_MoonRelief_Disk", "SM_Mech_Selene_Relief")]
         sel = [f["inner"] for f in d["flush"] if f["tag"] == "SM_Mech_Selene_Relief"]
-        check(len(d["flush"]) == 7 and len(ok) == 7 and all(abs(x - 1549.0) < 2.5 for x in inner) and len(sel) == 1 and abs(sel[0] - 1537.0) < 2.5,
-              "七件暗门 / 封石 / 浮雕板退到和墙面齐平（各退了 %s cm；朝殿心的面离殿心 %s cm，墙面是 1550；塞勒涅浮雕的花纹凸出到 %s）" % ([round(f["back"]) for f in d["flush"]], [round(x) for x in inner], [round(x) for x in sel]))
+        # 第八轮起：两段楼梯下口的封石、天鹅浮雕后面的门、月之龛的盖板改成照洞口现做的门板（pie_round8 管），这里只剩月亮浮雕（连银盘）和塞勒涅的浮雕板
+        check(len(d["flush"]) == 3 and len(ok) == 3 and all(abs(x - 1549.0) < 2.5 for x in inner) and len(sel) == 1 and abs(sel[0] - 1537.0) < 2.5,
+              "月亮浮雕（连银盘）、塞勒涅的浮雕板退到和墙面齐平（各退了 %s cm；朝殿心的面离殿心 %s cm，墙面是 1550；塞勒涅浮雕的花纹凸出到 %s）" % ([round(f["back"]) for f in d["flush"]], [round(x) for x in inner], [round(x) for x in sel]))
         for name, az, r, z in MECH:
             floor_z = max([f for f in (0, 600, 1450, 2300) if f <= z + 60] or [0])
             go(polar(az + 25.0, 1300.0, floor_z)); yield from wait(50)

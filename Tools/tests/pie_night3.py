@@ -71,18 +71,22 @@ def main():
 
     # ── A 月桥上一步步往下走 ──
     fl = {f["step"]: f for f in G["flow"]}
-    n = ok = 0; notes = []
+    # 2026-10-10（第八轮）用户要把女神像往瀑布中间挪：像、连判定月光的点一起从灰盒的位置转了 2°、往墙那边挪了 68 cm，
+    # 月光全照到她的那一步从灰盒的第 61 步变成了第 58 步。这里核：每一步的时刻还和灰盒一样；月光全照到她的只有第 58 步前后那一小段。
+    STAND = 58
+    n = ok = 0; notes = []; full = []
     for s in fl["scanBridge"]["scan"]:
         go(PTS[s["i"]], 10.0)
         yield from hold(0.22)
-        # 月光的边刚扫到某个取样点的那一步，UE 和灰盒可能差一个点（五个点里的一个）；别的都要一样
-        d = fin(); good = abs(d["lit"] - s["lit"]) < (0.21 if 0 < max(d["lit"], s["lit"]) < 0.5 else 0.01) and abs(H() - s["H"]) < 0.05 and zone() == "moonbr"
+        d = fin(); good = abs(H() - s["H"]) < 0.05 and zone() == "moonbr"
+        if d["lit"] > 0.99: full.append(s["i"])
         n += 1; ok += 1 if good else 0
-        if not good: notes.append("第 %d 点：灰盒 H=%.2f 照着 %.1f；UE %s 照着 %.1f" % (s["i"], s["H"], s["lit"], state()[:30], d["lit"]))
+        if not good: notes.append("第 %d 点：灰盒 H=%.2f；UE %s" % (s["i"], s["H"], state()[:30]))
     d = fin()
-    check(ok == n and d["glint"] and not d["goddess"], "月桥上 %d 步：每一步月光照着她怀里的月亮多少——%d 步和灰盒一致；只是走过去她不会亮（只亮一下）" % (n, ok))
+    check(ok == n and d["glint"] and not d["goddess"] and STAND in full and len(full) <= 3 and max(full) - min(full) == len(full) - 1,
+          "月桥上 %d 步：每一步的时刻 %d 步和灰盒一致；月光全照到她怀里那轮月亮的是第 %s 步（女神像挪过以后应当是第 58 步前后）；只是走过去她不会亮（只亮一下）" % (n, ok, full))
     for x in notes[:8]: say("     " + x)
-    st = fl["stand"]
+    st = dict(fl["stand"]); st["i"] = STAND; st["H"] = next(s["H"] for s in fl["scanBridge"]["scan"] if s["i"] == STAND)
     go(PTS[st["i"]], 10.0); look(100.0, -6.0)
     t0 = now()
     for _ in range(600):
@@ -96,7 +100,8 @@ def main():
         yield
         if fin()["halfExt"] >= 1: break
     d = fin()
-    check(d["halfExt"] == 1 and d["halfOn"] and abs(now() - t0 - 2.0) < 0.4, "半桥 %.1f 秒伸到头（灰盒 2.0 秒），能踩了" % (now() - t0))
+    # （从女神亮起来到这里中间截了一张图，截图要等几帧：量出来会比 2.0 秒少零点几秒，放宽到 0.6）
+    check(d["halfExt"] == 1 and d["halfOn"] and abs(now() - t0 - 2.0) < 0.6, "半桥 %.1f 秒伸到头（灰盒 2.0 秒），能踩了" % (now() - t0))
 
     # ── B 水庭：池沿、半桥、影桥、水亭 ──
     p = fl["poolEdge"]
@@ -151,6 +156,9 @@ def main():
         if good and got: dmax = max(math.dist(a2, b2) for a2, b2 in zip(got, r["quad"])); worst = max(worst, dmax); good = dmax < 1.5
         n += 1; ok += 1 if good else 0
     check(ok == n, "细桥的月影 %d 个时刻：四个角的位置 %d 个和灰盒一致（最多差 %.1f cm）" % (n, ok, worst))
+    # 和灰盒逐点比的时候把女神像临时放回灰盒的位置（核的是“月光怎么算”没变），比完再挪回现在的位置
+    cmd(w, "Dysis.GoddessShift 0 0")
+    yield from wait(10)
     n = ok = 0; notes = []
     for r in G["god"]:
         tc.set_forced_time(r["H"])
@@ -158,8 +166,10 @@ def main():
         got = str(director.debug_goddess_lit()); exp = ",".join(r["samples"]) + "|" + ",".join(r["sweep"])
         n += 1; ok += 1 if got == exp else 0
         if got != exp: notes.append("时刻 %.2f：灰盒 %s；UE %s" % (r["H"], exp, got))
-    check(ok == n, "女神身上十个取样点、%d 个时刻：照没照到 %d 个和灰盒一致" % (n, ok))
+    check(ok == n, "女神像放回灰盒的位置：身上十个取样点、%d 个时刻，照没照到 %d 个和灰盒一致" % (n, ok))
     for x in notes[:6]: say("     " + x)
+    cmd(w, "Dysis.GoddessShift -2.0 68.3")
+    yield from wait(10)
     tc.clear_forced_time()
 
     # ── D 放苹果、结局 ──

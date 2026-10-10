@@ -24,6 +24,7 @@ public class Dysis : ModuleRules
 			"AssetRegistry",       // 殿内混响资产一键生成（Audio/DysisSfxReverb.cpp，编辑器里用）
 			"AnimGraphRuntime",    // 主角的动作（Player/DysisHeroAnimInstance：不用动画蓝图，自己搭的播放和混合）
 			"AnimationCore",       // 两段骨头的反解（主角的腿：站着钉脚、跑的时候放大步幅）
+			"ProceduralMeshComponent",   // 按洞口实量的尺寸现做的小块网格（暗门和楼梯窗的拱、门板，瀑布底下补的水面：Mechanisms/DysisDirectorDetails.cpp、DysisDirectorFx.cpp）
 		});
 		
 		// Uncomment if you are using online features

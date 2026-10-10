@@ -22,9 +22,19 @@
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "ProceduralMeshComponent.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
+	// Dysis.SeaMirror 0|1：海面用原来那一版（0，默认）还是“天空之镜”那一版（1）
+	FAutoConsoleCommandWithWorldAndArgs GDysisSeaMirror(TEXT("Dysis.SeaMirror"), TEXT("海面：Dysis.SeaMirror 1 = 镜湖（平得像镜子，天和云映在里面），0 = 原来的"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			for (TActorIterator<ADysisDirector> It(World); It; ++It) It->DebugSetSeaMirror(Args.Num() == 0 || FCString::Atoi(*Args[0]) != 0);
+		}));
+	// 瀑布底下那一段水槽（低模上量的）：方位 116.4–139.6°，从水池边（半径 10.2 m）到后面石台的立面（13.4 m），槽底在 −2.2 m
+	constexpr float FxInletA0 = 116.3f, FxInletA1 = 139.7f, FxInletR1 = 1342.0f;
 	// 虹桥的两头（灰盒 BRIDGE.A / B）和桥的走向
 	const FVector FxBridgeA(138.018, 1433.371, 600.0), FxBridgeB(-1474.85, 367.721, 1750.0);
 	// 瀑布：方位 116.25°–139.75°，水帘在 r = 12.45 m；脚下的水面在 −45
@@ -63,6 +73,19 @@ UMaterialInstanceDynamic* ADysisDirector::FxMaterial(AActor* A, const TCHAR* Pat
 	// 模型原点在世界里的位置：材质里要按“离殿心多远”算东西的都用它
 	MID->SetVectorParameterValue(TEXT("Pivot"), FxVec(A->GetActorLocation()));
 	return MID;
+}
+
+void ADysisDirector::DebugSetSeaMirror(bool bOn)
+{
+	// 海面的另一版（2026-10-10 用户想试“天空之镜”，做出来给他挑）：一面几乎不起波的镜子，映什么全靠引擎的反射。原来那一版的材质留着，随时切回去
+	AActor* Sea = Piece(TEXT("SM_Mech_Water_Sea"));
+	UStaticMeshComponent* C = Sea ? Sea->FindComponentByClass<UStaticMeshComponent>() : nullptr;
+	if (!C || !SeaMID) return;
+	if (bOn && !SeaMirrorMID)
+		if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisSeaMirror.M_DysisSeaMirror"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			SeaMirrorMID = UMaterialInstanceDynamic::Create(Mat, this);
+	bSeaMirror = bOn && SeaMirrorMID != nullptr;
+	for (int32 i = 0; i < C->GetNumMaterials(); ++i) C->SetMaterial(i, bSeaMirror ? SeaMirrorMID.Get() : SeaMID.Get());
 }
 
 UDysisMoteField* ADysisDirector::FxMotes(const FVector& Center, const FQuat& Rot, const FVector& SizeCm, int32 Count)
@@ -123,6 +146,36 @@ void ADysisDirector::SetupFx()
 	const bool bAnimeWater = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater"), nullptr, LOAD_NoWarn | LOAD_Quiet) != nullptr;
 	PoolMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Pool")), bAnimeWater ? TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater") : TEXT("/Game/Dysis/Fx/M_DysisPool.M_DysisPool"));
 	FallMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Waterfall")), TEXT("/Game/Dysis/Fx/M_DysisWaterfall.M_DysisWaterfall"));
+	// 瀑布底下那一段水槽：水池的水面是一个半径 10.2 m 的圆盘，到不了这里——没开闸的时候槽里是空的，和旁边的水池断开（2026-10-10 用户）。
+	// 补一片扇形的水面，用的就是水池那个材质（花纹是按世界坐标铺的，接得上；材质里把这一段池边当成“不是岸”，不画那圈波纹）。
+	// 比水池的水面低 1.5 mm、往池子里多伸 6 cm：两片叠着的地方它在底下，不会闪。
+	if (InletWater) { InletWater->DestroyComponent(); InletWater = nullptr; }
+	if (PoolMID)
+	{
+		const float R0 = DysisGB::R_POOL - 6.0f, Z = FxWaterZ - 0.15f;
+		const int32 Segs = 12;
+		TArray<FVector> V, N;
+		TArray<int32> I;
+		for (int32 i = 0; i <= Segs; ++i)
+		{
+			const float Az = FxInletA0 + (FxInletA1 - FxInletA0) * i / Segs;
+			V.Add(DysisGB::PolarCm(Az, R0, Z)); V.Add(DysisGB::PolarCm(Az, FxInletR1, Z));
+			N.Add(FVector::UpVector); N.Add(FVector::UpVector);
+			if (i < Segs) I.Append({ 2 * i, 2 * i + 3, 2 * i + 1, 2 * i, 2 * i + 2, 2 * i + 3 });      // 这个顺序面朝上
+		}
+		InletWater = NewObject<UProceduralMeshComponent>(this);
+		InletWater->SetupAttachment(RootComponent);
+		InletWater->SetMobility(EComponentMobility::Movable);
+		InletWater->bUseAsyncCooking = false;
+		InletWater->SetGenerateOverlapEvents(false);
+		InletWater->SetCanEverAffectNavigation(false);
+		InletWater->SetCastShadow(false);
+		InletWater->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		InletWater->RegisterComponent();
+		InletWater->SetWorldLocationAndRotation(FVector::ZeroVector, FQuat::Identity);
+		InletWater->CreateMeshSection_LinearColor(0, V, I, N, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		InletWater->SetMaterial(0, PoolMID);
+	}
 	SetupWaterfallLook();
 	const int32 MoonN = UE_ARRAY_COUNT(GDysisMoonBridgePts);
 	if (AActor* Deck = MoonDeck.Get())
@@ -281,6 +334,7 @@ void ADysisDirector::UpdateFx(float Dt)
 	const FLinearColor SkyTint = FxLerp3(FLinearColor(0.40f, 0.58f, 0.86f), FLinearColor(0.92f, 0.54f, 0.44f), Dusk) * (Daylight * 0.9f)
 		+ FLinearColor(0.035f, 0.055f, 0.12f) * (Night * (0.7f + 0.9f * MoonUp));
 	if (SeaMID) SeaMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint);
+	if (SeaMirrorMID) SeaMirrorMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint);
 	if (PoolMID)
 	{
 		PoolMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint * 0.8f);          // 原来那个水面用的；动画水面没有这个参数
@@ -411,7 +465,8 @@ void ADysisDirector::UpdateFx(float Dt)
 			for (TActorIterator<ADysisBeamActor> It(GetWorld()); It; ++It)
 				if (It->GreyboxId == TEXT("iris")) { IrisBeam = *It; Iris = *It; break; }
 		const float On = (!bCaught && Iris && Iris->HasLight()) ? Flow * float(Iris->GetLit()) : 0.0f;
-		ReliefSpray->SetVisibility(On > 0.005f);
+		// 水帘里的那道虹不画了（2026-10-10 用户：浮雕那里的彩虹效果很扭曲，不要了——它是按旧浮雕上刻的那道弓摆的，新浮雕自己刻着一道虹）；水珠还在
+		ReliefSpray->SetVisibility(false);
 		ReliefSprayMID->SetVectorParameterValue(TEXT("LightDir"), FxVec(-Sun));
 		ReliefSprayMID->SetVectorParameterValue(TEXT("Eye"), FxVec(Eye));
 		ReliefSprayMID->SetVectorParameterValue(TEXT("SunColor"), SunCol);

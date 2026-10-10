@@ -750,6 +750,14 @@ if want("M_DysisAnimeWater"):
     V = [vector(mat, n, v, -1800, 300 + 160 * i) for i, (n, v) in enumerate([("MainColor", (0.25, 0.45, 0.52)), ("ShallowColor", (0.39, 0.66, 0.54)), ("DeepColor", (0.20, 0.26, 0.40)),
         ("LineColor", (0.73, 0.90, 0.81)), ("WarmColor", (0.95, 0.67, 0.35)), ("FlowDirection", (0.85, 0.52, 0.0))])]
     code = open(ANIME_DIR + "water_shader.hlsl", encoding="utf-8").read()
+    # 瀑布底下那一段水槽（方位 116.4–139.6°）接在水池的外沿上（DysisDirectorFx.cpp 在那里补了一片水面，用的也是这个材质）：
+    # 这一段池边不是岸，往外是开着的水——不画岸边那圈波纹；水槽里（贴图管不到的地方）按离岸远的深水算。两侧挨着槽壁的 20 cm 还留着波纹。
+    INLET = """float inletAz=degrees(atan2(P.y,P.x)); inletAz+=inletAz<0?360:0;
+float inlet=smoothstep(116.4,117.6,inletAz)*(1-smoothstep(138.4,139.6,inletAz))*smoothstep(900,985,length(P.xy));
+shore.r=lerp(shore.r,1,inlet); shore.g=lerp(shore.g,.25,inlet); shore.b=lerp(shore.b,0,inlet);
+"""
+    assert "float2 flow=Texture2DSample" in code
+    code = code.replace("float2 flow=Texture2DSample", INLET + "float2 flow=Texture2DSample", 1)
     color = custom(mat, code, [("P", wp), ("T", time), ("Shore", texobj(T_SHORE, -1500, -100)), ("Flow", texobj(T_FLOW, -1500, 0)), ("Shapes", texobj(T_SHAPES, -1500, 100))] + named(S) + named(V), F3, -900, 0)
     lift = node(mat, unreal.MaterialExpressionMultiply, -500, 200)
     mel.connect_material_expressions(color, "", lift, "A"); mel.connect_material_expressions(scalar(mat, "Lift", 0.10, -700, 320), "", lift, "B")
@@ -762,6 +770,72 @@ if want("M_DysisAnimeWater"):
         mel.connect_material_property(scalar(mat, name, val, -350, y), "", prop)
     # FxMaterial 会给每个换上去的材质写一个 Pivot；这个材质用不上，留一个同名的参数接着（不接出去）
     vector(mat, "Pivot", (0.0, 0.0, 0.0), -1800, 1300)
+    finish(mat, full)
+
+# ───────────────────────── 海：“天空之镜”那一版 ─────────────────────────
+if want("M_DysisSeaMirror"):
+    # 2026-10-10 用户想试试把海面做成镜湖（平得像镜子，天、云、岛整个映在里面），做出来给他挑——所以单做一个材质，
+    # 游戏里用控制台 Dysis.SeaMirror 0|1 切，原来的海（M_DysisSea）不动。
+    # 做法：一面几乎不起波的镜子——金属度 1、很光滑，映什么全靠引擎的反射（映的是画面里真的天、云、岛和神殿）。
+    #   Tint = 镜面的颜色（略带一点蓝的浅色：映出来的比本体稍暗、稍冷）；Ripple = 细波有多大（0 = 纹丝不动）；RippleCm = 细波一道有多宽；
+    #   Lift = 垫的一点底色（屏幕上看着多亮；引擎的反射够不着的地方不至于是一块黑）× SkyTint（代码按时刻给的天色，和原来的海用的是同一个）。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisSeaMirror", unreal.BlendMode.BLEND_OPAQUE, unlit=False, two_sided=False)
+    mel.connect_material_property(rgb_of(mat, vector(mat, "Tint", (0.80, 0.86, 0.92), -900, -400), -700, -400), "", unreal.MaterialProperty.MP_BASE_COLOR)
+    for prop, name, val, y in ((unreal.MaterialProperty.MP_METALLIC, "Metallic", 1.0, -250), (unreal.MaterialProperty.MP_ROUGHNESS, "Roughness", 0.04, -160), (unreal.MaterialProperty.MP_SPECULAR, "Specular", 1.0, -70)):
+        mel.connect_material_property(scalar(mat, name, val, -700, y), "", prop)
+    wp, time, depth = node(mat, unreal.MaterialExpressionWorldPosition, -1500, 100), node(mat, unreal.MaterialExpressionTime, -1500, 200), node(mat, unreal.MaterialExpressionPixelDepth, -1500, 300)
+    normal = custom(mat, noise_code("M") + """
+float2 w = WP.xy; float t = Time * 0.25;
+float far = saturate(1.0 - PD / (RippleCm * 70.0));                 // 远处压平：镜面远看是一整片，不起花
+#define DYSIS_MH(q) (NZ.n(float3((q) / RippleCm + float2(t * 0.11, t * 0.07), t * 0.13)) * 0.7 + NZ.n(float3((q) / (RippleCm * 3.0) - float2(t * 0.05, -t * 0.03), 3.0)) * 0.3)
+float e = RippleCm * 0.05;
+float h0 = DYSIS_MH(w), hx = DYSIS_MH(w + float2(e, 0.0)), hy = DYSIS_MH(w + float2(0.0, e));
+float k = Ripple * far / e;
+return normalize(float3(-(hx - h0) * k, -(hy - h0) * k, 1.0));
+""", [("WP", wp), ("Time", time), ("PD", depth), ("Ripple", scalar(mat, "Ripple", 3.0, -1500, 400)), ("RippleCm", scalar(mat, "RippleCm", 900.0, -1500, 500))], F3, -900, 150)
+    mel.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)
+    lift = node(mat, unreal.MaterialExpressionMultiply, -500, 600)
+    mel.connect_material_expressions(rgb_of(mat, vector(mat, "SkyTint", (0.45, 0.62, 0.85), -900, 600), -700, 600), "", lift, "A"); mel.connect_material_expressions(scalar(mat, "Lift", 0.0, -700, 720), "", lift, "B")
+    emissive(mat, lift)
+    vector(mat, "Pivot", (0.0, 0.0, 0.0), -1800, 1300)      # FxMaterial 会写这个参数；这个材质用不上
+    finish(mat, full)
+
+# ───────────────────────── 金苹果：镜面一样的金、人走近时周围一圈淡淡的虹光 ─────────────────────────
+if want("M_DysisAppleGold"):
+    # 2026-10-10 用户：金苹果的金色表面想要更好看，试试镜面。金属度 1、很光滑：一块一块的小平面各映各的，像切过面的金器。
+    # 叶子（顶点色偏绿的那几片）不是金属，照模型自己的颜色。Lift = 垫的一点金色（屏幕上看着多亮）：殿里暗的地方镜面映不到什么，不至于发黑。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisAppleGold", unreal.BlendMode.BLEND_OPAQUE, unlit=False, two_sided=False)
+    mat.set_editor_property("tangent_space_normal", False)
+    vc = node(mat, unreal.MaterialExpressionVertexColor, -1500, -300)
+    gold = rgb_of(mat, vector(mat, "Gold", (1.0, 0.74, 0.32), -1500, -150), -1300, -150)
+    leaf = custom(mat, "return step(VC.r * 1.05, VC.g);", [("VC", vc)], F1, -1100, -300)
+    base = node(mat, unreal.MaterialExpressionLinearInterpolate, -800, -250)
+    mel.connect_material_expressions(gold, "", base, "A"); mel.connect_material_expressions(rgb_of(mat, vc, -1300, -300), "", base, "B"); mel.connect_material_expressions(leaf, "", base, "Alpha")
+    mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    met = node(mat, unreal.MaterialExpressionLinearInterpolate, -800, -50, const_b=0.0)
+    mel.connect_material_expressions(scalar(mat, "Metallic", 1.0, -1100, -50), "", met, "A"); mel.connect_material_expressions(leaf, "", met, "Alpha")
+    mel.connect_material_property(met, "", unreal.MaterialProperty.MP_METALLIC)
+    rgh = node(mat, unreal.MaterialExpressionLinearInterpolate, -800, 100, const_b=0.7)
+    mel.connect_material_expressions(scalar(mat, "Roughness", 0.16, -1100, 100), "", rgh, "A"); mel.connect_material_expressions(leaf, "", rgh, "Alpha")
+    mel.connect_material_property(rgh, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    wp = node(mat, unreal.MaterialExpressionWorldPosition, -1500, 500)
+    nrm = custom(mat, "return normalize(cross(ddx(WP), ddy(WP)));", [("WP", wp)], F3, -1100, 500)      # 按面：每个小平面一个法线（顺序反了整件发黑）
+    mel.connect_material_property(nrm, "", unreal.MaterialProperty.MP_NORMAL)
+    lift = custom(mat, "return Gold * Lift * (1.0 - Leaf);", [("Gold", gold), ("Lift", scalar(mat, "Lift", 0.06, -1100, 300)), ("Leaf", leaf)], F3, -800, 300)
+    emissive(mat, lift)
+    finish(mat, full)
+if want("M_DysisAppleHalo"):
+    # 金苹果周围的一圈虹光（套在苹果外面的一个球；只看它的边缘：正对着的地方是空的，越到边上越亮，颜色顺着边转一圈虹）。Opacity 由代码按“人离它多近”给。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisAppleHalo", unreal.BlendMode.BLEND_ADDITIVE, unlit=True, two_sided=False)
+    nws, cam, time = node(mat, unreal.MaterialExpressionVertexNormalWS, -1500, 0), node(mat, unreal.MaterialExpressionCameraVectorWS, -1500, 100), node(mat, unreal.MaterialExpressionTime, -1500, 200)
+    glow = custom(mat, """
+float f = 1.0 - abs(dot(normalize(N), normalize(V)));          // 0 = 正对着，1 = 边缘
+float ring = smoothstep(0.08, 0.62, f) * (1.0 - smoothstep(0.78, 1.0, f));
+float h = f * 1.5 + Time * 0.07;
+float3 bow = 0.5 + 0.5 * cos(6.2831853 * (h + float3(0.0, 0.33, 0.67)));
+return bow * ring * Opacity;
+""", [("N", nws), ("V", cam), ("Time", time), ("Opacity", scalar(mat, "Opacity", 0.0, -1500, 300))], F3, -900, 0)
+    emissive(mat, glow)
     finish(mat, full)
 
 # ───────────────────────── 发光的小东西：棱镜分出来的七道色光、它们落在墙上的光斑、塞勒涅亮起来的眼睛 ─────────────────────────

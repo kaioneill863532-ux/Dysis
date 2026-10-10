@@ -17,6 +17,7 @@
 class UStaticMeshComponent;
 class UStaticMesh;
 class UBoxComponent;
+class UProceduralMeshComponent;
 class UDysisTimeComponent;
 struct FDysisRoofPieceSpec;
 
@@ -226,6 +227,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DebugGoddessLit() const;
 
+	/** 测算用：女神像（连怀里的月亮）绕殿心转过 DeltaAzDeg 度、再往墙那边挪 DeltaRCm 的话，这一刻月光还照得到那轮月亮吗（"照到几个点|各点的情况"）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugGoddessShift(float DeltaAzDeg, float DeltaRCm) const;
+
+	/** 把瀑布后面的女神像（像、台座、判定月光的取样点一起）从灰盒的位置绕殿心转过 DeltaAzDeg 度、往墙那边挪 DeltaRCm。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm);
+
 	/** 测试用：时刻 H 时屋顶细桥落在水面上的影子的四个角（JSON；月亮太低就是 null）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DebugBridgeShadow(float H) const;
@@ -306,6 +315,18 @@ public:
 	/** 按上面的数把配景重摆一遍（调过以后叫）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|配景")
 	void RebuildScenery();
+
+	/** 海面用哪一版：false = 原来的（有波纹、迎着看是青蓝的），true = 镜湖（平得像镜子，天和云映在里面）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Fx")
+	void DebugSetSeaMirror(bool bOn);
+
+	/** 殿里各层的地面：true = 和墙一个颜色（默认），false = 美术原来给地面单配的那种偏紫的灰。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Scenery")
+	void DebugSetFloorTone(bool bLikeWalls);
+
+	/** 这一轮新加的几样现在什么样（JSON，测试用）：瀑布底下的水面、海面是哪一版、地面的颜色、殿里的柱子挪了几根。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Scenery")
+	FString DescribeRound8() const;
 
 	/** 测试用：配景的状态（放了几件、台地上几件、礁石几块、几件挡人、有没有哪件会挡光、建筑换了几个面的配色）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|配景")
@@ -539,17 +560,54 @@ public:
 	FString DescribeWaterfall() const;
 private:
 
+	// 美术 2026-10-10 的机关模型：只换样子，碰撞和逻辑还是原来的部件 —— DysisDirectorMechPack.cpp
+	void SetupMechPack();
+	void UpdateMechPack(float Dt);
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> MechPackComps;
+	TWeakObjectPtr<UStaticMeshComponent> MirrorForms[3];     // 三相像的三个姿势：暗、日、月（和 MirrorW3 一个顺序）
+	TWeakObjectPtr<UStaticMeshComponent> SeleneEyeGlow;      // 塞勒涅醒了以后亮起来的那只眼睛
+	// 日之龛的盖（新模型自己掀：轴在靠墙的那条边上，朝着人掀开）、拉杆的杆（挂在墙上，跟着原来那根杆转）
+	TWeakObjectPtr<UStaticMeshComponent> SunLidModel, LeverArmModel, IrisReliefModel;
+	FVector SunLidHinge = FVector::ZeroVector, SunLidClosedLoc = FVector::ZeroVector, SunLidAxis = FVector::ZeroVector;
+	FQuat SunLidClosedRot = FQuat::Identity;
+	// 金苹果周围的虹光（人走近了才有）；伊莉丝浮雕：被窗光照着的时候颜色压暗（不然一片白，看不清）、虹平时是石头色
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> AppleHalo;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> AppleHaloMID;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> IrisReliefMID;
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> ShadowSpot;         // 伊莉丝浮雕下面那个空着的人形（影子的头要落进去的地方）
+	float AppleHaloK = 0.0f, IrisLitK = 0.0f, ReliefHint = 0.0f;
+	FQuat LeverMountRot = FQuat::Identity;       // 装在墙上的拉杆：没扳的时候朝哪
+	// 瀑布后面的女神像从灰盒的位置挪了多少（绕殿心转的度数、往墙那边的厘米数）；像、台座原来在哪
+	float GodShiftAz = 0.0f, GodShiftR = 0.0f;
+	FVector GodStatueBase = FVector::ZeroVector, GodPlinthBase = FVector::ZeroVector;
+	FRotator GodStatueRot = FRotator::ZeroRotator;
+	bool bGodBase = false;
+	FVector GodPoint(const FVector& P) const;
+	int32 MechPackReplaced = 0;
+public:
+	/** 测试用：换上了几件新模型、现在画着几件、三相像画的是哪一相。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeMechPack() const;
+private:
+
 	// 建筑上的小修补（2026-10-10 第七轮试玩反馈）：暗门和楼梯窗的拱、各层栏杆上跳不出去的护栏、岛边的护栏、
 	// 月桥口的石板、弧形的台面 —— DysisDirectorDetails.cpp
 	void SetupDetails();
 	void UpdateDetails(float Dt);
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMeshComponent>> DetailComps;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UProceduralMeshComponent>> DetailMeshes;      // 照洞口实量的尺寸现做的：拱、暗门的门板、月之龛的盖板
 	struct FJumpGuard { TWeakObjectPtr<UBoxComponent> Box; int32 Floor = 0; };
 	TArray<FJumpGuard> JumpGuards;               // 光路越过栏杆的那几段：人不在光上的时候拦着
 	TArray<TWeakObjectPtr<UStaticMeshComponent>> GapSlab;   // 月桥口那一段补上的栏杆石板
 	float GapSlabT = 0.0f;                       // 双子并肩以后过了多久（石板收进地里）
-	int32 DetailArches = 0, DetailEdgeWalls = 0, DetailLedgeParts = 0;
+	int32 DetailArches = 0, DetailEdgeWalls = 0, DetailLedgeParts = 0, DetailLeaves = 0;
 public:
 	/** 测试用：这些小修补的状态（护栏几段、现在开着几段、岛边几段、拱几个、月桥口的石板在不在、台面几段）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
@@ -564,7 +622,8 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> SceneryComps;
 	UPROPERTY()
 	TArray<TObjectPtr<class UMaterialInstanceDynamic>> CloudMIDs;   // 云的三档颜色
-	int32 SceneryOnTerrace = 0, ScenerySeaRocks = 0, ScenerySkipped = 0, ScenerySolid = 0, PaletteSlots = 0;
+	int32 SceneryOnTerrace = 0, ScenerySeaRocks = 0, ScenerySkipped = 0, ScenerySolid = 0, PaletteSlots = 0, InteriorColumnsFixed = 0;
+	bool bFloorsLikeWalls = true;
 
 	// “光和水”的样子：虹桥 / 月桥 / 瀑布 / 海 / 水庭的材质，光粒，瀑布脚下的水雾 —— DysisDirectorFx.cpp
 	void SetupFx();
@@ -598,6 +657,13 @@ private:
 	TObjectPtr<class UMaterialInstanceDynamic> SeaMID;
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> PoolMID;
+	// 瀑布底下那一段水槽里补的水面（水池的水面是个圆盘，到不了那里）
+	UPROPERTY(Transient)
+	TObjectPtr<UProceduralMeshComponent> InletWater;
+	// 海面的另一版：“天空之镜”（做给用户挑的；控制台 Dysis.SeaMirror 0|1）
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> SeaMirrorMID;
+	bool bSeaMirror = false;
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> FallMID;
 	// 瀑布加厚的那几层、两头封上的两片（材质和主瀑布一样，每帧跟着写同样的数）；开闸以后挡人的墙

@@ -49,7 +49,14 @@ def main():
 
     d = skin()
     check(d["pieces"] >= 80 and d["on"], "开局：%d 个建筑部件挂上了低模" % d["pieces"])
-    check(d["lowShown"] == d["pieces"] and d["origShown"] == 0, "画的是低模（%d 个），原模型都不画（还在画的 %d 个）" % (d["lowShown"], d["origShown"]))
+    # 第八轮起：外立面的 20 尊神像、屋顶的细桥换成了美术的机关模型，它们的低模不画（画的是新模型）
+    swapped = []
+    for a in unreal.GameplayStatics.get_all_actors_of_class(w, unreal.Actor):
+        if any(c.static_mesh and c.static_mesh.get_name().startswith("LP_") and not c.is_visible() for c in a.get_components_by_class(unreal.StaticMeshComponent)):
+            swapped.append(next((str(t) for t in a.tags if str(t).startswith("SM_")), a.get_name()))
+    odd = [t for t in swapped if not (t.startswith("SM_Facade_Statue_") or t == "SM_RoofBridge")]
+    check(d["lowShown"] + len(swapped) == d["pieces"] and d["origShown"] == 0 and not odd and len(swapped) == 21,
+          "画的是低模（%d 个；另有 %d 件换成了美术的机关模型%s），原模型都不画（还在画的 %d 个）" % (d["lowShown"], len(swapped), ("，不该换的：%s" % odd) if odd else "", d["origShown"]))
     solid0 = d["origSolid"]
     check(solid0 >= d["pieces"] * 0.6, "原模型的碰撞还在：%d / %d 个带碰撞（其余本来就不挡东西，比如外立面的装饰）" % (solid0, d["pieces"]))
     cmd("Dysis.LowPoly 0"); yield from wait(5); d = skin()

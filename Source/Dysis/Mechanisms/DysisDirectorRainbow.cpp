@@ -401,6 +401,7 @@ void ADysisDirector::UpdateIrisRelief(float Dt)
 	// 影子的头离人形越近，刻着的那一圈上越显出虹的颜色（提示）；对准了就整圈亮起来
 	const float Hint = bLight ? 0.4f * FMath::Clamp(1.0f - (ReliefMissCm - float(RbwHeadTolCm)) / 120.0f, 0.0f, 1.0f) : 0.0f;
 	if (BandsMID) BandsMID->SetScalarParameterValue(TEXT("Opacity"), FMath::Max(Hint, 0.95f * ReliefAlign));
+	ReliefHint = Hint;      // 新浮雕上的那道虹按它显颜色（DysisDirectorMechPack.cpp）
 	if (ReliefAlign >= 1.0f)
 	{
 		bReliefDone = true;

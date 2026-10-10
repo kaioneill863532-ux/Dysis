@@ -58,7 +58,7 @@ public:
 	/** 走：灰盒是 310（每秒三米多，只能是小跑的样子）。2026-10-10 用户要真正走路的动作、同意降速：先改成 160，
 	 *  试玩后说“还是有点太慢、再稍微快一点”，改成 190（大步快走，每分钟一百四十步）。跑仍是灰盒的 520。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Move")
-	float WalkSpeed = 190.f;
+	float WalkSpeed = 160.f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Move")
 	float RunSpeed = 520.f;

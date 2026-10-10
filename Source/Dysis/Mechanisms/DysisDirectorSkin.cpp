@@ -94,10 +94,9 @@ namespace
 	// Relief：这一件是浮雕——花纹比底板凸出这么多厘米，齐平的是底板，花纹仍然凸在墙面外。
 	struct FFlushSpec { const TCHAR* Tag; const TCHAR* Follow; float Relief = 0.0f; };
 	const FFlushSpec SkinFlush[] = {
-		{ TEXT("SM_Mech_StairSeal_TR"), nullptr }, { TEXT("SM_Mech_StairSeal_TS"), nullptr },          // 墙里两段楼梯下口的封石（暗门）
+		// （墙里两段楼梯下口的封石、天鹅浮雕后面的门、月之龛的盖板原来也在这张表里。2026-10-10 第八轮改成照洞口现做的门板——
+		//   这几块方石板比洞口大一圈，退平以后还凸出墙面 1 cm，用户看着像墙上鼓出来一块。见 DysisDirectorDetails.cpp）
 		{ TEXT("SM_Mech_MoonRelief_Block"), nullptr }, { TEXT("SM_Mech_MoonRelief_Disk"), TEXT("SM_Mech_MoonRelief_Block") },   // 月亮浮雕（挡着楼梯上口）和它上面的银盘
-		{ TEXT("SM_Mech_MoonShrine_Block"), nullptr },                                                 // 月之龛的盖板
-		{ TEXT("SM_Mech_Swan_Door"), nullptr },                                                        // 天鹅浮雕旁边的门（楼梯上口）
 		{ TEXT("SM_Mech_Selene_Relief"), nullptr, 12.0f },                                             // 塞勒涅的浮雕：底板退平，眼睛和眼眶的花纹留在墙面外
 	};
 	constexpr float SkinProud = 1.0f;
@@ -141,7 +140,8 @@ void ADysisDirector::SetupMechLook()
 				const UMaterialInterface* Cur = C->GetMaterial(Slot);
 				const FName Name = Cur ? Cur->GetFName() : NAME_None;
 				if (Name == TEXT("M_stone")) { C->SetMaterial(Slot, Warm); ++MechRecolored; }
-				else if (Name == TEXT("M_stoneDark")) { C->SetMaterial(Slot, Sand); ++MechRecolored; }
+				// 双子那一段加厚的墙是殿里的墙的一部分：和墙一个颜色（2026-10-10 用户：殿里的建筑不要两种颜色）
+				else if (Name == TEXT("M_stoneDark")) { C->SetMaterial(Slot, P.Key == FName(TEXT("SM_Mech_Twins_ThickWall")) ? Warm : Sand); ++MechRecolored; }
 			}
 	}
 
