@@ -3,6 +3,7 @@
 
 #include "Audio/DysisSfxSubsystem.h"
 #include "Beams/DysisBeamActor.h"
+#include "Player/DysisCharacter.h"
 #include "Sky/DysisTimeComponent.h"
 #include "Surfaces/DysisLuminousStone.h"
 #include "Surfaces/DysisMoonPath.h"
@@ -266,13 +267,26 @@ void UDysisFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickType
 		const bool bInput = Move->GetCurrentAcceleration().SizeSquared() > 1.0f;
 		if (bInput && Speed2D > S->MinStepSpeed)
 		{
-			const bool bRun = Speed2D > S->RunSpeedThreshold;
+			// 有主角模型：脚步声跟着动作里脚落地的那一下响（2026-10-10；原来按“走了多远”数，和迈的步子对不上）
+			const ADysisCharacter* Hero = Cast<ADysisCharacter>(C);
+			const int32 GaitSteps = Hero ? Hero->GetGaitStepCount() : -1;
+			const bool bRun = GaitSteps >= 0 ? Hero->GetGaitRunBlend() >= 0.5f : Speed2D > S->RunSpeedThreshold;
 			const float StepLen = FMath::Max(bRun ? S->RunStepCm : S->WalkStepCm, 10.0f);
-			if (!bWasMoving) StepDistance = StepLen * 0.55f;   // 一起步很快就是第一步
-			StepDistance += Speed2D * DeltaTime;
-			if (StepDistance >= StepLen)
+			bool bStep = false;
+			if (GaitSteps >= 0)
 			{
-				StepDistance = FMath::Fmod(StepDistance, StepLen);
+				bStep = bWasMoving && GaitSteps != LastGaitSteps;
+				LastGaitSteps = GaitSteps;
+			}
+			else
+			{
+				if (!bWasMoving) StepDistance = StepLen * 0.55f;   // 一起步很快就是第一步
+				StepDistance += Speed2D * DeltaTime;
+				bStep = StepDistance >= StepLen;
+				if (bStep) StepDistance = FMath::Fmod(StepDistance, StepLen);
+			}
+			if (bStep)
+			{
 				Surface = ClassifySurface(C);
 				const float Pitch = (Surface == EDysisFootSurface::WetStone && bRun) ? 1.04f : 1.0f;
 				Sfx->Play(StepKey(Surface, bRun), Loc, -1, 1.0f, Pitch);

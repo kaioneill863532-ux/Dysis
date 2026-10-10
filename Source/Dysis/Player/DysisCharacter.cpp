@@ -248,6 +248,18 @@ void ADysisCharacter::PlayTouch()
 	++TouchSerial;
 }
 
+int32 ADysisCharacter::GetGaitStepCount() const
+{
+	const UDysisHeroAnimInstance* Anim = bHeroMesh ? Cast<UDysisHeroAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+	return Anim ? Anim->StepCount : -1;
+}
+
+float ADysisCharacter::GetGaitRunBlend() const
+{
+	const UDysisHeroAnimInstance* Anim = bHeroMesh ? Cast<UDysisHeroAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+	return Anim ? Anim->RunBlend : 0.0f;
+}
+
 FName ADysisCharacter::GetHeroClipName() const
 {
 	const UDysisHeroAnimInstance* Anim = bHeroMesh ? Cast<UDysisHeroAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
@@ -441,6 +453,12 @@ void ADysisCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateHeroState(DeltaSeconds);
+	// 空中的水平速度（见 LeapSpeed）：只在“走路的速度”和“跳出去的速度”之间换，别的值（按住跑、测试里另设的）不碰
+	if (UCharacterMovementComponent* Move = GetCharacterMovement(); Move && !bRunning && LeapSpeed > WalkSpeed)
+	{
+		if (Move->IsFalling()) { if (FMath::IsNearlyEqual(Move->MaxWalkSpeed, WalkSpeed)) Move->MaxWalkSpeed = LeapSpeed; }
+		else if (FMath::IsNearlyEqual(Move->MaxWalkSpeed, LeapSpeed)) Move->MaxWalkSpeed = WalkSpeed;
+	}
 	// 过剧情时镜头定住：在控制器那一层关掉“转镜头”的输入（鼠标、手柄都算），对话结束再放开
 	if (const bool bTalking = InDialogue(); bTalking != bDialogueLookLocked)
 		if (APlayerController* PC = Cast<APlayerController>(GetController()))

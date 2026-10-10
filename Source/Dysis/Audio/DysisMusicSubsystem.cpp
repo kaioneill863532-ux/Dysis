@@ -1,4 +1,5 @@
 ﻿#include "DysisMusicSubsystem.h"
+#include "Audio/DysisUserVolume.h"
 
 #include "Components/AudioComponent.h"
 #include "Engine/GameInstance.h"
@@ -68,13 +69,14 @@ void UDysisMusicSubsystem::Tick(float DeltaTime)
 		{
 			// 不跟着关卡走的播放器：换关卡时接着放
 			Audio[i] = UGameplayStatics::CreateSound2D(World, Sounds[i], 0.0f, 1.0f, 0.0f, nullptr, /*bPersistAcrossLevelTransition*/ true, /*bAutoDestroy*/ false);
+			if (Audio[i]) Audio[i]->bIsUISound = true;   // 游戏暂停（设置页）时照样放：在设置页里拖音量听得见
 		}
 		UAudioComponent* A = Audio[i];
 		if (!A) continue;
 		if (bWant)
 		{
 			// 平方一下：音量听起来是匀速变的
-			A->SetVolumeMultiplier(FMath::Max(bMuted ? 0.0f : Volume * Gain[i] * Gain[i] * Duck, 0.0001f));
+			A->SetVolumeMultiplier(FMath::Max(bMuted ? 0.0f : Volume * DysisUserVolume::Music() * Gain[i] * Gain[i] * Duck, 0.0001f));
 			if (!A->IsPlaying()) A->Play(0.0f);
 		}
 		else if (A->IsPlaying()) A->Stop();

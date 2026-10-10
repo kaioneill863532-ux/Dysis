@@ -31,13 +31,26 @@ public:
 	FString DescribeGait();
 
 	/** 两段动作本身的速度：脚踩在地上那一段往后蹬得有多快（厘米/秒，从动作里量出来的）。
-	 *  速度在这两个数之间时走和跑按比例混；游戏里走是 3.1 m/s、跑是 5.2 m/s（灰盒的数），所以平时看到的基本都是“跑”那一段。
+	 *  游戏里走是 1.6 m/s、跑是 5.2 m/s：走的时候全是“走”那一段（步幅放大、步子放快来凑速度），
+	 *  速度过了 WalkBlendFromSpeed 才开始混进“跑”，到“跑”本身的速度以上全是“跑”。
 	 *  “跑”的 360 是在游戏里试出来的：按 300–380 各跑一遍，量踩地时脚掌在地上滑多快，360 时最小（走 3.1 m/s 时每秒约 20 cm）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
 	float WalkClipSpeed = 100.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
 	float RunClipSpeed = 360.0f;
+
+	/** 速度到这个数为止全是“走”那一段（比游戏里走的速度高一点，免得走着走着混进跑的样子）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float WalkBlendFromSpeed = 190.0f;
+
+	/** 步幅放大以后腿要够得着，人得矮一点：步幅每放大三成，骨盆放低这么多厘米。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float StrideDropCm = 4.0f;
+
+	/** 一个循环里两只脚各在什么时候落地（相位 0–1；走的那一段量出来右脚 0.3、左脚 0.8，跑的差不多）。脚步声按它响。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float FootfallPhase = 0.3f;
 
 	/** 走、跑这两段动作各放了几个循环（一个循环 = 左右各迈一步）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
@@ -73,6 +86,8 @@ public:
 	float CycleRate = 0.0f;       // 每秒迈几个循环
 	float StrideScale = 1.0f;     // 步幅放大多少
 	float GaitSpeed = 0.0f;       // 动作用的速度（慢一拍跟上真的速度）
+	double GaitPhase = 0.0;       // 这一回起步以来迈了几个循环（和动作那边的相位一起走）
+	int32 StepCount = 0;          // 脚落地了多少下（一直往上加）
 
 protected:
 	virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;

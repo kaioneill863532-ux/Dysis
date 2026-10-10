@@ -1,4 +1,4 @@
-# 玩家这一步的自动测试（UE 编辑器 Python，开 PIE 跑）：出生点、镜头、走 / 跳的数值、回落脚点的几条规则。
+﻿# 玩家这一步的自动测试（UE 编辑器 Python，开 PIE 跑）：出生点、镜头、走 / 跳的数值、回落脚点的几条规则。
 # 标准答案是灰盒 v0.12 的数（见 Source/Dysis/DysisGreybox.h 和 Tools/greybox/golden/greybox_player.json）。
 # 结果写在 项目/Saved/pie_player.txt，最后一行 DONE；每条前面 ✔ / ✘。
 import unreal, os, glob, math, traceback
@@ -56,7 +56,7 @@ def main():
     tgt = (f[0] - math.sin(yaw) * 55, f[1] + math.cos(yaw) * 55, f[2] + 150)
     d = math.dist((c.x, c.y, c.z), tgt)
     check(abs(d - 460) < 8, "第三人称：镜头离瞄点 %.0f cm（应 460）" % d)
-    check(pawn.get_editor_property("walk_speed") == 310 and pawn.get_editor_property("run_speed") == 520, "走 310 / 跑 520 cm/s")
+    check(pawn.get_editor_property("walk_speed") == 160 and pawn.get_editor_property("run_speed") == 520, "走 160 / 跑 520 cm/s（走：2026-10-10 用户要真正走路的动作，从灰盒的 310 降下来）")
     yield from shoot(w, "第三人称_出生点")
 
     # 3 走：在岛上横着走 1 秒，量速度（正前方是开场那束光，先不往上撞）
@@ -65,7 +65,7 @@ def main():
     for i in range(50):
         pawn.add_movement_input(fwd, 1.0, False); yield
         if i > 20: sp = max(sp, pawn.get_velocity().length_2d() if hasattr(pawn.get_velocity(), "length_2d") else math.hypot(pawn.get_velocity().x, pawn.get_velocity().y))
-    check(abs(sp - 310) < 6, "走的速度 %.0f cm/s（应 310）" % sp)
+    check(abs(sp - 160) < 6, "走的速度 %.0f cm/s（应 160）" % sp)
     yield from wait(20)
 
     # 4 跳：最高点应为 v²/2g = 760²/(2×2200) = 131 cm；在岛上跳不应该被送回落脚点

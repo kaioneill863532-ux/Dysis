@@ -1,4 +1,4 @@
-# 夜里第二段的测试（UE 编辑器 Python，开 PIE 跑）：月之龛、双子、月桥。
+﻿# 夜里第二段的测试（UE 编辑器 Python，开 PIE 跑）：月之龛、双子、月桥。
 #   · 月之龛、厚墙两块月石：镜子在对应的那一格，几个时刻，九个取样点照没照到——和灰盒比；
 #   · 像站在回廊不同地方被月亮直射照着多少——和灰盒比；
 #   · 走到厚墙前（墙透开）→ 把波吕丢刻斯拉出来 → 顺时针一路推回卡斯托耳身边 → 并肩，月桥出现，铜链收起来；
@@ -140,8 +140,10 @@ def main():
     took = now() - t0
     yield from wait(60)
     d = tw(); exp = fl["push"]
-    check(d["joined"] and abs(d["polluxAz"] - TW["endAz"]) < 0.06 and d["lit"] > 0.99 and d["litC"] > 0.99 and abs(took - exp["seconds"]) < 1.0 and behind,
-          "顺时针一路推回卡斯托耳身边：用了 %.1f 秒（灰盒 %.1f 秒），停在方位 %.1f°，并肩=%s，月光照着 波吕丢刻斯 %.2f / 卡斯托耳 %.2f，人一直在他身后=%s；%s" % (took, exp["seconds"], d["polluxAz"], d["joined"], d["lit"], d["litC"], behind, state()[:30]))
+    # 推着像走是按人走路的速度走的：灰盒走 310 cm/s，游戏里 2026-10-10 起走 160（用户要真正走路的动作），时间按比例长
+    want_s = exp["seconds"] * 310.0 / pawn.get_editor_property("walk_speed")
+    check(d["joined"] and abs(d["polluxAz"] - TW["endAz"]) < 0.06 and d["lit"] > 0.99 and d["litC"] > 0.99 and abs(took - want_s) < 1.5 and behind,
+          "顺时针一路推回卡斯托耳身边：用了 %.1f 秒（灰盒 %.1f 秒 × 走路慢了的倍数），停在方位 %.1f°，并肩=%s，月光照着 波吕丢刻斯 %.2f / 卡斯托耳 %.2f，人一直在他身后=%s；%s" % (took, want_s, d["polluxAz"], d["joined"], d["lit"], d["litC"], behind, state()[:30]))
     check(d["bridgeK"] == 1 and not d["dormant"] and d["railsOn"] == d["rails"] and not d["chainOn"] and not d["chainShown"], "月桥出现（护栏 %d 块立起来），桥头的铜链收起来了" % d["railsOn"])
     look(30.0, -12.0)
     yield from wait(10)

@@ -134,7 +134,7 @@ namespace
 
 		// 每帧从游戏那边抄过来的
 		bool bFixLegs = true;
-		float RunBlend = 0.0f, CycleRate = 0.0f, StrideTarget = 1.0f, CyclesPerClip = 2.0f, RunPhaseLead = 0.5f;
+		float RunBlend = 0.0f, CycleRate = 0.0f, StrideTarget = 1.0f, CyclesPerClip = 2.0f, RunPhaseLead = 0.5f, StrideDropCm = 0.0f;
 		// 这边自己记的
 		float Stride = 1.0f;
 		double Phase = 0.0;            // 迈到第几个循环了（对 CyclesPerClip 取余）
@@ -261,6 +261,7 @@ namespace
 			for (int32 i = 0; i < Players.Num(); ++i)
 				if (Weights[i] > KINDA_SMALL_NUMBER && Ground[i].IsValid())
 					Off += Weights[i] * (Ground[i].SwayAt(Players[i].GetAccumulatedTime()) + FVector(Keep[i].X, Keep[i].Y, 0.0));
+			Off.Z -= StrideDropCm * FMath::Max(Stride - 1.0f, 0.0f) / 0.3f;   // 步子迈大了：人矮一点，腿才够得着
 			const bool bMove = !Off.IsNearlyZero(0.01);
 			const bool bWarp = FMath::Abs(Stride - 1.0f) > 0.005f && Legs[0].IsValid(BC) && Legs[1].IsValid(BC);
 			if (!bMove && !bWarp) return;
@@ -336,6 +337,7 @@ namespace
 			Root.StrideTarget = Hero->StrideScale;
 			Root.CyclesPerClip = Hero->CyclesPerClip;
 			Root.RunPhaseLead = Hero->RunPhaseLead;
+			Root.StrideDropCm = Hero->StrideDropCm;
 		}
 	};
 }
@@ -365,19 +367,45 @@ void UDysisHeroAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	else if (Hero->IsAscendingSteps()) { Clip = EDysisHeroClip::RunUpstairs; PlaybackRate = FMath::Clamp(Speed / 320.0f, 0.7f, 2.0f); }
 	else if (Speed > 8.0f && Clips.IsValidIndex(HeroClip_Run) && Clips[HeroClip_Walk] && Clips[HeroClip_Run])
 	{
-		// 走和跑：速度在两段动作本身的速度之间时按比例混（步子的大小、快慢也在两段之间）；
-		// 比“走”还慢、比“跑”还快的部分，步幅和步子的快慢各担一半（开方），脚在地上往后蹬的速度始终 = 人往前走的速度
+		// 走和跑：速度到 WalkBlendFromSpeed 为止全是“走”，再往上按比例混进“跑”，到“跑”本身的速度以上全是“跑”。
+		// 比动作本身快（慢）的部分，步幅和步子的快慢各担一半（开方）；脚在地上往后蹬的速度始终 = 人往前走的速度
 		const float Cycles = FMath::Max(CyclesPerClip, 1.0f);
 		const float WalkStride = WalkClipSpeed * Clips[HeroClip_Walk]->GetPlayLength() / Cycles;    // 一个循环往前走多远（厘米）
 		const float RunStride = RunClipSpeed * Clips[HeroClip_Run]->GetPlayLength() / Cycles;
-		RunBlend = FMath::Clamp((GaitSpeed - WalkClipSpeed) / FMath::Max(RunClipSpeed - WalkClipSpeed, 1.0f), 0.0f, 1.0f);
-		const float Natural = FMath::Lerp(WalkClipSpeed, RunClipSpeed, RunBlend);
-		StrideScale = FMath::Clamp(FMath::Sqrt(GaitSpeed / FMath::Max(Natural, 1.0f)), StrideMin, StrideMax);
-		CycleRate = FMath::Min(GaitSpeed / FMath::Max(FMath::Lerp(WalkStride, RunStride, RunBlend) * StrideScale, 1.0f), 4.0f);
+		const float BlendFrom = FMath::Clamp(WalkBlendFromSpeed, WalkClipSpeed, RunClipSpeed - 1.0f);
+		auto WalkScale = [this](float V) { return FMath::Clamp(FMath::Sqrt(V / FMath::Max(WalkClipSpeed, 1.0f)), StrideMin, StrideMax); };
+		float StrideCm;
+		if (GaitSpeed <= BlendFrom)
+		{
+			RunBlend = 0.0f;
+			StrideScale = WalkScale(GaitSpeed);
+			StrideCm = WalkStride * StrideScale;
+		}
+		else if (GaitSpeed >= RunClipSpeed)
+		{
+			RunBlend = 1.0f;
+			StrideScale = FMath::Clamp(FMath::Sqrt(GaitSpeed / RunClipSpeed), StrideMin, StrideMax);
+			StrideCm = RunStride * StrideScale;
+		}
+		else
+		{
+			RunBlend = (GaitSpeed - BlendFrom) / (RunClipSpeed - BlendFrom);
+			StrideScale = FMath::Lerp(WalkScale(BlendFrom), 1.0f, RunBlend);
+			StrideCm = FMath::Lerp(WalkStride * WalkScale(BlendFrom), RunStride, RunBlend);
+		}
+		CycleRate = FMath::Min(GaitSpeed / FMath::Max(StrideCm, 1.0f), 4.0f);
 		Clip = RunBlend >= 0.5f ? EDysisHeroClip::Run : EDysisHeroClip::Walk;
 	}
 	ActiveClip = int32(Clip);
 	RestartSerial = Hero->GetTouchSerial();
+	// 脚落地：一个循环两下。相位和动作那边的一起走（那边在走、跑两段都退场以后才清零，这里一停就清，只差在急停再起步的那一瞬）
+	if (CycleRate > 0.0f)
+	{
+		const double Before = FMath::FloorToDouble(GaitPhase * 2.0 - 2.0 * FootfallPhase);
+		GaitPhase += double(CycleRate) * DeltaSeconds;
+		if (FMath::FloorToDouble(GaitPhase * 2.0 - 2.0 * FootfallPhase) > Before) ++StepCount;
+	}
+	else GaitPhase = 0.0;
 }
 
 FName UDysisHeroAnimInstance::GetActiveClipName() const
@@ -399,9 +427,9 @@ FString UDysisHeroAnimInstance::DescribeGait()
 	const int32 Which[3] = { HeroClip_Walk, HeroClip_Run, HeroClip_Upstairs };
 	for (int32 k = 0; k < 3; ++k)
 		if (R.Ground.IsValidIndex(Which[k]) && R.Ground[Which[k]].IsValid()) Drop[k] = float(-R.Ground[Which[k]].Sway[0].Z);
-	return FString::Printf(TEXT("{\"clip\":\"%s\",\"weights\":{%s},\"phase\":%.3f,\"cycleRate\":%.3f,\"stride\":%.3f,\"runBlend\":%.3f,\"gaitSpeed\":%.1f,\"offset\":[%.2f,%.2f,%.2f],")
+	return FString::Printf(TEXT("{\"clip\":\"%s\",\"steps\":%d,\"weights\":{%s},\"phase\":%.3f,\"cycleRate\":%.3f,\"stride\":%.3f,\"runBlend\":%.3f,\"gaitSpeed\":%.1f,\"offset\":[%.2f,%.2f,%.2f],")
 		TEXT("\"idleSwayX\":[%.1f,%.1f],\"idleSwayY\":[%.1f,%.1f],\"drop\":{\"walk\":%.1f,\"run\":%.1f,\"upstairs\":%.1f}}"),
-		*GetActiveClipName().ToString(), *W, R.Phase, CycleRate, R.Stride, RunBlend, GaitSpeed, R.LastOffset.X, R.LastOffset.Y, R.LastOffset.Z,
+		*GetActiveClipName().ToString(), StepCount, *W, R.Phase, CycleRate, R.Stride, RunBlend, GaitSpeed, R.LastOffset.X, R.LastOffset.Y, R.LastOffset.Z,
 		Lo.X, Hi.X, Lo.Y, Hi.Y, Drop[0], Drop[1], Drop[2]);
 }
 

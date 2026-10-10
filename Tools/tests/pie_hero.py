@@ -70,11 +70,11 @@ def main():
     seen = []; sp = 0.0
     for i in range(46):
         pawn.add_movement_input(fwd, 1.0, False); yield
-        if i > 12 and speed() > 300: seen.append(clip()); sp = max(sp, speed())
+        if i > 12 and speed() > 150: seen.append(clip()); sp = max(sp, speed())
         if i == 28: director.debug_camera(unreal.Vector(foot()[0] + math.cos(yaw) * 380, foot()[1] + math.sin(yaw) * 380, foot()[2] + 110), unreal.Vector(foot()[0], foot()[1], foot()[2] + 95), 45.0)
         if i == 40: unreal.SystemLibrary.execute_console_command(w, "Shot")
     director.debug_camera_off()
-    check(len(seen) > 8 and set(seen) == {"A_Run"} and abs(sp - 310) < 8, "走（%.0f cm/s）：放的主要是 %s（走路那段动作本身只有 1.0 m/s，游戏里走是 3.1 m/s，按速度混下来九成是 A_Run）" % (sp, sorted(set(seen))))
+    check(len(seen) > 8 and set(seen) == {"A_Walk"} and abs(sp - 160) < 8, "走（%.0f cm/s）：放的是 %s（走的那一段动作，步幅放大、步子放快）" % (sp, sorted(set(seen))))
     yield from wait(25)
     check(clip() == "A_Idle", "停下来回到 %s" % clip())
     # 慢慢走（手柄轻推）：应该是走路的动作
@@ -82,7 +82,7 @@ def main():
     for i in range(60):
         pawn.add_movement_input(fwd, -0.45, False); yield
         if i > 25: seen.add(clip()); sp = max(sp, speed())
-    check(seen == {"A_Walk"} and sp < 200, "慢慢走（%.0f cm/s）：放的是 %s" % (sp, sorted(seen)))
+    check(seen == {"A_Walk"} and sp < 100, "慢慢走（%.0f cm/s）：放的是 %s" % (sp, sorted(seen)))
     yield from wait(25)
 
     # 3 跳：起跳 → 下落 → 落地 → 站着
@@ -186,7 +186,7 @@ def main():
     check(lag_idle < 2.0 and 0.5 < hair()["breeze"] < 2.5, "站着时头发只是轻轻飘（发梢 %.1f cm），没有被甩出去（%.1f cm）" % (hair()["breeze"], lag_idle))
     # 走、跑：脚踝最低时离地多高（脚踩平时是 14.6 cm；没修之前“跑”那一段最低也有 23 cm，人是悬着的）
     hh2 = pawn.get_component_by_class(unreal.CapsuleComponent).get_scaled_capsule_half_height()
-    for label, spd, want_stride in (("走", 310.0, 1.0), ("跑", 520.0, 1.202)):
+    for label, spd, want_stride, want_clip, back_cm in (("走", 160.0, 1.265, "A_Walk", 2.0), ("跑", 520.0, 1.202, "A_Run", 3.0)):
         mv.set_editor_property("max_walk_speed", spd)
         go(polar(215.0, 1450.0, 0.0), 8.0)
         yield from wait(40)
@@ -201,15 +201,25 @@ def main():
                 lags.append((h["lagCm"], h["lag"][0] * math.cos(yaw) + h["lag"][1] * math.sin(yaw)))
         yield from ring(2.6, each)
         g = seen.get("g", gait()); back = sorted(x[1] for x in lags)[len(lags) // 2] if lags else 0.0
-        check(12.0 < low[0] < 17.5 and g["clip"] == "A_Run" and abs(g["stride"] - want_stride) < 0.06,
+        check(12.0 < low[0] < 17.5 and g["clip"] == want_clip and abs(g["stride"] - want_stride) < 0.06,
               "%s（%.0f cm/s）：脚踝最低离地 %.1f cm（踩到地了）；步幅 ×%.2f、每秒 %.2f 个循环、走跑混合 %.2f" % (label, spd, low[0], g["stride"], g["cycleRate"], g["runBlend"]))
-        check(back < -3.0 and max(x[0] for x in lags) <= 22.0, "%s的时候头发往后飘：发梢往后 %.1f cm（最多偏 %.1f cm）" % (label, -back, max(x[0] for x in lags)))
+        check(back < -back_cm and max(x[0] for x in lags) <= 22.0, "%s的时候头发往后飘：发梢往后 %.1f cm（最多偏 %.1f cm）" % (label, -back, max(x[0] for x in lags)))
         t = 0.0
         while t < 2.0:
             yield
             t += dt()
         check(hair()["lagCm"] < 1.5, "停下 2 秒后头发晃回原位（还偏 %.1f cm）" % hair()["lagCm"])
-    mv.set_editor_property("max_walk_speed", 310.0)
+    mv.set_editor_property("max_walk_speed", 160.0)
+    # 脚步声跟着动作里脚落地的那一下：走 2 秒，数落地了几下（每分钟一百三十步 → 2 秒 4 下上下）
+    go(polar(215.0, 1450.0, 0.0), 8.0)
+    yield from wait(40)
+    n0 = [None]; n1 = [0]
+    def count(t):
+        g = gait()
+        if n0[0] is None: n0[0] = g.get("steps", 0)
+        n1[0] = g.get("steps", 0)
+    yield from ring(2.0, count)
+    check(3 <= n1[0] - n0[0] <= 6, "走 2 秒脚落地 %d 下（脚步声跟着这个响）" % (n1[0] - n0[0]))
     say("全部通过" if bad[0] == 0 else "有 %d 条没过" % bad[0])
 
 class R:

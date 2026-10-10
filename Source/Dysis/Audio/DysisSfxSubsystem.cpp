@@ -1,5 +1,6 @@
 ﻿// 狄西斯的日落回廊 · 音效播放子系统
 #include "Audio/DysisSfxSubsystem.h"
+#include "Audio/DysisUserVolume.h"
 
 #include "AudioDevice.h"
 #include "Camera/PlayerCameraManager.h"
@@ -111,7 +112,7 @@ void UDysisSfxSubsystem::DebugPrint(const FString& Line) const
 
 float UDysisSfxSubsystem::BaseVolume(const FDysisSfxEvent& Event) const
 {
-	return Event.Volume * UDysisSfxSettings::Get()->GetCategoryVolume(Event.Category);
+	return Event.Volume * UDysisSfxSettings::Get()->GetCategoryVolume(Event.Category) * DysisUserVolume::Sfx();   // 最后一个是玩家在设置页里调的
 }
 
 USoundBase* UDysisSfxSubsystem::ResolveSound(const FDysisSfxEvent& Event, int32 Variant, FKeyState& State)
@@ -232,6 +233,13 @@ UAudioComponent* UDysisSfxSubsystem::PlayInternal(FName Key, const FVector* Loca
 	}
 
 	State.LastPlayTime = T;
+	if (Comp && (bAudition || Event->Category == EDysisSfxCategory::UI) && !Comp->bIsUISound)
+	{
+		// 界面的声音、试听：游戏暂停（设置页）时也要响
+		Comp->Stop();
+		Comp->bIsUISound = true;
+		Comp->Play();
+	}
 	if (Comp)
 	{
 		State.Active.Add(Comp);

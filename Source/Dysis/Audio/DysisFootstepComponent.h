@@ -53,6 +53,7 @@ private:
 	bool bHavePrev = false;
 
 	float StepDistance = 0.0f;
+	int32 LastGaitSteps = -1;   // 上一帧主角迈到第几步（脚步声跟着动作响）
 	bool bWasMoving = false;
 	float LastMoveSpeed = 0.0f;
 	bool bWasOnGround = true;

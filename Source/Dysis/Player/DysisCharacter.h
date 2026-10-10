@@ -54,12 +54,18 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis")
 	TObjectPtr<UDysisInteractComponent> Interact;
 
-	// ───── 移动（灰盒数值，厘米 / 秒） ─────
+	// ───── 移动（厘米 / 秒） ─────
+	/** 走：灰盒是 310（每秒三米多，只能是小跑的样子）。2026-10-10 用户要真正走路的动作、同意降速：改成 160（快步走，每分钟一百三十步）。跑仍是灰盒的 520。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Move")
-	float WalkSpeed = 310.f;
+	float WalkSpeed = 160.f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Move")
 	float RunSpeed = 520.f;
+
+	/** 跳起来以后在空中往前最快多快（没按住跑的时候）：灰盒里走是 310，那些要跳过去的缺口（殿里一级一级的光阶）是按这个速度量好的；
+	 *  走路降到 160 以后原地起跳就够不着了，所以空中仍按 310——地上走得慢，跳出去的远近和灰盒一样。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Move")
+	float LeapSpeed = 310.f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Move")
 	float JumpSpeed = 760.f;
@@ -150,6 +156,10 @@ public:
 	/** 头发现在的样子（JSON：发梢偏了多少、自己飘的幅度；测试用）。 */
 	UFUNCTION(BlueprintPure, Category = "Dysis|Hero")
 	FString DescribeHair() const;
+
+	/** 迈了第几步了（脚落地的那一下加一；脚步声跟着它响）、现在走和跑各占多少（0 = 走，1 = 跑）。没有主角模型时是 -1。 */
+	int32 GetGaitStepCount() const;
+	float GetGaitRunBlend() const;
 
 	/** 现在镜头离瞄点多远（测试用）。 */
 	UFUNCTION(BlueprintPure, Category = "Dysis|Camera")
