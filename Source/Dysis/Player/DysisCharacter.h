@@ -104,6 +104,57 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Camera")
 	float CameraTunnelDistance = 260.f;
 
+	/** 镜头离墙至少这么远（厘米）：挡镜头时扫的那个小球的半径。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Camera")
+	float CameraProbeRadius = 22.f;
+
+	/** 被墙顶近以后，前面空了镜头每秒往回放多少厘米（收近是立刻的）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Camera")
+	float CameraPushOutSpeed = 900.f;
+
+	/** 脚下的一团影子：朝下投的一块贴花，把地面压暗一点。殿里大部分地方照不到太阳（只有环境光），人没有影子，看着像飘着。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Hero")
+	TObjectPtr<class UDecalComponent> BlobShadow;
+
+	/** 那团影子有多深（0 = 没有）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float BlobShadowStrength = 0.6f;
+
+	// ───── 头发的摆动（模型没有头发的骨头：在材质里按一张遮罩把头发的顶点挪一挪，见 Art/Characters/make_hair_mask.py） ─────
+	/** 头发像挂在头上的一根弹簧：头一动，发梢慢一拍跟上、再晃两下停住。这是它来回晃的快慢（每秒几次）和停得多快（0–1，越大停得越快）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairSpringHz = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairDamping = 0.38f;
+
+	/** 头的速度变了多少，发梢就被甩出去多少（比例）。人是一按键就到全速的，全算上头发会甩得太远。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairInertia = 0.28f;
+
+	/** 一直在走的时候头发往后飘多少：速度（厘米/秒）乘这个数 = 发梢往后多少厘米。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairDragSeconds = 0.02f;
+
+	/** 发梢最多离原位多远（厘米）。往身子里面（往前）只让它进一点点，不然会穿进后背。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairMaxLagCm = 16.f;
+
+	/** 站着时头发自己轻轻飘的幅度、跑起来以后的幅度（发梢，厘米）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairBreezeCm = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Hero")
+	float HairRunBreezeCm = 3.5f;
+
+	/** 头发现在的样子（JSON：发梢偏了多少、自己飘的幅度；测试用）。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Hero")
+	FString DescribeHair() const;
+
+	/** 现在镜头离瞄点多远（测试用）。 */
+	UFUNCTION(BlueprintPure, Category = "Dysis|Camera")
+	float GetCameraArmNow() const { return CamArmNow; }
+
 	/** 入夜以后镜头用固定曝光（不然自动曝光会把月夜提亮得和白天一样）。数越大越亮，加 1 亮一倍。
 	 *  −1.0 是拿灰盒同样位置、同样时刻的画面对出来的：月光照不到的墙、夜空、月光照到的地面都和灰盒差不多亮。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Camera")
@@ -227,6 +278,20 @@ private:
 	int32 TouchSerial = 0;
 	FVector PrevHeroLocation = FVector::ZeroVector;
 	float CamTun = 0.0f;   // 0 = 在开阔处，1 = 在墙里的楼梯上（镜头收紧）
+	float CamArmNow = -1.0f;   // 镜头现在离瞄点多远（被墙顶近以后慢慢放回去）
+
+	// 头发：材质的动态实例、弹簧现在的偏移和速度（世界坐标，厘米）、上一帧头在哪和头的速度
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> HeroMID;
+	FVector HairLag = FVector::ZeroVector, HairLagVel = FVector::ZeroVector, HairPrevHead = FVector::ZeroVector, HairPrevHeadVel = FVector::ZeroVector, HairLagShown = FVector::ZeroVector;
+	float HairBreezeNow = 0.0f;
+	bool bHairInit = false;
+	void UpdateHair(float Dt);
+
+	// 脚下的一团影子（贴花）：照不到太阳、月亮的地方人也“踩”在地上
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> BlobShadowMID;
+	float BlobShadowK = 1.0f;
 
 	/** coyote 窗口标志（离地起表、跳了即灭）。 */
 	bool bCanCoyoteJump = false;

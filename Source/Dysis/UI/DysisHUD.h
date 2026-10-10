@@ -96,9 +96,16 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Dysis|HUD")
 	bool IsSettingsOpen() const { return Screen == EDysisScreen::Settings; }
 
-	/** 主界面“开始游戏”。bInstant = 不要黑场过渡（测试用）。 */
+	/** 主界面“开始游戏”。bInstant = 不要黑场过渡（测试用；同时打开测试模式）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
 	void StartGame(bool bInstant = false);
+
+	/** 测试模式（自动测试没人点鼠标、也不想出声）：对话 4 秒一句自己翻页，背景音乐静音。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
+	void SetTestMode(bool bOn) { bTestMode = bOn; }
+
+	UFUNCTION(BlueprintPure, Category = "Dysis|HUD")
+	bool IsTestMode() const { return bTestMode; }
 
 	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
 	void OpenSettings();
@@ -109,6 +116,8 @@ public:
 	/** 回到主界面：重新载入关卡，一切从头。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|HUD")
 	void ReturnToMainMenu();
+
+	bool bTestMode = false;
 
 	/** 场上正在播的对话组件（HUD 按它的当前句画文本框、名牌、立绘）。 */
 	UPROPERTY(Transient)

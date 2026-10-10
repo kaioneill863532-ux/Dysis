@@ -12,6 +12,7 @@
 #include "Sky/DysisSkyLibrary.h"
 #include "Sky/DysisTimeComponent.h"
 #include "Camera/CameraActor.h"
+#include "Components/BoxComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -34,6 +35,11 @@ namespace
 	// 殿顶的虹门（灰盒 ARCH）：拱心在环道上的位置、正对接光台的方向、沿拱的方向，拱的半径、拱心比最高一级高多少
 	const FVector FxArchC(1246.343, 766.807, 0.0), FxArchN(0.46502, 0.8853, 0.0), FxArchT(-0.8853, 0.46502, 0.0);
 	constexpr float FxArchR = 153.069f, FxArchH = 155.396f;
+	// 瀑布（方位 116.25°–139.75°；前后两片水帘在 r = 12.45 / 12.73 m，顶上从墙里漫出来）
+	constexpr float FxFallA0 = 116.25f, FxFallA1 = 139.75f, FxFallBack = 1273.0f, FxFallTopZ = 2930.0f, FxFallWallR = 1560.0f;
+	// 加厚：同一个模型绕殿心放大这么多再放一份（两片水帘落到 r ≈ 13.1 / 13.4 m），和原来的叠着看有前后的错动。
+	// 只能往墙那边加：水帘前面 r ≈ 12.3 m 是虹桥的边
+	constexpr float FxFallThickK = 1.0526f;
 	// 环道面的高度、最高一级升到头比环道高多少（和 DysisDirectorRoof.cpp 里的 RoofRingZ / RoofTopZEnd 是同两个数）
 	constexpr float FxRoofRingZ = 3030.0f, FxRoofTopZEnd = 720.0f;
 	// 灰盒合成那一遍里虹的总亮度（uRainK）；Boost：UE 的曝光下再提多少才和灰盒看着一样亮
@@ -117,6 +123,7 @@ void ADysisDirector::SetupFx()
 	const bool bAnimeWater = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater"), nullptr, LOAD_NoWarn | LOAD_Quiet) != nullptr;
 	PoolMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Pool")), bAnimeWater ? TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater") : TEXT("/Game/Dysis/Fx/M_DysisPool.M_DysisPool"));
 	FallMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Waterfall")), TEXT("/Game/Dysis/Fx/M_DysisWaterfall.M_DysisWaterfall"));
+	SetupWaterfallLook();
 	const int32 MoonN = UE_ARRAY_COUNT(GDysisMoonBridgePts);
 	if (AActor* Deck = MoonDeck.Get())
 		if ((MoonDeckMID = FxMaterial(Deck, TEXT("/Game/Dysis/Night/M_DysisMoonBridge.M_DysisMoonBridge"))) != nullptr)
@@ -287,6 +294,18 @@ void ADysisDirector::UpdateFx(float Dt)
 		FallHoleK = DysisGB::Toward(FallHoleK, HoleWant, 3.0f, Dt);
 		FallMID->SetVectorParameterValue(TEXT("Hole"), FxVec(FallHole));
 		FallMID->SetScalarParameterValue(TEXT("HoleK"), FallHoleK);
+		for (UMaterialInstanceDynamic* More : FallMoreMIDs)
+			if (More)
+			{
+				More->SetVectorParameterValue(TEXT("Tint"), FallTint);
+				More->SetScalarParameterValue(TEXT("Opacity"), FMath::Clamp(Flow * 1.2f, 0.0f, 1.0f));
+				More->SetVectorParameterValue(TEXT("Hole"), FxVec(FallHole));
+				More->SetScalarParameterValue(TEXT("HoleK"), FallHoleK);
+			}
+		// 开了闸、水下来以后：瀑布这一块（连同后面的水槽和女神像）人进不去了
+		const ECollisionEnabled::Type Mode = Flow > 0.15f ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision;
+		for (const TWeakObjectPtr<UBoxComponent>& B : FallBlocks)
+			if (B.IsValid() && B->GetCollisionEnabled() != Mode) B->SetCollisionEnabled(Mode);
 	}
 	if (FallMist && FallMistMID)
 	{
@@ -397,4 +416,85 @@ void ADysisDirector::DebugCameraOff()
 	const UWorld* World = GetWorld();
 	APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
 	if (PC && PC->GetPawn()) PC->SetViewTarget(PC->GetPawn());
+}
+
+// ───────────────────────── 瀑布：加厚、两头封上、开闸后挡人 ─────────────────────────
+
+void ADysisDirector::SetupWaterfallLook()
+{
+	// 2026-10-10 用户定：瀑布要有厚度，左右两边也挡上，开了水闸以后人就没法靠近后面的女神像了
+	// （灰盒里瀑布是两片薄水帘，从东边的石台上能绕到水帘后面，一直走到女神像跟前）。
+	for (UStaticMeshComponent* C : FallMore) if (C) C->DestroyComponent();
+	FallMore.Reset(); FallMoreMIDs.Reset(); FallBlocks.Reset();
+	AActor* Fall = Piece(TEXT("SM_Mech_Water_Waterfall"));
+	UStaticMeshComponent* Src = Fall ? Fall->FindComponentByClass<UStaticMeshComponent>() : nullptr;
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisWaterfall.M_DysisWaterfall"));
+	if (!Src || !Mat) return;
+	// 挂在瀑布这个 Actor 上：没水的时候它整个藏起来，这几片跟着藏
+	auto Sheet = [&](UStaticMesh* Mesh, const FVector& Loc, const FQuat& Rot, const FVector& Scale, float Phase, float Flat, float Density)
+	{
+		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Fall);
+		C->SetupAttachment(Src);
+		C->SetMobility(EComponentMobility::Movable);
+		C->SetStaticMesh(Mesh);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCastShadow(false);
+		C->RegisterComponent();
+		C->SetWorldLocationAndRotation(Loc, Rot);
+		C->SetWorldScale3D(Scale);
+		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
+		MID->SetVectorParameterValue(TEXT("Pivot"), FxVec(Loc));
+		MID->SetScalarParameterValue(TEXT("Phase"), Phase);
+		MID->SetScalarParameterValue(TEXT("Flat"), Flat);
+		MID->SetScalarParameterValue(TEXT("Density"), Density);
+		for (int32 i = 0; i < C->GetNumMaterials(); ++i) C->SetMaterial(i, MID);
+		FallMore.Add(C);
+		FallMoreMIDs.Add(MID);
+	};
+	// ① 加厚：往墙那边再放一层
+	{
+		const FVector L = Src->GetComponentLocation();
+		const FVector S = Src->GetComponentScale();
+		Sheet(Src->GetStaticMesh(), FVector(L.X * FxFallThickK, L.Y * FxFallThickK, L.Z), Src->GetComponentQuat(), FVector(S.X * FxFallThickK, S.Y * FxFallThickK, S.Z), 1.0f, 0.0f, 0.85f);
+	}
+	// ② 两头各立一片水，从最前面的水帘一直到墙：侧面看过去也是水，看不到水帘后面
+	if (PlaneMesh)
+		for (const float Az : { FxFallA0, FxFallA1 })
+		{
+			const FVector Radial = DysisGB::PolarCm(Az, 1.0f, 0.0f).GetSafeNormal();
+			const float R0 = FxFallR - 2.0f, R1 = FxFallWallR, Z0 = FxWaterZ, Z1 = FxFallTopZ;
+			Sheet(PlaneMesh, DysisGB::PolarCm(Az, (R0 + R1) * 0.5f, (Z0 + Z1) * 0.5f), FRotationMatrix::MakeFromXY(Radial, FVector::UpVector).ToQuat(),
+				FVector((R1 - R0) / 100.0, (Z1 - Z0) / 100.0, 1.0), Az == FxFallA0 ? 2.0f : 3.0f, 1.0f, 1.15f);
+		}
+	// ③ 挡人的墙（只挡人，不挡光、不挡镜头；开闸以后才生效）：两头各一道，前面沿水帘四段
+	auto Block = [this](const FVector& Center, float YawDeg, const FVector& Half)
+	{
+		UBoxComponent* Box = MakeWall();
+		Box->SetBoxExtent(Half);
+		Box->SetWorldLocationAndRotation(Center, FRotator(0.0f, YawDeg, 0.0f));
+		Box->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Box->ComponentTags.Add(TEXT("DysisNoTrap"));   // 水下来的时候人要是正好站在里面，不会被卡死
+		FallBlocks.Add(Box);
+	};
+	const float ZMid = (FxWaterZ - 60.0f + FxFallTopZ) * 0.5f, ZHalf = (FxFallTopZ - FxWaterZ + 60.0f) * 0.5f;
+	for (const float Az : { FxFallA0, FxFallA1 })
+		Block(DysisGB::PolarCm(Az, (FxFallR + FxFallWallR) * 0.5f, ZMid), Az, FVector((FxFallWallR - FxFallR) * 0.5f, 6.0f, ZHalf));
+	const int32 Segs = 4;
+	const float Step = (FxFallA1 - FxFallA0) / Segs;
+	for (int32 i = 0; i < Segs; ++i)
+	{
+		const float Az = FxFallA0 + Step * (i + 0.5f);
+		const float HalfChord = FxFallR * FMath::Tan(FMath::DegreesToRadians(Step * 0.5f)) + 4.0f;
+		Block(DysisGB::PolarCm(Az, FxFallR - 6.0f, ZMid), Az, FVector(6.0f, HalfChord, ZHalf));
+	}
+}
+
+FString ADysisDirector::DescribeWaterfall() const
+{
+	int32 Sheets = 0, Sides = 0, Blocking = 0;
+	for (const UStaticMeshComponent* C : FallMore)
+		if (C) { ++Sheets; if (C->GetStaticMesh() == PlaneMesh) ++Sides; }
+	for (const TWeakObjectPtr<UBoxComponent>& B : FallBlocks)
+		if (B.IsValid() && B->GetCollisionEnabled() != ECollisionEnabled::NoCollision) ++Blocking;
+	return FString::Printf(TEXT("{\"extraSheets\":%d,\"sideSheets\":%d,\"blocks\":%d,\"blocking\":%d}"), Sheets, Sides, FallBlocks.Num(), Blocking);
 }

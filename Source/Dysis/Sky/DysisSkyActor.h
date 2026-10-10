@@ -301,6 +301,23 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	int32 StarCount = 1800;
 
+	/** 主界面上星星的拖尾（2026-10-10 用户要的）：主界面的天转得快（一两分钟一昼夜），每颗星后面拖一道淡下去的光，像长时间曝光拍的星轨。
+	 *  每颗星一条细长的小片，顺着它转的方向摆在它身后；离转轴近的星拖得短，远的拖得长。游戏里星空转得很慢，不显示。 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Dysis|Sky|主界面")
+	TObjectPtr<UInstancedStaticMeshComponent> StarTrails;
+
+	/** 拖尾有多长：星星绕着转轴转过这么多度的那一段弧。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|主界面")
+	float MenuStarTrailDeg = 5.0f;
+
+	/** 拖尾有多亮（相对星星本身）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky|主界面")
+	float MenuStarTrailGain = 0.5f;
+
+	/** 测试用：拖尾现在显没显示、有几条。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky|主界面")
+	FString DescribeStarTrails() const;
+
 	/** 星星离天空中心多远（厘米；在月亮圆盘和夜空的球之间）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	float StarDistanceCm = 430000.f;
@@ -345,6 +362,13 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> StarMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> StarTrailMID;
+	float TrailsBuiltDeg = -1.f;
+	void BuildStarTrails();
+	TArray<FVector> StarDirs;        // 每颗星的方向、颜色 × 亮度（和 Stars 里的实例一一对应）
+	TArray<float> StarData;
 
 	int32 StarsBuilt = 0;
 	float StarOpacity = 0.f;

@@ -97,9 +97,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
 	FString DescribeRoof() const;
 
-	/** 三相像的底座转到第几格（6 格：0 月之龛、1 夜里照女神、2 白天照日之龛……）。按一次绞盘转一格。 */
+	/** 三相像的底座转到第几格（6 格：0 月之龛、1 夜里照女神、2 白天照日之龛……）。按一次绞盘转一格。
+	 *  开局在第 0 格（2026-10-10 用户定：灰盒开局就在第 2 格，人不用转、走过去镜光已经在了；现在要自己转两下）。 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
-	int32 MirrorSlot = 2;
+	int32 MirrorSlot = 0;
+
+	/** 玩家（或测试）转过三相像没有；入夜时已经按“没转过就转回白天那一格”处理过没有。 */
+	bool bMirrorTouched = false, bMirrorNightSeen = false;
 
 	/** 日之龛打开了没有。 */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Dysis|Director")
@@ -501,6 +505,9 @@ private:
 	void UpdateViews();
 	bool bTopArmillaryTold = false;              // 殿顶浑天仪那句“金苹果”的描述说过了
 	bool bMenuPose = false;                      // 主界面开着：屋顶的踏步摆成升到头的样子
+	// 背景音乐跟着游戏走（进游戏先停、踩上那道光才响、靠近机关和过剧情时压低）—— DysisDirectorSfx.cpp
+	void UpdateMusic();
+	bool bMusicInGame = false, bMusicOn = false;
 	/** 入夜以后狄西斯自己说的那一句，用剧情对话框放。 */
 	UPROPERTY()
 	TObjectPtr<class UDysisDialogueComponent> NightDialogue;
@@ -512,6 +519,25 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMeshComponent>> SkinOrigs;      // 对应的原模型组件（管碰撞）
 	bool bLowPolyShown = false;
+
+	// 机关部件的样子（都不换模型、不动碰撞）：石头做的换成和墙一样的配色；嵌在内墙里的暗门、封石、浮雕板退到和墙面齐平 —— DysisDirectorSkin.cpp
+	void SetupMechLook();
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> FlushComps;     // 齐平以后看得见的那一份（原件不画了，碰撞照旧）
+	TMap<FName, TWeakObjectPtr<UStaticMeshComponent>> FlushOf;   // 部件名 → 它看得见的那一份
+	int32 MechRecolored = 0;
+public:
+	/** 这个部件现在画的是哪一个组件（退到和墙面齐平的那些是另挂的一份；别的就是它自己）。 */
+	UStaticMeshComponent* VisualOf(FName PieceTag) const;
+
+	/** 测试用：机关部件的样子（几个退平了、各退了多少厘米、几个面换了配色）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeMechLook() const;
+
+	/** 测试用：瀑布（几层、两头封没封、挡人的墙开没开）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeWaterfall() const;
+private:
 
 	// 殿外的配景和夕照的配色：山、石、草坡、云；建筑换上美术那版外景的调色板 —— DysisDirectorScenery.cpp
 	void SetupScenery();
@@ -557,6 +583,13 @@ private:
 	TObjectPtr<class UMaterialInstanceDynamic> PoolMID;
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> FallMID;
+	// 瀑布加厚的那几层、两头封上的两片（材质和主瀑布一样，每帧跟着写同样的数）；开闸以后挡人的墙
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> FallMoreMIDs;
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> FallMore;
+	TArray<TWeakObjectPtr<UBoxComponent>> FallBlocks;
+	void SetupWaterfallLook();
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> MoonDeckMID;
 	UPROPERTY()

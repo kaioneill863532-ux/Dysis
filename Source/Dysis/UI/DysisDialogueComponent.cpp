@@ -27,13 +27,17 @@ void UDysisDialogueComponent::Play()
 {
 	if (Lines.Num() == 0) return;
 	CurrentLine = 0;
-	LineTimer = SecondsPerLine;
 	SetComponentTickEnabled(true);
 	// 注册到 HUD（一次只画一个；后播的顶掉先播的）。
 	if (GetWorld())
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			if (ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
+			{
 				H->ActiveDialogue = this;
+				Hud = H;
+			}
+	LineTimer = AutoSeconds();
+	LineShownSeconds = 0.0f;
 	if (ForcedH >= 0.0f)
 		if (UDysisTimeComponent* Time = ResolveTime())
 			Time->SetForcedTime(ForcedH);   // 过场钉住时刻（灰盒 state.forceH 同义）
@@ -52,14 +56,30 @@ void UDysisDialogueComponent::Advance()
 				Time->ClearForcedTime();   // 演完放开时刻，天跟着人走
 		return;
 	}
-	LineTimer = SecondsPerLine;
+	LineTimer = AutoSeconds();
+	LineShownSeconds = 0.0f;
+}
+
+bool UDysisDialogueComponent::AdvanceByPlayer()
+{
+	if (CurrentLine < 0 || LineShownSeconds < 0.25f) return false;
+	Advance();
+	return true;
+}
+
+float UDysisDialogueComponent::AutoSeconds() const
+{
+	if (SecondsPerLine > 0.0f) return SecondsPerLine;
+	const ADysisHUD* H = Hud.Get();
+	return H && H->IsTestMode() ? 4.0f : 0.0f;
 }
 
 void UDysisDialogueComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (CurrentLine < 0) { SetComponentTickEnabled(false); return; }
-	if (SecondsPerLine > 0.0f)
+	LineShownSeconds += DeltaTime;
+	if (AutoSeconds() > 0.0f)
 	{
 		LineTimer -= DeltaTime;
 		if (LineTimer <= 0.0f) Advance();
@@ -86,7 +106,7 @@ namespace
 				FText::FromString(TEXT("塞勒涅：那就让她把光带下来吧。我在水里等她。")),
 				FText::FromString(TEXT("赫利俄斯：等她集齐了日、虹、月，黎明会来接她。")),
 			};
-			D->SecondsPerLine = 4.0f;
+			D->SecondsPerLine = 0.0f;   // 演示也不自己翻页：等玩家点
 			D->ForcedH = -1.0f;   // 演示不钉时刻；虹之龛正式版设 RELIEF_H=31.05
 			D->Play();
 		}));

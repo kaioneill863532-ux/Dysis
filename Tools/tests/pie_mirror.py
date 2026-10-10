@@ -1,4 +1,4 @@
-# 三相像和日之龛的测试（UE 编辑器 Python，开 PIE 跑）：
+﻿# 三相像和日之龛的测试（UE 编辑器 Python，开 PIE 跑）：
 #   · 人在三层回廊不同地方（时刻不同）时，三相像是暗相还是日相、镜光有没有、能不能踩——和灰盒比；
 #   · 镜子停在日相时，只变太阳的时刻，镜光和灰盒比；白天把六格转一遍；
 #   · 夜里：月相、反射的月光，和灰盒比；
@@ -71,6 +71,10 @@ def main():
     check("mirror" in beams and "mmoon" in beams, "镜光和月光反射两束都在（%s）" % sorted(beams))
 
     # ── A 白天：人站在不同地方（时刻不同）──
+    # 灰盒里三相像一开始就在“日相”（第 2 格）；2026-10-10 起游戏里改成从第 0 格开始、要玩家自己转两下，这里先替玩家转好再比
+    check(mirror()["slot"] == 0, "三相像一开始在第 0 格（要转两下才到日相），现在第 %s 格" % mirror()["slot"])
+    director.debug_set_mirror_slot(2)
+    yield from wait(260)
     n = ok = 0; notes = []
     for r in G["day"]:
         tc.set_forced_time(r["H"])

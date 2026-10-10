@@ -25,7 +25,6 @@ void ADysisPrologueDirector::BeginPlay()
 	Dialogue->ForcedH = bFreezeTimeDuringDialogue
 		? (float)UDysisSkyLibrary::DysisConst(TEXT("H_I"))   // 22.37 = 13:29（开场）
 		: -1.0f;
-	Dialogue->SecondsPerLine = 5.0f;   // 开场对话稍慢（叙事节奏）
 
 	Countdown = bAutoStart ? StartDelaySeconds : -1.0f;
 }

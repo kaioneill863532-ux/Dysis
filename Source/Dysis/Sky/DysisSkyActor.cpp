@@ -102,6 +102,17 @@ ADysisSkyActor::ADysisSkyActor()
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> Plane(TEXT("/Engine/BasicShapes/Plane.Plane"));
 	if (Plane.Succeeded()) Stars->SetStaticMesh(Plane.Object);
 
+	StarTrails = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("StarTrails"));
+	StarTrails->SetupAttachment(RootComponent);
+	StarTrails->SetMobility(EComponentMobility::Movable);
+	StarTrails->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	StarTrails->SetCastShadow(false);
+	StarTrails->bUseAsOccluder = false;
+	StarTrails->SetTranslucentSortPriority(-91);   // 画在星星后面
+	StarTrails->NumCustomDataFloats = 3;
+	StarTrails->SetVisibility(false);
+	if (Plane.Succeeded()) StarTrails->SetStaticMesh(Plane.Object);
+
 	PreviewH = UDysisSkyLibrary::DysisConst(TEXT("H_I"));
 }
 
@@ -225,6 +236,7 @@ void ADysisSkyActor::ApplyStarRotation()
 		Base = FQuat(FVector(FMath::Cos(Lat), 0.0, FMath::Sin(Lat)), FMath::DegreesToRadians(CurrentH));
 	}
 	Stars->SetRelativeRotation(FQuat(FVector::UpVector, FMath::DegreesToRadians(StarSpinDeg)) * Base);
+	if (StarTrails) StarTrails->SetRelativeRotation(Stars->GetRelativeRotation());
 }
 
 void ADysisSkyActor::BuildStars()
@@ -250,6 +262,10 @@ void ADysisSkyActor::BuildStars()
 	Stars->AddInstances(Xf, /*bShouldReturnIndices*/ false, /*bWorldSpace*/ false);
 	for (int32 i = 0; i < StarCount; ++i) Stars->SetCustomData(i, MakeArrayView(&Data[i * 3], 3), i == StarCount - 1);
 	StarsBuilt = StarCount;
+	StarDirs.Reset(StarCount);
+	for (const FTransform& T : Xf) StarDirs.Add(T.GetLocation().GetSafeNormal());
+	StarData = Data;
+	TrailsBuiltDeg = -1.f;
 }
 
 FRotator ADysisSkyActor::GetMainLightRotation() const
@@ -426,6 +442,24 @@ void ADysisSkyActor::ApplyNightSky()
 		}
 		ApplyStarRotation();
 		Stars->SetVisibility(StarMID && StarOpacity > 0.001f);
+		// 主界面：星星的拖尾
+		if (StarTrails)
+		{
+			const bool bTrails = bMenuOrbit && StarMaterial && StarOpacity > 0.001f && MenuStarTrailDeg > 0.01f;
+			if (bTrails)
+			{
+				if (!FMath::IsNearlyEqual(TrailsBuiltDeg, MenuStarTrailDeg, 0.01f) || StarTrails->GetInstanceCount() != StarDirs.Num()) BuildStarTrails();
+				if (!StarTrailMID || StarTrailMID->Parent != StarMaterial)
+				{
+					StarTrailMID = UMaterialInstanceDynamic::Create(StarMaterial, this);
+					StarTrailMID->SetScalarParameterValue(TEXT("Trail"), 1.0f);
+					StarTrails->SetMaterial(0, StarTrailMID);
+				}
+				StarTrailMID->SetScalarParameterValue(TEXT("Opacity"), StarOpacity * MenuStarTrailGain);
+				StarTrailMID->SetScalarParameterValue(TEXT("Glow"), StarGain);
+			}
+			StarTrails->SetVisibility(bTrails);
+		}
 	}
 }
 
@@ -442,4 +476,35 @@ void ADysisSkyActor::ApplyMoonDisc()
 	}
 	if (MoonDiscMID) MoonDiscMID->SetScalarParameterValue(TEXT("Opacity"), MoonDiscOpacity);
 	MoonDisc->SetVisibility(MoonDiscOpacity > 0.001f);
+}
+
+void ADysisSkyActor::BuildStarTrails()
+{
+	if (!StarTrails || StarDirs.Num() == 0 || StarData.Num() < StarDirs.Num() * 3) return;
+	TrailsBuiltDeg = MenuStarTrailDeg;
+	StarTrails->ClearInstances();
+	// 主界面上整片星空绕着“日月那个圆的圆心”的方向 A 转（SetMenuOrbit / ApplyStarRotation）。
+	// 星星 d 转的方向是 −A × d，所以拖尾摆在它身后 +A × d 那一边；一条直的小片近似那一小段弧。
+	const float Az = FMath::DegreesToRadians(MenuOrbitAzDeg), Alt = FMath::DegreesToRadians(MenuOrbitCenterAltDeg);
+	const FVector A(FMath::Cos(Alt) * FMath::Cos(Az), FMath::Cos(Alt) * FMath::Sin(Az), FMath::Sin(Alt));
+	const double Width = 2.0 * StarDistanceCm * FMath::Tan(FMath::DegreesToRadians(StarAngularSizeDeg * 0.5)) * 0.7;
+	const double Arc = FMath::DegreesToRadians(MenuStarTrailDeg);
+	TArray<FTransform> Xf; Xf.Reserve(StarDirs.Num());
+	for (const FVector& D : StarDirs)
+	{
+		const FVector Cross = FVector::CrossProduct(A, D);
+		const double Sin = Cross.Size();
+		const FVector T = Sin > 1.0e-4 ? Cross / Sin : FVector::ForwardVector;
+		const double Len = FMath::Max(StarDistanceCm * Sin * Arc, Width);
+		// 小片的本地 X 顺着拖尾（头在 −X 那一端，就是星星的位置），面朝天空中心
+		Xf.Emplace(FRotationMatrix::MakeFromXZ(T, -D).Rotator(), D * StarDistanceCm + T * (Len * 0.5), FVector(Len / 100.0, Width / 100.0, 1.0));
+	}
+	StarTrails->AddInstances(Xf, /*bShouldReturnIndices*/ false, /*bWorldSpace*/ false);
+	for (int32 i = 0; i < StarDirs.Num(); ++i) StarTrails->SetCustomData(i, MakeArrayView(&StarData[i * 3], 3), i == StarDirs.Num() - 1);
+}
+
+FString ADysisSkyActor::DescribeStarTrails() const
+{
+	return FString::Printf(TEXT("{\"shown\":%s,\"count\":%d,\"deg\":%.2f,\"menu\":%s,\"starOpacity\":%.3f}"),
+		StarTrails && StarTrails->IsVisible() ? TEXT("true") : TEXT("false"), StarTrails ? StarTrails->GetInstanceCount() : 0, MenuStarTrailDeg, bMenuOrbit ? TEXT("true") : TEXT("false"), StarOpacity);
 }

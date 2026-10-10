@@ -116,6 +116,7 @@ void ADysisDirector::BeginPlay()
 	SetupFx();
 	SetupLowPolySkin();
 	SetupScenery();
+	SetupMechLook();
 	BuildInteracts();
 }
 
@@ -316,6 +317,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateScenery();
 	UpdateViews();
 	UpdateSfx();
+	UpdateMusic();
 }
 
 // ───────────────────────── 关卡标题 ─────────────────────────

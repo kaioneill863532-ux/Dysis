@@ -28,6 +28,10 @@ namespace
 	constexpr float MirOffsetCm = 55.0f, MirHeightCm = 95.0f;                                       // 镜子在身前多远、离脚多高
 	constexpr float MirLevelYaw = 153.191f, MirLevelTilt = 30.9004f;                                // 模型摆的姿势：白天那一格、日相
 	const FVector MirCrankPos(421.72, -1470.73, 1450.0);    // 绞盘：方位 286°、半径 15.3 m
+	// 开局在第几格、白天照日之龛的是第几格。灰盒开局就在白天那一格；2026-10-10 用户要玩家自己转两下，所以从第 0 格起。
+	// 第 0、1 格正好是夜里要用的两格（0 照开月之龛、1 照亮月亮浮雕）：白天一次都没转过的人，入夜时她自己转回白天那一格，
+	// 夜里那一段就和灰盒一样从第 2 格开始转，不会一入夜月之龛自己就开了。
+	constexpr int32 MirStartSlot = 0, MirDaySlot = 2;
 	// 日之龛：三层东边挑出去的石台上（方位 96°）
 	const FVector MirSunNichePos(-155.75, 1481.84, 2000.0);
 
@@ -78,7 +82,8 @@ void ADysisDirector::SetupMirror()
 		for (const TCHAR* Name : { TEXT("SM_Mech_Mirror_Statue"), TEXT("SM_Mech_Mirror_Mirror"), TEXT("SM_Mech_Mirror_Crank") })
 			if (AActor* A = Piece(Name)) State->Mirror.Self.Add(A);
 	}
-	MirrorSlot = 2;
+	MirrorSlot = MirStartSlot;
+	bMirrorTouched = bMirrorNightSeen = false;
 	MirrorYawNow = MirSlots[MirrorSlot];
 	MirrorW3[0] = 1.0f; MirrorW3[1] = MirrorW3[2] = 0.0f;
 	MirrorForm = 0;
@@ -102,7 +107,7 @@ void ADysisDirector::AddMirrorInteracts()
 		I.ZRange = []() { return FVector2D(1420.0, 1630.0); };
 		I.RadiusCm = 150.0f;
 		I.Label = []() { return FText::FromString(DysisCopy::PromptRotateStatue); };
-		I.Act = [this]() { MirrorSlot = (MirrorSlot + 1) % 6; };
+		I.Act = [this]() { MirrorSlot = (MirrorSlot + 1) % 6; bMirrorTouched = true; };
 		Interacts.Add(MoveTemp(I));
 	}
 	{
@@ -166,6 +171,12 @@ void ADysisDirector::UpdateMirrors(float Dt)
 	const float H = Time ? Time->H : 0.0f;
 	const FVector Sun = UDysisSkyLibrary::DysisSunDir(H), Moon = UDysisSkyLibrary::DysisMoonDir(H);
 	const bool bDay = !bCaught && Sun.Z > 0.01, bNight = bCaught && Moon.Z > 0.01;
+	if (!bCaught) bMirrorNightSeen = false;
+	else if (!bMirrorNightSeen)
+	{
+		bMirrorNightSeen = true;
+		if (!bMirrorTouched) MirrorSlot = MirDaySlot;
+	}
 
 	// 她面朝着光（水平方向相差不到 100°）、镜子中心照得到 → 是那一相
 	const float Y = FMath::DegreesToRadians(MirrorYawNow);
@@ -230,6 +241,7 @@ void ADysisDirector::UpdateNiches(float Dt)
 void ADysisDirector::DebugSetMirrorSlot(int32 Slot)
 {
 	MirrorSlot = ((Slot % 6) + 6) % 6;
+	bMirrorTouched = true;
 }
 
 void ADysisDirector::DebugSetNight(bool bNight)

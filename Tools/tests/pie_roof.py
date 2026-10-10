@@ -1,4 +1,4 @@
-# 屋顶这一段的测试（UE 编辑器 Python，开 PIE 跑）：圆眼光柱和灰盒比；从细桥上环道、顺时针走，踏步升起来；
+﻿# 屋顶这一段的测试（UE 编辑器 Python，开 PIE 跑）：圆眼光柱和灰盒比；从细桥上环道、顺时针走，踏步升起来；
 # 在浑天仪旁取下金苹果（入夜）；往回走，桥门锁上、另外半圈降成楼梯。
 # 标准答案：Tools/greybox/golden/greybox_roof.json。结果写在 项目/Saved/pie_roof.txt，最后一行 DONE。
 import unreal, os, json, math, glob, traceback
@@ -147,11 +147,12 @@ def main():
     check(worst < 1.0 and abs(r4["iris"] - 1100) < 1, "25 秒后 16 级楼梯都降到位（最大差 %.1f cm），光圈全开（%.0f）" % (worst, r4["iris"]))
     yield from shoot(w, "夜里的楼梯")
     # 沿楼梯往下走到四层。经过瀑布那一段（方位 116°–140°）时楼梯只有靠中庭的内侧一半，外侧有挡墙：这一段贴着内侧走
-    # 最后一级踏步和四层的地面一样高：刚踩上地面就停的话，脚下算哪一块会来回跳（区域在 crown / L3 之间跳），所以踩上以后再多走半秒
+    # 最后一级踏步比四层的地面高 0.6 cm（2026-10-10 起，为了两个面不叠在一起闪）：踩上地面以后再走几步就停——
+    # 再往前（方位 93° 起）是 90° 那根柱子 30 cm 高的柱础，照直走会踩上去
     extra = -1
     for i in range(5000):
         a, r = az_r()
-        if extra < 0 and "zone=L3" in state() and foot()[2] < 2310: extra = 30
+        if extra < 0 and "zone=L3" in state() and foot()[2] < 2310: extra = 6
         if extra == 0: break
         if extra > 0: extra -= 1
         t = math.radians(a)

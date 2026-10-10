@@ -1,4 +1,4 @@
-# 2026-10-08 这一轮反馈的测试和截图（UE 编辑器 Python，开 PIE 跑）：
+﻿# 2026-10-08 这一轮反馈的测试和截图（UE 编辑器 Python，开 PIE 跑）：
 #   · 没开水闸（没有水雾）时窗光不显出来，开了才有；
 #   · 虹桥长出来时人正站在桥头的路上：不会被卡住，走得开；
 #   · 入夜以后音乐换成夜里的那一首；
@@ -156,9 +156,9 @@ def main():
         yield from seconds(9.0)
         ok = False; info = ""
         for m in music:
-            comps = {c.get_name(): c.is_playing() for c in m.get_components_by_class(unreal.AudioComponent)}
-            info = "%s 音量 %.1f" % (comps, m.get_editor_property("music_volume"))
-            ok = m.is_night() and comps.get("NightAudio") and not comps.get("DayAudio")
+            st = json.loads(str(m.describe_music()))
+            info = "%s 音量 %.1f" % (st, m.get_editor_property("music_volume"))
+            ok = m.is_night() and st["want"] == "night" and st["night"] > 0.6 and st["day"] < 0.1
         check(ok, "入夜 9 秒后：夜里的曲子在放、白天的停了（%s）" % info)
         for m in music: m.stop_music(0.5)
         for name, az, r, z, turn, pitch in [("屋顶_刚入夜", 100.0, 1420.0, 3035.0, 0.0, -8.0), ("屋顶_刚入夜_看东边", 100.0, 1420.0, 3035.0, 160.0, 12.0), ("四层_天鹅旁", 250.0, 1400.0, 2300.0, 20.0, 4.0),
@@ -200,7 +200,7 @@ def main():
         yield from seconds(4.0)
         a = sky()
         director.debug_set_selene_talked(True)
-        yield from seconds(5.0)
+        yield from seconds(8.0)      # 月虹是慢慢显出来的（约 6 秒）
         b = sky()
         check(a["moonbow"] < 0.02 and not a["moonbowShown"] and b["moonbow"] > 0.9 and b["moonbowShown"], "月虹：那段话没说过时没有（%.2f），说完了、月亮在东边 27° 高时显出来（%.2f）" % (a["moonbow"], b["moonbow"]))
         yield from shoot(w, "月虹_二层对面看")
@@ -208,7 +208,7 @@ def main():
         yield from wait(90)
         yield from shoot(w, "月虹_水庭里看")
         tc.set_forced_time(170.0)
-        yield from seconds(5.0)
+        yield from seconds(8.0)
         c = sky()
         check(c["moonbow"] < 0.05, "月亮升高以后（68°）月虹淡掉（%.2f）" % c["moonbow"])
         tc.clear_forced_time()

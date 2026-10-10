@@ -21,9 +21,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Dialogue")
 	TArray<FText> Lines;
 
-	/** 每句停留秒数（0 = 只能按 E 翻页）。 */
+	/** 每句自己翻页的秒数。0 = 不自己翻，等玩家点（鼠标左键 / E / 空格）。
+	 *  2026-10-10 用户定：自动翻页关掉——句子正要自己翻的时候玩家点一下，会一下跳两句。
+	 *  自动测试里（HUD 的测试模式）没人点，按 4 秒一句自己翻。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Dialogue")
-	float SecondsPerLine = 4.0f;
+	float SecondsPerLine = 0.0f;
 
 	/** 播放期间钉住的时刻（<0 不钉；设计：虹之龛对话发生在 RELIEF_H）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Dialogue")
@@ -33,8 +35,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Dialogue")
 	void Play();
 
-	/** 立即翻下一句（E 键；HUD 提示里写）。 */
+	/** 立即翻下一句。 */
 	void Advance();
+
+	/** 玩家点了一下：这一句刚出来不到 0.25 秒的话不算（连点两下不会连翻两句）。翻了返回 true。 */
+	bool AdvanceByPlayer();
 
 	/** 正在播吗。 */
 	UFUNCTION(BlueprintPure, Category = "Dysis|Dialogue")
@@ -49,6 +54,9 @@ protected:
 
 private:
 	float LineTimer = 0.0f;
+	float LineShownSeconds = 0.0f;
+	float AutoSeconds() const;
+	TWeakObjectPtr<class ADysisHUD> Hud;
 	UDysisTimeComponent* ResolveTime();
 	TWeakObjectPtr<UDysisTimeComponent> CachedTime;
 };

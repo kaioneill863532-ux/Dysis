@@ -394,7 +394,10 @@ return Color * (a * breathe * wisp * Opacity);
 
 # ───────────────────────── 月虹 ─────────────────────────
 if want("M_DysisMoonbow"):
-    # 立在瀑布前面的一片透明片上画一道弧：白里带一点七色（外红内紫），里外各晕开一片水汽的光，亮度随水汽飘过有一点起伏。
+    # 立在瀑布前面的一片透明片上画一道弧：白里带一点七色（外红内紫）。
+    # 2026-10-10 重做（用户：光效突兀、虹本身不好看）：以前是一道边缘清楚的弧，里外各晕开一大片亮光，像贴上去的一个发光的圈。
+    # 现在：弧是软的、没有硬边；只在“有水汽的地方”显出来——两层慢慢飘的雾，一段浓一段淡；两只脚慢慢淡进水面上的水汽里；
+    # 那一大片亮光去掉了，只留贴着弧的一点点；上面偶尔有水珠闪一下。
     # 参数 W、H（片子的宽高，厘米）、Radius、Band（弧的半径、半宽）、Opacity、Glow。
     mat, full = new_mat("/Game/Dysis/Night", "M_DysisMoonbow", unreal.BlendMode.BLEND_ADDITIVE)
     lp = local_of(mat, node(mat, unreal.MaterialExpressionWorldPosition, -1700, 0), -1450, 0)
@@ -403,15 +406,20 @@ if want("M_DysisMoonbow"):
     c = custom(mat, NOISE + """
 float2 p = float2(LP.x * W / 100.0, H * 0.5 - LP.y * H / 100.0);             // 横向离中线多远、离底边多高（厘米）
 float r = length(p);
-float t = (r - (Radius - Band)) / (2.0 * Band);                              // 0 = 内缘，1 = 外缘
+float d = (r - Radius) / Band;                                               // 离弧的中线多远（以半宽计）
+float t = saturate(0.5 + d * 0.5);                                           // 0 = 内缘，1 = 外缘
 float x = (1.0 - t) * 7.0;
 %s
-float band = pow(saturate(t) * saturate(1.0 - t) * 4.0, 0.7);
-float mist = exp(-pow((r - Radius) / (Band * 3.2), 2.0)) * 0.30;             // 弧的里外各晕开一片水汽的光
-float wisp = 0.75 + 0.5 * NZ.n(float3(p * 0.012, Time * 0.12));              // 水汽飘过去，亮度有一点起伏
-float foot = smoothstep(0.0, 200.0, p.y);                                    // 脚落到水面的地方淡出去
-float3 col = lerp(float3(0.80, 0.87, 1.0), sp, 0.32);
-return (col * band + float3(0.70, 0.80, 1.0) * mist) * (wisp * foot * Glow * Opacity);
+float band = exp(-d * d * 1.5);                                              // 软的一道，没有硬边
+float m1 = NZ.n(float3(p * 0.0042 + float2(Time * 0.035, -Time * 0.05), Time * 0.03));          // 大团的水汽，慢慢飘
+float m2 = NZ.n(float3(p * 0.013 + float2(-Time * 0.05, -Time * 0.11), 3.0 + Time * 0.06));     // 细一点的，往下落
+float mist = smoothstep(0.22, 0.78, 0.15 + 0.95 * m1 + 0.45 * (m2 - 0.5));   // 有水汽的地方虹才显出来
+float ang = atan2(max(p.y, 0.0), abs(p.x) + 1.0);                            // 0 = 贴着水面，π/2 = 弧顶
+float foot = smoothstep(0.04, 0.40, ang);                                    // 两只脚慢慢淡进水面上的水汽里
+float3 col = lerp(float3(0.82, 0.88, 1.0), sp, 0.30);                        // 月虹颜色很淡，近乎白
+float halo = exp(-abs(d) * 0.6) * 0.06;                                      // 贴着弧的一点点光
+float glint = NZ.sp(p * 0.03, Time * 1.3) * band * 1.4;                      // 水珠偶尔闪一下
+return (col * (band * (0.22 + 0.78 * mist) + glint) + float3(0.70, 0.80, 1.0) * (halo * mist)) * (foot * Glow * Opacity);
 """ % SPECTRUM, [("LP", lp), ("Time", time)] + [(p.get_editor_property("parameter_name"), p) for p in P], F3, -900, 0)
     emissive(mat, c)
     finish(mat, full)
@@ -493,6 +501,8 @@ if want("M_DysisWaterfall"):
     # 夜里镜子反射的月光打到的那一块水帘透开（灰盒 FALLHOLE）：中间几乎全透，边上一圈被月光照亮的水——透过它看得见后面的女神。
     # 自己不受光（半透明受光在引擎里很吃力也不好看），亮度和冷暖由代码按时刻给（Tint）。参数 Tint、Opacity、Pivot（模型原点在世界里的位置，代码写）、
     # TopZ / BottomZ（上沿、水面的高度）、A0 / A1（两边的方位，度）、Hole（透开那一块的中心）、HoleR（半径）、HoleK（透开多少）、RimGain。
+    # 2026-10-10 瀑布加厚：同一个材质还用在“往墙那边再放的一层”和“两头封上的侧片”上——
+    #   Phase 每一层不一样（水丝错开、快慢差一点，叠着看有前后的错动），Flat = 1 是侧片（顺着半径铺、两边不淡出），Density 是这一层有多浓。
     mat, full = new_mat("/Game/Dysis/Fx", "M_DysisWaterfall", unreal.BlendMode.BLEND_TRANSLUCENT)
     lp = local_of(mat, node(mat, unreal.MaterialExpressionWorldPosition, -1700, 0), -1450, 0)
     ax, ay, az = axis_world(mat, (1, 0, 0), -1450, 150), axis_world(mat, (0, 1, 0), -1450, 290), axis_world(mat, (0, 0, 1), -1450, 430)
@@ -500,21 +510,23 @@ if want("M_DysisWaterfall"):
     pivot = rgb_of(mat, vector(mat, "Pivot", (0.0, 0.0, 0.0), -1700, 660), -1450, 660)
     tint = rgb_of(mat, vector(mat, "Tint", (0.45, 0.50, 0.55), -1700, 820), -1450, 820)
     hole = rgb_of(mat, vector(mat, "Hole", (0.0, 0.0, -9900.0), -1700, 980), -1450, 980)
-    P = [scalar(mat, n, v, -1450, 1140 + 100 * i) for i, (n, v) in enumerate([("TopZ", 2950.0), ("BottomZ", -45.0), ("A0", 116.25), ("A1", 139.75), ("HoleR", 135.0), ("HoleK", 0.0), ("RimGain", 0.5)])]
+    P = [scalar(mat, n, v, -1450, 1140 + 100 * i) for i, (n, v) in enumerate([("TopZ", 2950.0), ("BottomZ", -45.0), ("A0", 116.25), ("A1", 139.75), ("HoleR", 135.0), ("HoleK", 0.0), ("RimGain", 0.5),
+        ("Flat", 0.0), ("Phase", 0.0), ("Density", 1.0)])]
     one, opac = node(mat, unreal.MaterialExpressionConstant, -1450, 1900, r=1.0), scalar(mat, "Opacity", 1.0, -1450, 2000)
     c = custom(mat, NOISE + """
 float3 W = Pivot + AX * LP.x + AY * LP.y + AZ * LP.z;                         // 世界位置（殿心是原点）
 float ang = degrees(atan2(W.y, W.x)); ang += ang < 0.0 ? 360.0 : 0.0;         // 方位
-float u = radians(ang) * length(W.xy), v = W.z;                               // 沿水帘横着多远、多高（厘米）
-float s1 = NZ.n(float3(u * 0.055, (v + Time * 540.0) * 0.0042, 1.7));         // 粗的水流
-float s2 = NZ.n(float3(u * 0.19, (v + Time * 820.0) * 0.011, 5.1));           // 细的水丝
-float s3 = NZ.n(float3(u * 0.02, (v + Time * 300.0) * 0.002, 9.3));           // 一阵一阵的浓淡
+float u = lerp(radians(ang) * length(W.xy), length(W.xy), Flat) + Phase * 137.0, v = W.z;   // 沿水帘横着多远、多高（厘米）；侧片顺着半径铺
+float vn = v + Phase * 911.0, tk = Time * (1.0 - 0.1 * Phase);                // 每一层的水丝错开、快慢差一点
+float s1 = NZ.n(float3(u * 0.055, (vn + tk * 540.0) * 0.0042, 1.7));          // 粗的水流
+float s2 = NZ.n(float3(u * 0.19, (vn + tk * 820.0) * 0.011, 5.1));            // 细的水丝
+float s3 = NZ.n(float3(u * 0.02, (vn + tk * 300.0) * 0.002, 9.3));            // 一阵一阵的浓淡
 float thread = pow(s2, 2.6);
 float body = 0.20 + 0.30 * s1 + 0.18 * s3;                                    // 水帘本身：半透
 float fall = saturate((TopZ - v) / 160.0);                                    // 上沿：刚漫出来的地方薄
 float foam = exp(-max(v - BottomZ, 0.0) / 150.0);                             // 落到水面的地方泛白
-float side = smoothstep(A0, A0 + 1.3, ang) * smoothstep(A1, A1 - 1.3, ang);   // 两边软
-float a = saturate(body * (0.45 + 0.55 * fall) + thread * 0.8 + foam * 0.6) * side * saturate(fall * 3.0 + 0.25);
+float side = lerp(smoothstep(A0, A0 + 1.3, ang) * smoothstep(A1, A1 - 1.3, ang), 1.0, Flat);   // 两边软（侧片不用）
+float a = saturate(body * (0.45 + 0.55 * fall) + thread * 0.8 + foam * 0.6) * side * saturate(fall * 3.0 + 0.25) * Density;
 float hd = length(W - Hole) / max(HoleR, 1.0);
 float open = HoleK * (1.0 - smoothstep(0.55, 1.0, hd));                       // 月光打到的那一块透开
 float rim = HoleK * smoothstep(0.5, 0.85, hd) * (1.0 - smoothstep(0.85, 1.25, hd));   // 边上一圈被月光照亮的水
@@ -637,4 +649,27 @@ if want("M_DysisAnimeWater"):
         mel.connect_material_property(scalar(mat, name, val, -350, y), "", prop)
     # FxMaterial 会给每个换上去的材质写一个 Pivot；这个材质用不上，留一个同名的参数接着（不接出去）
     vector(mat, "Pivot", (0.0, 0.0, 0.0), -1800, 1300)
+    finish(mat, full)
+
+# ───────────────────────── 发光的小东西：棱镜分出来的七道色光、它们落在墙上的光斑、塞勒涅亮起来的眼睛 ─────────────────────────
+if want("M_DysisGlow"):
+    # 一根细圆柱 / 一块小圆片自己发光：正对着看的地方亮，转到边上淡下去（Edge 越大边越软；0 = 整块一样亮）。
+    # 光柱的材质现在是“视线穿过多厚就多亮”的体积光，这么细的东西用它就看不见了（2026-10-10 用户发现棱镜的彩虹光束不见了），所以单做一个。
+    # 参数 Color、Intensity（屏幕上的亮度，1 ≈ 白）、Edge。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisGlow", unreal.BlendMode.BLEND_ADDITIVE)
+    col = rgb_of(mat, vector(mat, "Color", (1.0, 1.0, 1.0), -1100, -100), -850, -100)
+    c = custom(mat, "float f = abs(dot(normalize(N), normalize(CV)));\nreturn Color * (Intensity * pow(max(f, 0.001), Edge));",
+        [("N", node(mat, unreal.MaterialExpressionPixelNormalWS, -850, 60)), ("CV", node(mat, unreal.MaterialExpressionCameraVectorWS, -850, 160)),
+         ("Color", col), ("Intensity", scalar(mat, "Intensity", 1.0, -850, 260)), ("Edge", scalar(mat, "Edge", 1.3, -850, 360))], F3, -500, 0)
+    emissive(mat, c)
+    finish(mat, full)
+
+# ───────────────────────── 人脚下的一团影子 ─────────────────────────
+if want("M_DysisBlobShadow"):
+    # 朝下投的一块贴花：中间把地面压暗、往外淡出去。殿里大部分地方只有环境光，人没有影子，看着像飘在地上。参数 Opacity。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisBlobShadow", unreal.BlendMode.BLEND_TRANSLUCENT, unlit=False, two_sided=False, material_domain=unreal.MaterialDomain.MD_DEFERRED_DECAL)
+    op = custom(mat, "float2 q = UV * 2.0 - 1.0;\nreturn pow(saturate(1.0 - length(q)), 1.3) * Opacity;",
+        [("UV", node(mat, unreal.MaterialExpressionTextureCoordinate, -850, 0)), ("Opacity", scalar(mat, "Opacity", 0.5, -850, 120))], F1, -500, 0)
+    mel.connect_material_property(node(mat, unreal.MaterialExpressionConstant3Vector, -500, -160, constant=unreal.LinearColor(0.0, 0.0, 0.0, 1.0)), "", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(op, "", unreal.MaterialProperty.MP_OPACITY)
     finish(mat, full)

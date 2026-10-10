@@ -105,7 +105,6 @@ void ADysisGoldenApple::Place(FVector TargetCm)
 			Ending->Lines.SetNum(Count);
 			for (int32 i = 0; i < Count; ++i) Ending->Lines[i] = FText::FromString(Lines[i]);
 			Ending->ForcedH = -1.0f;   // 结局不钉时刻——天色交给塞勒涅
-			Ending->SecondsPerLine = 5.0f;
 			Ending->Play();
 		}
 	}

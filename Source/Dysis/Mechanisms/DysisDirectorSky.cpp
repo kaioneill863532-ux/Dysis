@@ -29,7 +29,7 @@ namespace
 	constexpr float BowAz = 128.0f, BowR = 1040.0f;          // 片子立在水帘前面 2 m 的空里（再靠外、再宽就插进回廊的栏杆了）
 	constexpr float BowW = 1400.0f, BowH = 760.0f;           // 片子的宽、高
 	constexpr float BowBottomZ = -45.0f;                     // 片子的底边 = 水面；虹的圆心就在底边上
-	constexpr float BowRadius = 640.0f, BowBand = 42.0f;     // 虹的半径、色带的半宽
+	constexpr float BowRadius = 640.0f, BowBand = 58.0f;     // 虹的半径、色带的半宽（软边的，比灰盒的 42 宽一点）
 	constexpr float BowAltLo0 = 12.0f, BowAltLo1 = 20.0f, BowAltHi0 = 40.0f, BowAltHi1 = 50.0f;   // 月亮“不高不低”：高度 20°–40° 最清楚，12° 以下、50° 以上没有
 
 	// 结局的星座
@@ -101,7 +101,7 @@ void ADysisDirector::SetupSkyFx()
 			MoonbowMID->SetScalarParameterValue(TEXT("Radius"), BowRadius);
 			MoonbowMID->SetScalarParameterValue(TEXT("Band"), BowBand);
 			MoonbowMID->SetScalarParameterValue(TEXT("Opacity"), 0.0f);
-			MoonbowMID->SetScalarParameterValue(TEXT("Glow"), 0.2f);   // 月虹是淡淡的一道白
+			MoonbowMID->SetScalarParameterValue(TEXT("Glow"), 0.24f);   // 月虹是淡淡的一道白
 			MoonbowPlane->SetMaterial(0, MoonbowMID);
 			MoonbowPlane->SetVisibility(false);
 		}
@@ -172,7 +172,7 @@ void ADysisDirector::UpdateMoonbow(float Dt)
 		const float Alt = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(UDysisSkyLibrary::DysisMoonDir(Time->H).Z, -1.0, 1.0)));
 		Want = DysisGB::Smoothstep(BowAltLo0, BowAltLo1, Alt) * (1.0f - DysisGB::Smoothstep(BowAltHi0, BowAltHi1, Alt));
 	}
-	MoonbowK = DysisGB::Toward(MoonbowK, Want, 0.45f, Dt);
+	MoonbowK = DysisGB::Toward(MoonbowK, Want, 0.16f, Dt);   // 六秒左右慢慢显出来（原来两秒，看着是突然冒出来的）
 	if (MoonbowPlane && MoonbowMID)
 	{
 		MoonbowPlane->SetVisibility(MoonbowK > 0.002f);

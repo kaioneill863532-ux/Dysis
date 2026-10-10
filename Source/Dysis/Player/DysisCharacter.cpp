@@ -10,6 +10,9 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/DecalComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Animation/AnimSequence.h"
@@ -48,8 +51,7 @@ ADysisCharacter::ADysisCharacter(const FObjectInitializer& ObjectInitializer)
 	CameraArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraArm"));
 	CameraArm->SetupAttachment(GetCapsuleComponent());
 	CameraArm->bUsePawnControlRotation = true;
-	CameraArm->bDoCollisionTest = true;      // 碰到墙、台阶、顶就往前收，镜头不穿进墙里
-	CameraArm->ProbeSize = 12.f;
+	CameraArm->bDoCollisionTest = false;     // 挡镜头的事自己算（UpdateCamera）：引擎自带的那一套瞄点一进墙镜头就整个弹到人身上
 	CameraArm->TargetArmLength = CameraDistance;
 	CameraArm->bEnableCameraLag = false;
 
@@ -84,6 +86,14 @@ ADysisCharacter::ADysisCharacter(const FObjectInitializer& ObjectInitializer)
 	GetMesh()->SetGenerateOverlapEvents(false);
 	GetMesh()->SetCanEverAffectNavigation(false);
 	GetMesh()->bCastHiddenShadow = true;   // 第一人称时人藏起来，影子留着
+	GetMesh()->bReceivesDecals = false;    // 脚下那团影子不要印到自己腿上
+
+	BlobShadow = CreateDefaultSubobject<UDecalComponent>(TEXT("BlobShadow"));
+	BlobShadow->SetupAttachment(GetCapsuleComponent());
+	BlobShadow->SetRelativeLocation(FVector(0.f, 0.f, -CapsuleHalfHeight));
+	BlobShadow->SetRelativeRotation(FRotator(-90.f, 0.f, 0.f));   // 朝正下方投
+	BlobShadow->DecalSize = FVector(70.f, 44.f, 44.f);            // 上下各 70 cm（台阶、斜着的光都盖得住）、半径 44 cm
+	BlobShadow->SetVisibility(false);
 
 	Time = CreateDefaultSubobject<UDysisTimeComponent>(TEXT("DysisTime"));
 	Interact = CreateDefaultSubobject<UDysisInteractComponent>(TEXT("DysisInteract"));
@@ -137,7 +147,14 @@ void ADysisCharacter::SetupHeroMesh()
 		return;
 	}
 	GetMesh()->SetSkeletalMeshAsset(Hero);
+	if (UMaterialInterface* Blob = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisBlobShadow.M_DysisBlobShadow"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+	{
+		BlobShadowMID = UMaterialInstanceDynamic::Create(Blob, this);
+		BlobShadow->SetDecalMaterial(BlobShadowMID);
+		BlobShadow->SetVisibility(true);
+	}
 	GetMesh()->SetAnimInstanceClass(UDysisHeroAnimInstance::StaticClass());
+	HeroMID = GetMesh()->GetMaterial(0) ? GetMesh()->CreateDynamicMaterialInstance(0) : nullptr;   // 头发的摆动要每帧给材质递数
 	// 圆锥用不着了：不画，也不留影子
 	for (UStaticMeshComponent* Part : { AvatarBody.Get(), AvatarHead.Get() })
 		if (Part)
@@ -147,8 +164,51 @@ void ADysisCharacter::SetupHeroMesh()
 		}
 }
 
+void ADysisCharacter::UpdateHair(float Dt)
+{
+	if (!HeroMID || Dt <= 1.0e-4f) return;
+	// 头这一帧的速度（位移 + 动作里头自己的晃动都算在内）；瞬移（重生、测试里的传送）不算
+	const FVector Head = GetMesh()->GetSocketLocation(TEXT("head"));
+	FVector HeadVel = bHairInit ? (Head - HairPrevHead) / Dt : FVector::ZeroVector;
+	if (HeadVel.SizeSquared() > FMath::Square(2500.0)) { HeadVel = FVector::ZeroVector; HairPrevHeadVel = FVector::ZeroVector; }
+	const FVector Kick = (HeadVel - HairPrevHeadVel).GetClampedToMaxSize(700.0);
+	HairPrevHead = Head;
+	HairPrevHeadVel = HeadVel;
+	bHairInit = true;
+	// 弹簧：头的速度一变，发梢被甩向反方向，然后晃回来（小步长算，帧率低也稳）
+	HairLagVel -= Kick * HairInertia;
+	const float W = 2.0f * PI * FMath::Max(HairSpringHz, 0.1f);
+	for (float Left = FMath::Min(Dt, 0.1f); Left > 0.0f; Left -= 1.0f / 120.0f)
+	{
+		const float H = FMath::Min(Left, 1.0f / 120.0f);
+		HairLagVel += (-W * W * HairLag - 2.0f * HairDamping * W * HairLagVel) * H;
+		HairLag += HairLagVel * H;
+	}
+	// 一直在走：往后飘一点、抬起来一点
+	const FVector Vel = GetVelocity();
+	const float Speed = float(Vel.Size2D());
+	const FVector Fwd = FRotator(0.0, GetActorRotation().Yaw, 0.0).Vector(), Right = FVector::CrossProduct(FVector::UpVector, Fwd);
+	const FVector Raw = HairLag - FVector(Vel.X, Vel.Y, 0.0) * HairDragSeconds;
+	// 按人的朝向收一收：往前（穿进后背）最多 2 cm，往后、往两边、往上各有个头
+	const float F = FMath::Clamp(float(Raw | Fwd), -HairMaxLagCm, 2.0f);
+	const float R = FMath::Clamp(float(Raw | Right), -0.7f * HairMaxLagCm, 0.7f * HairMaxLagCm);
+	const float U = FMath::Clamp(float(Raw.Z) + 2.5f * FMath::Min(Speed / 520.0f, 1.0f), -2.0f, 0.5f * HairMaxLagCm);
+	HairLagShown = Fwd * F + Right * R + FVector::UpVector * U;
+	HairBreezeNow = DysisGB::Toward(HairBreezeNow, FMath::Lerp(HairBreezeCm, HairRunBreezeCm, FMath::Min(Speed / 520.0f, 1.0f)), 4.0f, Dt);
+	HeroMID->SetVectorParameterValue(TEXT("HairLag"), FLinearColor(HairLagShown));
+	HeroMID->SetVectorParameterValue(TEXT("HairSwayA"), FLinearColor(Right * HairBreezeNow));
+	HeroMID->SetVectorParameterValue(TEXT("HairSwayB"), FLinearColor((Fwd * -0.6 + FVector::UpVector * 0.4) * (HairBreezeNow * 0.7f)));
+}
+
+FString ADysisCharacter::DescribeHair() const
+{
+	return FString::Printf(TEXT("{\"on\":%s,\"lag\":[%.2f,%.2f,%.2f],\"lagCm\":%.2f,\"breeze\":%.2f}"), HeroMID ? TEXT("true") : TEXT("false"),
+		HairLagShown.X, HairLagShown.Y, HairLagShown.Z, HairLagShown.Size(), HairBreezeNow);
+}
+
 void ADysisCharacter::UpdateHeroState(float Dt)
 {
+	UpdateHair(Dt);
 	const UCharacterMovementComponent* Move = GetCharacterMovement();
 	const FVector Loc = GetActorLocation(), Delta = Loc - PrevHeroLocation;
 	PrevHeroLocation = Loc;
@@ -159,6 +219,15 @@ void ADysisCharacter::UpdateHeroState(float Dt)
 	else StepHoldSeconds = FMath::Max(0.f, StepHoldSeconds - Dt);
 	bAscendingSteps = StepHoldSeconds > 0.f && Speed > 40.f && bGround;
 	LandingSeconds = FMath::Max(0.f, LandingSeconds - Dt);
+	// 脚下的影子：离地（跳起来、往下落）的时候淡掉大半
+	BlobShadowK = DysisGB::Toward(BlobShadowK, bGround ? 1.f : 0.25f, 4.f, Dt);
+	if (BlobShadowMID) BlobShadowMID->SetScalarParameterValue(TEXT("Opacity"), BlobShadowK * BlobShadowStrength);
+	// 站着换重心时身子会挪到一只脚上（离胶囊中心二十厘米）：影子跟着身子走
+	if (bHeroMesh && BlobShadow)
+	{
+		const FVector Hip = GetMesh()->GetSocketLocation(TEXT("pelvis"));
+		BlobShadow->SetWorldLocation(FVector(Hip.X, Hip.Y, Loc.Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
+	}
 	// 伸手：一走动、一离地就停
 	TouchSeconds = (Speed > 35.f || !bGround) ? 0.f : FMath::Max(0.f, TouchSeconds - Dt);
 }
@@ -285,17 +354,20 @@ void ADysisCharacter::AdvancePressed()
 	if (UiBlocksInput()) return;
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 		if (ADysisHUD* H = Cast<ADysisHUD>(PC->GetHUD()))
-			if (H->ActiveDialogue && H->ActiveDialogue->IsPlaying()) H->ActiveDialogue->Advance();
+			if (H->ActiveDialogue && H->ActiveDialogue->IsPlaying()) H->ActiveDialogue->AdvanceByPlayer();
 }
 
 void ADysisCharacter::JumpPressed()
 {
-	if (!UiBlocksInput() && !InDialogue()) Jump();
+	// 过剧情时空格、E 和鼠标一样是“下一句”（对话不再自己翻页，只用键盘的人也得能翻）
+	if (InDialogue()) { AdvancePressed(); return; }
+	if (!UiBlocksInput()) Jump();
 }
 
 void ADysisCharacter::TryInteractPressed()
 {
-	if (UiBlocksInput() || InDialogue()) return;
+	if (InDialogue()) { AdvancePressed(); return; }
+	if (UiBlocksInput()) return;
 	if (Interact && Interact->TryInteract()) PlayTouch();   // 互动成功：伸一下手
 }
 
@@ -439,13 +511,33 @@ void ADysisCharacter::UpdateCamera(float Dt)
 		Target.X *= RR / R;
 		Target.Y *= RR / R;
 	}
-	CameraArm->bDoCollisionTest = true;
+	// 镜头不穿墙（2026-10-10：以前瞄点是“人往右偏 55 cm”那一点，人贴着右边的墙走时它会伸进墙里，
+	// 镜头就整个弹到人身上、下一帧又弹回去——看着是按方向键镜头乱晃，转视角时还会看到墙里墙外）：
+	//   ① 瞄点先从人头顶上的中线朝肩头那边扫一个小球，被墙挡住就停在墙跟前；
+	//   ② 再从瞄点朝镜头的方向扫同一个小球，被挡住就收到那里（立刻收），前面空了再慢慢放回去。
+	// 小球的半径要盖得住“低模的墙面比碰撞用的原模型往里鼓出来的那一点”加上镜头自己的近裁面。
+	const float WantArm = FMath::Lerp(CameraDistance, FMath::Min(CameraDistance, CameraTunnelDistance), CamTun);
+	const FVector Head = Foot + FVector(0.f, 0.f, CameraTargetHeight - 8.f * CamTun);
+	float FreeArm = WantArm;
+	if (UWorld* World = GetWorld())
+	{
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(DysisCamera), /*bTraceComplex*/ false, this);
+		const FCollisionShape Ball = FCollisionShape::MakeSphere(CameraProbeRadius);
+		FHitResult Hit;
+		if (!Head.Equals(Target, 1.0) && World->SweepSingleByChannel(Hit, Head, Target, FQuat::Identity, ECC_Camera, Ball, Query))
+			Target = Hit.bStartPenetrating ? Head : Hit.Location;
+		const FVector Back = -GetControlRotation().Vector();
+		if (World->SweepSingleByChannel(Hit, Target, Target + Back * WantArm, FQuat::Identity, ECC_Camera, Ball, Query))
+			FreeArm = Hit.bStartPenetrating ? 0.f : FMath::Max(0.f, Hit.Distance);
+	}
+	CamArmNow = (Dt <= 0.f || CamArmNow < 0.f || FreeArm < CamArmNow) ? FreeArm : DysisGB::Toward(CamArmNow, FreeArm, CameraPushOutSpeed, Dt);
+	CameraArm->bDoCollisionTest = false;
 	CameraArm->SocketOffset = FVector::ZeroVector;
 	CameraArm->TargetOffset = Target - GetActorLocation();   // 世界方向的偏移
-	CameraArm->TargetArmLength = FMath::Lerp(CameraDistance, FMath::Min(CameraDistance, CameraTunnelDistance), CamTun);
+	CameraArm->TargetArmLength = CamArmNow;
 
 	// 镜头被墙顶到贴脸的时候把人藏起来（灰盒：距离 > 0.9 m 才画人）
-	if (Camera) SetAvatarShown(Dt <= 0.f || FVector::Dist(Camera->GetComponentLocation(), Target) > 90.f);
+	SetAvatarShown(Dt <= 0.f || CamArmNow > 90.f);
 }
 
 // ───────────────────────── 刚踏空还能跳（灰盒 0.14 s） ─────────────────────────

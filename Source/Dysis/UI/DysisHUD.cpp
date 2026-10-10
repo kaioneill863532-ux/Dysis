@@ -358,6 +358,7 @@ void ADysisHUD::StartGame(bool bInstant)
 	if (Screen != EDysisScreen::MainMenu || StartPhase != 0) return;
 	if (bInstant)
 	{
+		bTestMode = true;
 		StartPhase = 1; FadeAlpha = 1.0f; FadeTarget = 1.0f;   // 下一帧走完切换
 		return;
 	}

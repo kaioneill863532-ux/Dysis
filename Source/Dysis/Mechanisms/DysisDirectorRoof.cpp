@@ -241,7 +241,9 @@ void ADysisDirector::PlaceRoofPiece(FRoofPiece& P)
 	{
 		// 升起来的踏步：模型摆在升到头的位置；夜里的楼梯：模型摆在环道面上
 		const float BaseZ = S.Kind == RoofUp ? RoofRingZ + S.ZEnd : RoofRingZ;
-		T->SetActorLocation(P.TreadBase + FVector(0.0, 0.0, P.Z - BaseZ));
+		// 夜里的楼梯降到头时最下面一级正好和四层的楼面（23 m）一样高：两个面叠在一起会互相“打架”、一片麻点乱闪，抬高半厘米
+		const float Lift = S.Kind != RoofUp && FMath::Abs(P.Z - 2300.0f) < 1.0f ? 0.6f : 0.0f;
+		T->SetActorLocation(P.TreadBase + FVector(0.0, 0.0, P.Z - BaseZ + Lift));
 	}
 	if (AActor* Cb = P.Curb.Get())
 	{

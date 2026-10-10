@@ -4,6 +4,9 @@
 #include "DysisDirector.h"
 #include "DysisGreybox.h"
 #include "Audio/DysisSfxSubsystem.h"
+#include "Audio/DysisMusicManager.h"
+#include "UI/DysisHUD.h"
+#include "UI/DysisDialogueComponent.h"
 #include "Sky/DysisTimeComponent.h"
 #include "World/DysisWorldState.h"
 #include "Components/StaticMeshComponent.h"
@@ -151,4 +154,44 @@ void ADysisDirector::UpdateSfx()
 	if (SfxRose(TEXT("goddess"), bGoddessLit ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Mech.HalfBridge.Extend"), PieceLoc(TEXT("SM_Mech_HalfBridge_Deck"), Goddess));
 	if (SfxRose(TEXT("shadow"), ShadowOn, 0.99f)) Sfx(TEXT("Story.ShadowBridge.Join"), Me);
 	if (SfxRose(TEXT("placed"), bApplePlaced ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Story.Apple.Place"), FVector(0.0, 0.0, 180.0));
+}
+
+// ───────────────────────── 背景音乐 ─────────────────────────
+
+void ADysisDirector::UpdateMusic()
+{
+	// 走法见 Audio/DysisMusicManager.h 开头（2026-10-10 用户定的）
+	ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this);
+	if (!Music) return;
+	const ADysisHUD* Hud = ADysisHUD::Get(this);
+	if (!GameStarted())
+	{
+		// 主界面：白天的曲子照放，不压
+		bMusicInGame = bMusicOn = false;
+		Music->SetDucked(false);
+		return;
+	}
+	if (Hud && Hud->IsTestMode()) Music->SetMuted(true);   // 自动测试：不出声
+	const UDysisTimeComponent* Time = PlayerTime();
+	if (!bMusicInGame)
+	{
+		// 刚点了“开始游戏”：曲子淡出去，只留海浪声
+		bMusicInGame = true;
+		bMusicOn = false;
+		Music->StopMusic(2.5f);
+	}
+	if (!bMusicOn && Time)
+	{
+		// 人踩上通往神殿的那道光（脚离开岛面往上走了）才响起来；夜里（只有测试会直接跳到夜里）放夜晚的
+		if (Time->Zone.StartsWith(TEXT("beam:")) || Time->FootCm.Z > DysisGB::ISLAND_TOP_Z + 40.0f)
+		{
+			bMusicOn = true;
+			if (bCaught) Music->SwitchToNight();
+			else Music->RiseDay();
+		}
+	}
+	// 靠近机关（脚边浮出了互动提示）、过剧情：压低；离开、剧情结束：放回来
+	const bool bTalking = Hud && Hud->ActiveDialogue && Hud->ActiveDialogue->IsPlaying();
+	const bool bNear = Time && NearestInteract(Time->FootCm) != nullptr;
+	Music->SetDucked(bMusicOn && (bTalking || bNear));
 }

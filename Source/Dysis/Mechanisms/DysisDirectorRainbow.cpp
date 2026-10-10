@@ -111,14 +111,16 @@ UStaticMeshComponent* ADysisDirector::MakeGlow(UStaticMesh* Mesh, const FLinearC
 	C->SetCastShadow(false);
 	C->SetVisibility(false);
 	C->RegisterComponent();
-	if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Beams/M_DysisBeam.M_DysisBeam")))
+	// 一根发光的小东西（棱镜分出来的色光、它们落在墙上的光斑）：中间亮、边上软。
+	// 以前借用光柱的材质；2026-10-09 光柱改成“视线穿过多厚就多亮”的体积光以后，这么细的东西就看不见了，所以单做了一个
+	if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisGlow.M_DysisGlow")))
 	{
 		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
 		MID->SetVectorParameterValue(TEXT("Color"), Color);
 		MID->SetScalarParameterValue(TEXT("Intensity"), Intensity);
-		MID->SetScalarParameterValue(TEXT("Brightness"), 1.0f);
 		C->SetMaterial(0, MID);
 	}
+	else UE_LOG(LogTemp, Warning, TEXT("Dysis 效果：找不到 /Game/Dysis/Fx/M_DysisGlow（跑一遍 Art/Fx/ue_make_fx_materials.py）"));
 	return C;
 }
 
@@ -270,8 +272,8 @@ void ADysisDirector::SetupRainbow()
 	UStaticMesh* Cyl = SluiceMarker ? SluiceMarker->GetStaticMesh() : nullptr;
 	for (int32 k = 0; k < 7; ++k)
 	{
-		PrismRays.Add(MakeGlow(Cyl, RbwBow(k), 0.5f));
-		PrismSpots.Add(MakeGlow(Cyl, RbwBow(k), 1.6f));
+		PrismRays.Add(MakeGlow(Cyl, RbwBow(k), 1.1f));
+		PrismSpots.Add(MakeGlow(Cyl, RbwBow(k), 2.2f));
 	}
 
 	// 塞勒涅醒来的对话（文案表：伊莉丝 × 塞勒涅 × 狄西斯）
@@ -564,7 +566,7 @@ void ADysisDirector::UpdateRainbow(float Dt)
 				if (Ray)
 				{
 					Ray->SetWorldLocationAndRotation((RbwPrismPos + PrismHitPos[k]) * 0.5, FRotationMatrix::MakeFromZ(Dir).ToQuat());
-					Ray->SetWorldScale3D(FVector(0.05, 0.05, Len / 100.0));
+					Ray->SetWorldScale3D(FVector(0.07, 0.07, Len / 100.0));
 				}
 				if (Spot)
 				{
@@ -597,14 +599,14 @@ void ADysisDirector::UpdateRainbow(float Dt)
 		ADysisHUD::Notify(GetWorld(), DysisCopy::PrismPuzzleSolved, 3.0f);
 		SeleneTalkIn = 1.4f;
 		// 她的眼睛亮起来
-		if (UStaticMeshComponent* C = RbwMesh(Piece(TEXT("SM_Mech_Selene_Relief"))))
+		if (UStaticMeshComponent* C = VisualOf(TEXT("SM_Mech_Selene_Relief")))
 			if (C->GetNumMaterials() > 1)
-				if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Beams/M_DysisBeam.M_DysisBeam")))
+				if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisGlow.M_DysisGlow")))
 				{
 					UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
 					MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(FColor(0x3a, 0x4c, 0xff)));
 					MID->SetScalarParameterValue(TEXT("Intensity"), 2.4f);
-					MID->SetScalarParameterValue(TEXT("Brightness"), 1.0f);
+					MID->SetScalarParameterValue(TEXT("Edge"), 0.0f);
 					C->SetMaterial(1, MID);
 				}
 	}

@@ -144,6 +144,7 @@ void ADysisDirector::AddFinaleInteracts()
 		bApplePlaced = true;
 		FinaleT = 0.0f;
 		ADysisHUD::Notify(GetWorld(), DysisCopy::ApplePlaced, 6.0f);
+		if (ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this)) Music->CrossToDay();   // 夜晚的曲子淡下去，换回白天的
 	};
 	Interacts.Add(MoveTemp(I));
 }
@@ -354,7 +355,7 @@ void ADysisDirector::UpdateFinale(float Dt)
 	{
 		bEndingDone = true;
 		FinaleT = 100.0f;
-		if (ADysisMusicManager* Music = ADysisMusicManager::GetDysisMusicManager(this)) Music->StopMusic(2.0f);
+		// 音乐不停：白天的曲子一直放到回主界面（主界面放的就是它），中间不断
 		if (ADysisHUD* Hud = ADysisHUD::Get(this)) Hud->FadeTo(1.0f, 2.0f);
 	}
 	if (bEndingDone && Before < 102.5f && FinaleT >= 102.5f)

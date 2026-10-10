@@ -1,122 +1,97 @@
-﻿// 狄西斯的日落回廊 · 背景音乐管理器（来自美术/音频侧 zip 包 2026-10-06）
+﻿// 狄西斯的日落回廊 · 背景音乐管理器（来自美术/音频侧 zip 包 2026-10-06；2026-10-10 改成只发号施令）
 #include "DysisMusicManager.h"
+#include "DysisMusicSubsystem.h"
 
-#include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
-#include "TimerManager.h"
 #include "HAL/IConsoleManager.h"
 
 ADysisMusicManager::ADysisMusicManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
-	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
-	SetRootComponent(Root);
-
-	DayAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("DayAudio"));
-	DayAudio->SetupAttachment(Root);
-	SetupAudio(DayAudio);
-
-	NightAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("NightAudio"));
-	NightAudio->SetupAttachment(Root);
-	SetupAudio(NightAudio);
+	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 }
 
-void ADysisMusicManager::SetupAudio(UAudioComponent* Audio)
+UDysisMusicSubsystem* ADysisMusicManager::Sub() const
 {
-	Audio->bAutoActivate = false;
-	Audio->bAllowSpatialization = false;   // 背景音乐：不分方位、不随距离衰减
-	Audio->bIsUISound = true;              // 暂停游戏时也继续播
+	return UDysisMusicSubsystem::Get(this);
 }
 
 void ADysisMusicManager::BeginPlay()
 {
 	Super::BeginPlay();
-	DayAudio->SetVolumeMultiplier(MusicVolume);
-	NightAudio->SetVolumeMultiplier(MusicVolume);
-	if (bAutoPlayDay)
-	{
-		PlayDay();
-	}
-}
-
-void ADysisMusicManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	GetWorldTimerManager().ClearTimer(NightTimer);
-	Super::EndPlay(EndPlayReason);
+	UDysisMusicSubsystem* S = Sub();
+	if (!S) return;
+	S->SetSounds(DayMusic, NightMusic);
+	S->SetVolume(MusicVolume);
+	S->SetMuted(false);
+	S->SetDuck(1.0f, DuckDownSeconds, DuckUpSeconds);
+	// 进关卡（主界面）：白天的曲子。上一关结尾已经在放白天的曲子的话就接着放，不重新开始
+	if (bAutoPlayDay && S->GetWanted() != UDysisMusicSubsystem::Day) PlayDay();
 }
 
 void ADysisMusicManager::PlayDay()
 {
-	GetWorldTimerManager().ClearTimer(NightTimer);
-	bNight = false;
-	NightAudio->Stop();
-	if (!DayMusic)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("DysisMusic: DayMusic 没有设置"));
-		return;
-	}
-	DayAudio->SetSound(DayMusic);
-	DayAudio->SetVolumeMultiplier(MusicVolume);
-	DayAudio->FadeIn(FadeInSeconds, 1.0f);
+	if (!DayMusic) { UE_LOG(LogTemp, Warning, TEXT("DysisMusic: DayMusic 没有设置")); return; }
+	if (UDysisMusicSubsystem* S = Sub()) S->Play(UDysisMusicSubsystem::Day, FadeOutSeconds, FadeInSeconds);
+}
+
+void ADysisMusicManager::RiseDay()
+{
+	if (UDysisMusicSubsystem* S = Sub()) S->Play(UDysisMusicSubsystem::Day, FadeOutSeconds, RiseSeconds);
 }
 
 void ADysisMusicManager::SwitchToNight()
 {
-	if (bNight)
-	{
-		return;
-	}
-	bNight = true;
-
-	float Wait = SilenceSeconds;
-	if (DayAudio->IsPlaying())
-	{
-		DayAudio->FadeOut(FadeOutSeconds, 0.0f);
-		Wait += FadeOutSeconds;
-	}
-	if (Wait <= KINDA_SMALL_NUMBER)
-	{
-		StartNightTrack();
-	}
-	else
-	{
-		GetWorldTimerManager().SetTimer(NightTimer, this, &ADysisMusicManager::StartNightTrack, Wait, false);
-	}
+	UDysisMusicSubsystem* S = Sub();
+	if (!S || S->GetWanted() == UDysisMusicSubsystem::Night) return;
+	if (!NightMusic) { UE_LOG(LogTemp, Warning, TEXT("DysisMusic: NightMusic 没有设置")); return; }
+	// 白天的还响着：等它淡出、再安静一会儿；本来就没在放（还没踩上那道光就入夜了，只有测试里会这样）就直接淡入
+	const bool bDayAudible = S->GetGain(UDysisMusicSubsystem::Day) > 0.01f;
+	S->Play(UDysisMusicSubsystem::Night, FadeOutSeconds, FadeInSeconds, bDayAudible ? FadeOutSeconds + SilenceSeconds : 0.0f);
 }
 
-void ADysisMusicManager::StartNightTrack()
+void ADysisMusicManager::CrossToDay()
 {
-	DayAudio->Stop();
-	if (!NightMusic)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("DysisMusic: NightMusic 没有设置"));
-		return;
-	}
-	NightAudio->SetSound(NightMusic);
-	NightAudio->SetVolumeMultiplier(MusicVolume);
-	NightAudio->FadeIn(FadeInSeconds, 1.0f);
+	if (UDysisMusicSubsystem* S = Sub()) S->Play(UDysisMusicSubsystem::Day, EndingCrossSeconds, EndingCrossSeconds);
 }
 
 void ADysisMusicManager::StopMusic(float FadeSeconds)
 {
-	GetWorldTimerManager().ClearTimer(NightTimer);
-	for (UAudioComponent* Audio : { DayAudio.Get(), NightAudio.Get() })
-	{
-		if (Audio && Audio->IsPlaying())
-		{
-			Audio->FadeOut(FMath::Max(FadeSeconds, 0.0f), 0.0f);
-		}
-	}
+	if (UDysisMusicSubsystem* S = Sub()) S->Play(-1, FMath::Max(FadeSeconds, 0.0f), 0.0f);
+}
+
+void ADysisMusicManager::SetDucked(bool bDucked)
+{
+	if (UDysisMusicSubsystem* S = Sub()) S->SetDuck(bDucked ? DuckLevel : 1.0f, DuckDownSeconds, DuckUpSeconds);
+}
+
+void ADysisMusicManager::SetMuted(bool bMuted)
+{
+	if (UDysisMusicSubsystem* S = Sub()) S->SetMuted(bMuted);
 }
 
 void ADysisMusicManager::SetMusicVolume(float NewVolume)
 {
 	MusicVolume = FMath::Clamp(NewVolume, 0.0f, 2.0f);
-	DayAudio->SetVolumeMultiplier(MusicVolume);
-	NightAudio->SetVolumeMultiplier(MusicVolume);
+	if (UDysisMusicSubsystem* S = Sub()) S->SetVolume(MusicVolume);
+}
+
+bool ADysisMusicManager::IsNight() const
+{
+	const UDysisMusicSubsystem* S = Sub();
+	return S && S->GetWanted() == UDysisMusicSubsystem::Night;
+}
+
+FString ADysisMusicManager::DescribeMusic() const
+{
+	const UDysisMusicSubsystem* S = Sub();
+	if (!S) return TEXT("{}");
+	const int32 W = S->GetWanted();
+	return FString::Printf(TEXT("{\"want\":\"%s\",\"day\":%.3f,\"night\":%.3f,\"duck\":%.3f}"),
+		W == UDysisMusicSubsystem::Day ? TEXT("day") : W == UDysisMusicSubsystem::Night ? TEXT("night") : TEXT("none"),
+		S->GetGain(UDysisMusicSubsystem::Day), S->GetGain(UDysisMusicSubsystem::Night), S->GetDuck());
 }
 
 ADysisMusicManager* ADysisMusicManager::GetDysisMusicManager(const UObject* WorldContextObject)
