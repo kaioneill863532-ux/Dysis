@@ -183,6 +183,38 @@ void ADysisDirector::SetupFx()
 		}
 		FallMotes = FxMotes(Base + FVector(0.0, 0.0, 90.0), Rot, FVector(640.0, 330.0, 440.0), 130);
 		FallMotes->SetLook(FLinearColor(0.85f, 0.93f, 1.0f), 8.0f, FVector(0.0, 0.0, 0.06), 0.05f, 1.5f);
+		// 溅起来的水珠：从水帘落到水面的那一线蹦出来，往中庭这边抛出去（盒子的长边沿着水帘，+Y 朝中庭）
+		auto Drops = [this](const FVector& Center, const FQuat& BoxRot, const FVector& SizeCm, int32 Count, const FVector& Burst, float Life, float DropCm)
+		{
+			UDysisMoteField* M = NewObject<UDysisMoteField>(this);
+			M->SetupAttachment(RootComponent);
+			M->RegisterComponent();
+			M->SetWorldLocationAndRotation(Center, BoxRot);
+			M->SetWorldScale3D(SizeCm / 100.0);
+			M->UseMaterial(TEXT("/Game/Dysis/Fx/M_DysisDroplet.M_DysisDroplet"));
+			M->Build(Count, Count * 17 + 5);
+			if (UMaterialInstanceDynamic* MID = M->GetMID())
+			{
+				MID->SetVectorParameterValue(TEXT("SizeCm"), FLinearColor(float(SizeCm.X), float(SizeCm.Y), float(SizeCm.Z), 0.0f));
+				MID->SetVectorParameterValue(TEXT("Burst"), FLinearColor(float(Burst.X), float(Burst.Y), float(Burst.Z), 0.0f));
+				MID->SetScalarParameterValue(TEXT("Life"), Life);
+				MID->SetScalarParameterValue(TEXT("Size"), DropCm);
+			}
+			M->SetOpacity(0.0f);
+			return M;
+		};
+		const FQuat Out = FRotator(0.0f, FxFallAz + 90.0f, 0.0f).Quaternion();
+		const FVector BoxCm(520.0, 300.0, 240.0);
+		FallDrops = Drops(DysisGB::PolarCm(FxFallAz, FxFallR - 14.0f - float(BoxCm.Y) * 0.5f, FxWaterZ + float(BoxCm.Z) * 0.5f), Out, BoxCm, 190, FVector(70.0, 210.0, 390.0), 0.9f, 5.0f);
+		// 两边：水帘散出去的水珠，一路往下掉（用光粒那一套：竖着的一个高盒子，每秒往下飘过大半个盒子，到两头淡出去）
+		FallEdgeDrops.Reset();
+		for (const float Az : { FxFallA0 + 0.5f, FxFallA1 - 0.5f })
+		{
+			const FVector Tall(140.0, 170.0, 1500.0);
+			UDysisMoteField* M = FxMotes(DysisGB::PolarCm(Az, FxFallR - 30.0f, FxWaterZ + float(Tall.Z) * 0.5f), Out, Tall, 64);
+			M->SetLook(FLinearColor(0.85f, 0.93f, 1.0f), 4.5f, FVector(0.0, 0.0, -0.55), 0.012f, 1.0f);
+			FallEdgeDrops.Add(M);
+		}
 	}
 
 	// 水沫里的虹 ①：伊莉丝浮雕前的水帘（灰盒 IRISREL.box：比石板左右各宽 0.5 m、厚 0.9 m，贴着浮雕面）
@@ -315,6 +347,23 @@ void ADysisDirector::UpdateFx(float Dt)
 		FallMistMID->SetVectorParameterValue(TEXT("Color"), FxLerp3(FLinearColor(0.80f, 0.90f, 1.0f), FLinearColor(1.0f, 0.82f, 0.64f), Dusk) * (1.0f - 0.35f * Night) + FLinearColor(0.0f, 0.0f, 0.1f) * Night);
 	}
 	if (FallMotes) FallMotes->SetOpacity(Flow * (0.25f + 0.75f * FMath::Max(Daylight, Night * MoonUp * 0.6f)));
+	{
+		// 水珠：白天是亮的水白，夜里只剩月光下的一点银蓝
+		const float DropK = Flow * (0.10f + 0.90f * FMath::Max(Daylight, Night * (0.25f + 0.45f * MoonUp)));
+		const FLinearColor DropColor = FxLerp3(FLinearColor(0.85f, 0.93f, 1.0f), FLinearColor(1.0f, 0.84f, 0.68f), Dusk) * (1.0f - 0.5f * Night) + FLinearColor(0.10f, 0.16f, 0.32f) * Night;
+		auto Paint = [&](UDysisMoteField* M, float K)
+		{
+			if (!M) return;
+			if (UMaterialInstanceDynamic* MID = M->GetMID())
+			{
+				MID->SetVectorParameterValue(TEXT("Color"), DropColor);
+				MID->SetScalarParameterValue(TEXT("Glow"), 0.9f);
+			}
+			M->SetOpacity(K);
+		};
+		Paint(FallDrops, DropK);
+		for (UDysisMoteField* M : FallEdgeDrops) Paint(M, DropK * 0.8f);
+	}
 
 	// 虹桥上的光点：桥长出来多少就亮多少，入夜桥没了就没了
 	const float BridgeShown = bCaught ? 0.0f : BridgeK;
@@ -425,13 +474,14 @@ void ADysisDirector::SetupWaterfallLook()
 	// 2026-10-10 用户定：瀑布要有厚度，左右两边也挡上，开了水闸以后人就没法靠近后面的女神像了
 	// （灰盒里瀑布是两片薄水帘，从东边的石台上能绕到水帘后面，一直走到女神像跟前）。
 	for (UStaticMeshComponent* C : FallMore) if (C) C->DestroyComponent();
-	FallMore.Reset(); FallMoreMIDs.Reset(); FallBlocks.Reset();
+	for (UStaticMeshComponent* C : FallExtras) if (C) C->DestroyComponent();
+	FallMore.Reset(); FallExtras.Reset(); FallMoreMIDs.Reset(); FallBlocks.Reset();
 	AActor* Fall = Piece(TEXT("SM_Mech_Water_Waterfall"));
 	UStaticMeshComponent* Src = Fall ? Fall->FindComponentByClass<UStaticMeshComponent>() : nullptr;
 	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisWaterfall.M_DysisWaterfall"));
 	if (!Src || !Mat) return;
 	// 挂在瀑布这个 Actor 上：没水的时候它整个藏起来，这几片跟着藏
-	auto Sheet = [&](UStaticMesh* Mesh, const FVector& Loc, const FQuat& Rot, const FVector& Scale, float Phase, float Flat, float Density)
+	auto Sheet = [&](UStaticMesh* Mesh, const FVector& Loc, const FQuat& Rot, const FVector& Scale, float Phase, float Flat, float Density, float Strand = 0.0f, UMaterialInterface* Other = nullptr)
 	{
 		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Fall);
 		C->SetupAttachment(Src);
@@ -442,15 +492,18 @@ void ADysisDirector::SetupWaterfallLook()
 		C->RegisterComponent();
 		C->SetWorldLocationAndRotation(Loc, Rot);
 		C->SetWorldScale3D(Scale);
-		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Mat, this);
+		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Other ? Other : Mat, this);
 		MID->SetVectorParameterValue(TEXT("Pivot"), FxVec(Loc));
 		MID->SetScalarParameterValue(TEXT("Phase"), Phase);
 		MID->SetScalarParameterValue(TEXT("Flat"), Flat);
 		MID->SetScalarParameterValue(TEXT("Density"), Density);
-		for (int32 i = 0; i < C->GetNumMaterials(); ++i) C->SetMaterial(i, MID);
-		FallMore.Add(C);
-		FallMoreMIDs.Add(MID);
+		MID->SetScalarParameterValue(TEXT("Strand"), Strand);
+		for (int32 i = 0; i < FMath::Max(C->GetNumMaterials(), 1); ++i) C->SetMaterial(i, MID);
+		(Other ? FallExtras : FallMore).Add(C);
+		FallMoreMIDs.Add(MID);   // 颜色、显出来多少每帧一起给
+		return MID;
 	};
+	if (FallMID) FallMID->SetScalarParameterValue(TEXT("Strand"), 0.25f);   // 主水帘：往下只散开一点
 	// ① 加厚：往墙那边再放一层
 	{
 		const FVector L = Src->GetComponentLocation();
@@ -466,6 +519,37 @@ void ADysisDirector::SetupWaterfallLook()
 			Sheet(PlaneMesh, DysisGB::PolarCm(Az, (R0 + R1) * 0.5f, (Z0 + Z1) * 0.5f), FRotationMatrix::MakeFromXY(Radial, FVector::UpVector).ToQuat(),
 				FVector((R1 - R0) / 100.0, (Z1 - Z0) / 100.0, 1.0), Az == FxFallA0 ? 2.0f : 3.0f, 1.0f, 1.15f);
 		}
+	// ④ 第二版（2026-10-10 用户：原来平着下来一片、边也硬，要自然些，加粒子，入水的地方也设计一下）：
+	//    最前面再罩一层全是散开水股的（比主水帘靠外不到 20 cm——再往外人就能碰到了）；
+	//    脚下两层往上蹿的水花；水面上一片白沫，波纹一圈圈往中庭推。水珠在 SetupFx 里（和脚下的水沫放在一起）。
+	{
+		const FVector L = Src->GetComponentLocation();
+		const FVector S = Src->GetComponentScale();
+		const float Kf = 0.9855f;
+		Sheet(Src->GetStaticMesh(), FVector(L.X * Kf, L.Y * Kf, L.Z), Src->GetComponentQuat(), FVector(S.X * Kf, S.Y * Kf, S.Z), 4.0f, 0.0f, 0.62f, 1.0f);
+		if (UMaterialInterface* Splash = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisFallSplash.M_DysisFallSplash"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+		{
+			// 瀑布的模型从水面（−45）到 2930：竖着压扁成水面以上两米多的一段，再把底对回水面
+			int32 i = 0;
+			for (const float Kr : { 0.992f, 0.978f })
+			{
+				const float Kz = i == 0 ? 0.085f : 0.062f;
+				UMaterialInstanceDynamic* M = Sheet(Src->GetStaticMesh(), FVector(L.X * Kr, L.Y * Kr, L.Z + FxWaterZ * (1.0f - Kz)), Src->GetComponentQuat(),
+					FVector(S.X * Kr, S.Y * Kr, S.Z * Kz), 6.0f + i, 0.0f, 1.0f, 0.0f, Splash);
+				M->SetScalarParameterValue(TEXT("BottomZ"), FxWaterZ);
+				M->SetScalarParameterValue(TEXT("Height"), (FxFallTopZ - FxWaterZ) * Kz);
+				++i;
+			}
+		}
+		UMaterialInterface* Foam = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisFallFoam.M_DysisFallFoam"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (Foam && PlaneMesh)
+		{
+			// 一块平片贴在水面上（高出一点点），盖住从水帘后面的石台到往中庭七米；哪里有白沫是材质里按离落点多远算的
+			UMaterialInstanceDynamic* M = Sheet(PlaneMesh, DysisGB::PolarCm(FxFallAz, FxFallR - 230.0f, FxWaterZ + 1.5f), FRotator(0.0f, FxFallAz, 0.0f).Quaternion(),
+				FVector(9.6, 13.0, 1.0), 0.0f, 0.0f, 1.0f, 0.0f, Foam);
+			M->SetScalarParameterValue(TEXT("R0"), FxFallR);
+		}
+	}
 	// ③ 挡人的墙（只挡人，不挡光、不挡镜头；开闸以后才生效）：两头各一道，前面沿水帘四段
 	auto Block = [this](const FVector& Center, float YawDeg, const FVector& Half)
 	{
@@ -496,5 +580,6 @@ FString ADysisDirector::DescribeWaterfall() const
 		if (C) { ++Sheets; if (C->GetStaticMesh() == PlaneMesh) ++Sides; }
 	for (const TWeakObjectPtr<UBoxComponent>& B : FallBlocks)
 		if (B.IsValid() && B->GetCollisionEnabled() != ECollisionEnabled::NoCollision) ++Blocking;
-	return FString::Printf(TEXT("{\"extraSheets\":%d,\"sideSheets\":%d,\"blocks\":%d,\"blocking\":%d}"), Sheets, Sides, FallBlocks.Num(), Blocking);
+	return FString::Printf(TEXT("{\"extraSheets\":%d,\"sideSheets\":%d,\"blocks\":%d,\"blocking\":%d,\"splashFoam\":%d,\"drops\":%d}"), Sheets, Sides, FallBlocks.Num(), Blocking,
+		FallExtras.Num(), (FallDrops ? FallDrops->GetInstanceCount() : 0) + (FallEdgeDrops.Num() > 0 && FallEdgeDrops[0] ? FallEdgeDrops[0]->GetInstanceCount() * FallEdgeDrops.Num() : 0));
 }

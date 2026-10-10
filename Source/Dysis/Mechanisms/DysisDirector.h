@@ -600,6 +600,13 @@ private:
 	TObjectPtr<class UDysisMoteField> BridgeMotes;
 	UPROPERTY()
 	TObjectPtr<class UDysisMoteField> FallMotes;
+	// 瀑布第二版（2026-10-10）：脚下的水花（两层）、水面上的白沫和波纹、溅起来的水珠、两边散出去的水珠
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UStaticMeshComponent>> FallExtras;
+	UPROPERTY(Transient)
+	TObjectPtr<class UDysisMoteField> FallDrops;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<class UDysisMoteField>> FallEdgeDrops;
 	UPROPERTY()
 	TArray<TObjectPtr<class UDysisMoteField>> MoonMotes;
 	UPROPERTY()

@@ -384,11 +384,27 @@ void ADysisSkyActor::ApplyDaySky()
 	{
 		if (!HeightFog.IsValid())
 			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-				if (UExponentialHeightFogComponent* C = It->FindComponentByClass<UExponentialHeightFogComponent>()) { HeightFog = C; break; }
+				if (UExponentialHeightFogComponent* C = It->FindComponentByClass<UExponentialHeightFogComponent>())
+				{
+					HeightFog = C;
+					DayFogDensity = C->FogDensity; DayFogMaxOpacity = C->FogMaxOpacity; DayFogHeightFalloff = C->FogHeightFalloff;
+					DayFogStartCm = C->StartDistance; DayFogCutoffCm = C->FogCutoffDistance;
+					break;
+				}
 		if (UExponentialHeightFogComponent* C = HeightFog.Get())
 		{
+			// 入夜多少（和夜里的环境光同一条曲线）：雾从白天海平线上的那一层，过渡成罩着整个夜的一层薄的蓝雾
+			const float NightK = NightFogDensity > 0.0f ? Smooth(1.5f, -9.f, SunAlt) : 0.0f;
 			C->SetSkyAtmosphereAmbientContributionColorScale(FLinearColor::Black);   // 不再用引擎那片蓝天的颜色
-			C->SetFogInscatteringColor(Mix(SkyHorizonDay, SkyHorizonDusk) * (SkyGain * Dim * FogGain));
+			C->SetFogInscatteringColor(Mix(SkyHorizonDay, SkyHorizonDusk) * (SkyGain * Dim * FogGain) + NightFogColor * NightK);
+			if (NightFogDensity > 0.0f)
+			{
+				C->SetFogDensity(FMath::Lerp(DayFogDensity, NightFogDensity, NightK));
+				C->SetFogMaxOpacity(FMath::Lerp(DayFogMaxOpacity, NightFogMaxOpacity, NightK));
+				C->SetFogHeightFalloff(FMath::Lerp(DayFogHeightFalloff, NightFogHeightFalloff, NightK));
+				C->SetStartDistance(FMath::Lerp(DayFogStartCm, NightFogStartCm, NightK));
+				C->SetFogCutoffDistance(NightK > 0.01f ? NightFogCutoffCm : DayFogCutoffCm);
+			}
 			C->SetDirectionalInscatteringColor(Mix(SkyWarmDownDay, SkyWarmDownDusk) * (SkyGain * Dim * FogSunGain));
 		}
 	}

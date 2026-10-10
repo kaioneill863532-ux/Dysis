@@ -196,7 +196,8 @@ def main():
     # ── 瀑布：加厚、两头封上；开闸以后进不去 ──
     if on("fall"):
         d = json.loads(str(director.describe_waterfall()))
-        check(d["extraSheets"] == 3 and d["sideSheets"] == 2 and d["blocks"] == 6 and d["blocking"] == 0, "瀑布多了一层、两头各一片；没开闸时不挡人：%s" % d)
+        check(d["extraSheets"] == 4 and d["sideSheets"] == 2 and d["blocks"] == 6 and d["blocking"] == 0 and d["splashFoam"] == 3 and d["drops"] > 200,
+              "瀑布：前后各多一层、两头各一片，脚下两层水花、水面一片白沫、三百来颗水珠；没开闸时不挡人：%s" % d)
         def dist_goddess(): f = foot(); return math.hypot(f[0] - GODDESS[0], f[1] - GODDESS[1])
         # 没开闸：从东边的石台能走到女神像跟前
         go(polar(110.0, 1430.0, 90.0)); yield from wait(40)

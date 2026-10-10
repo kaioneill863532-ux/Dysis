@@ -26,9 +26,16 @@ public:
 	/** 整体显出来多少（0–1）；0 时整个不画。 */
 	void SetOpacity(float Opacity);
 
+	/** 换一个材质（默认是光粒 M_DysisMote；瀑布溅起来的水珠用 M_DysisDroplet）。要在 Build 之前叫。 */
+	void UseMaterial(const TCHAR* Path);
+
+	/** 这一份材质（给它递别的参数用）。 */
+	UMaterialInstanceDynamic* GetMID() { return Mid(); }
+
 private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> MoteMID;
 
 	UMaterialInstanceDynamic* Mid();
+	FString MaterialPath = TEXT("/Game/Dysis/Fx/M_DysisMote.M_DysisMote");
 };

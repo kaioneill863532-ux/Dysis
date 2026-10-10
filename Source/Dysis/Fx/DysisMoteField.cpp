@@ -20,12 +20,18 @@ UDysisMoteField::UDysisMoteField()
 UMaterialInstanceDynamic* UDysisMoteField::Mid()
 {
 	if (!MoteMID)
-		if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisMote.M_DysisMote")))
+		if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, *MaterialPath))
 		{
 			MoteMID = UMaterialInstanceDynamic::Create(Mat, this);
 			SetMaterial(0, MoteMID);
 		}
 	return MoteMID;
+}
+
+void UDysisMoteField::UseMaterial(const TCHAR* Path)
+{
+	MaterialPath = Path;
+	MoteMID = nullptr;
 }
 
 void UDysisMoteField::Build(int32 Count, int32 Seed)

@@ -115,9 +115,10 @@ public:
 	TArray<TObjectPtr<UDirectionalLightComponent>> NightFill;
 
 	/** 每一盏的照度（勒克斯）。按灰盒的数算是 0.59（朝上的面得到 0.45 × 换算 3.0）；这里的引擎自己还会算一点反光，
-	 *  拿画面对下来 0.45 时月光照不到的墙和灰盒一样暗。 */
+	 *  拿画面对下来 0.45 时月光照不到的墙和灰盒一样暗。
+	 *  2026-10-10 用户：月光照不到的地方不要那么黑（参考图是一张雪夜，暗处是看得清的深蓝）——提到 1.2，颜色也蓝一点。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
-	float NightFillLux = 0.45f;
+	float NightFillLux = 1.2f;
 
 	/** 这四盏斜着的角度（离地平线多少度）：越低墙面得到的越多、地面越少。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
@@ -268,9 +269,31 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Sky")
 	void SetAfterSunset(bool bAfter);
 
+	// ───── 夜里的薄雾（2026-10-10 用户要的：月光照不到的地方别那么黑，整个夜里罩一层淡淡的蓝雾） ─────
+	/** 入夜以后关卡里那层雾的浓度（0 = 不动关卡里原来的）、最多盖住多少、多高以内一样浓（落差，越小越均匀）、离镜头多远开始有。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightFogDensity = 0.09f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightFogMaxOpacity = 0.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightFogHeightFalloff = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightFogStartCm = 300.0f;
+
+	/** 比这更远的东西不罩雾（夜空那个大球在 4.6 km 外，不能让雾把星星盖了）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	float NightFogCutoffCm = 150000.0f;
+
+	/** 夜雾自己的颜色（月色的蓝；夜里是固定曝光，这个数就是它看上去多亮）。 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
+	FLinearColor NightFogColor = FLinearColor(0.012f, 0.022f, 0.055f);
+
 	/** 灰盒 nightAmb 天上那一半的颜色（#3a4c70）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
-	FLinearColor NightFillColor = FLinearColor(0.0423f, 0.0723f, 0.1620f);
+	FLinearColor NightFillColor = FLinearColor(0.045f, 0.080f, 0.185f);
 
 	/** 夜空（灰盒 nightDome）：罩在外面的一个大球，朝里的一面画夜空——地平线附近深蓝、头顶近乎黑，月亮周围一圈淡淡的光。
 	 *  太阳落到地平线下 2° 开始显出来，到 10° 完全盖住白天的天。 */
@@ -353,6 +376,8 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> DayDomeMID;
 	float SkyGain = 0.f;
 	TWeakObjectPtr<class UExponentialHeightFogComponent> HeightFog;
+	// 关卡里那层雾白天的样子（第一次找到它时记下来，夜里从这几个数往夜雾的数上过渡）
+	float DayFogDensity = 0.0f, DayFogMaxOpacity = 1.0f, DayFogHeightFalloff = 0.2f, DayFogStartCm = 0.0f, DayFogCutoffCm = 0.0f;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> MoonDiscMID;

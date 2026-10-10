@@ -1,4 +1,4 @@
-# 殿外的配景、夕照的天和水庭的动画水面（UE 编辑器 Python，开 PIE 跑）：
+﻿# 殿外的配景、夕照的天和水庭的动画水面（UE 编辑器 Python，开 PIE 跑）：
 #   · 检查：山石云放上了、没有一件会挡光、台地上的石头挡人、建筑换了配色、水庭的水是动画水面、白天的天是“夕照的天”、
 #     小岛到台地这一条线上没有东西、开局那几个位置日月没被山挡住；
 #   · 拍图：开局的小岛、台地、殿门、水庭、各层、殿顶（下午 → 黄昏 → 夜），给人看画面。
@@ -87,15 +87,27 @@ def main():
         dome = [c for c in sky.get_components_by_class(unreal.StaticMeshComponent) if c.get_name() == "DayDome"]
         dm = dome[0].get_material(0).get_base_material().get_name() if dome and dome[0].get_material(0) else "-"
         check(dome and dome[0].is_visible() and dm == "M_DysisSunsetSky" and sky.get_sky_gain() > 0.5, "白天的天是夕照的天（%s，亮度 %.2f）" % (dm, sky.get_sky_gain() if dome else 0.0))
-        # 小岛通到台地的这一条线上没有配景：从开局的位置朝殿心每 2 m 取一点，周围 6 m 以内不能有配景的中心
-        lane_bad = 0
+        # 小岛通到台地的这一条线：开场的光从这里斜着上来（落在离殿心 31.8 m、高 −80，每往外 1 m 低 0.65 m）。
+        # 2026-10-10 起岛的正面也堆了礁岩，所以这条线上可以有石头，但顶要在光下面至少 1 m——不挡光、不碍着人走。
+        # 从殿心朝小岛每 2 m 取一点，中心在周围 4.5 m 以内的石头挨个看顶有多高
+        lane_bad = 0; lane_n = 0
         comps = [c for c in director.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name().startswith("SM_MATCH_Rock")]
         for i in range(0, 16):
-            p = polar(23.7, 2400.0 + 200.0 * i, 0.0)
+            rr = 2400.0 + 200.0 * i
+            p = polar(23.7, rr, 0.0)
+            beam_z = -80.0 - 0.65 * max(rr - 3180.0, 0.0)
             for c in comps:
                 l = c.get_world_location()
-                if math.hypot(l.x - p[0], l.y - p[1]) < 600.0: lane_bad += 1
-        check(len(comps) >= 15 and lane_bad == 0, "小岛到台地这一条线上没有石头（查了 %d 块）" % len(comps))
+                if math.hypot(l.x - p[0], l.y - p[1]) < 450.0:   # 代码里是轴线两边各 5.6 m 以内的石头压低；这里查中心在 4.5 m 以内的
+                    # 石头的顶：当成一个歪着的椭球算（引擎报的包围盒是个方盒子，歪一点就虚高一两米）。石头模型没缩放时半宽 85 / 89、半高 93 cm
+                    sc = c.get_world_scale()
+                    top = l.z + math.sqrt((c.get_forward_vector().z * 85.0 * sc.x) ** 2 + (c.get_right_vector().z * 89.0 * sc.y) ** 2 + (c.get_up_vector().z * 93.0 * sc.z) ** 2)
+                    lane_n += 1
+                    beam_z = -80.0 - 0.65 * max(math.hypot(l.x, l.y) - 3180.0, 0.0)   # 光在这块石头自己这里有多高（石头的顶在它中心上方）
+                    if top > beam_z - 100.0:
+                        lane_bad += 1
+                        say("     线上太高的石头：离殿心 %.0f、方位 %.1f°，顶 %.0f，光在这里高 %.0f" % (math.hypot(l.x, l.y), math.degrees(math.atan2(l.y, l.x)) % 360, top, beam_z))
+        check(len(comps) >= 15 and lane_bad == 0, "小岛到台地这一条线上的石头都在光下面 1 m 以外（查了 %d 块，线上 %d 块次）" % (len(comps), lane_n))
         # 日月不被山挡：从台地、殿顶两处看，太阳整个下午（方位 204°–244°）和月亮刚升起来的那一段，山顶都在它们下面
         lib = unreal.DysisSkyLibrary
         mts = [c for c in director.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "SM_MATCH_Mountain"]
