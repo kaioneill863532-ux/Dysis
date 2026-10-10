@@ -1,4 +1,4 @@
-# 主角模型和动作的测试（UE 编辑器 Python，开 PIE 跑）：用的是不是正式模型、站 / 走 / 跑 / 起跳 / 下落 / 落地 / 上台阶 / 互动伸手
+﻿# 主角模型和动作的测试（UE 编辑器 Python，开 PIE 跑）：用的是不是正式模型、站 / 走 / 跑 / 起跳 / 下落 / 落地 / 上台阶 / 互动伸手
 # 各放的是不是对的那一段动作、第一人称时人藏起来；顺带拍几张看样子。结果写在 项目/Saved/pie_hero.txt，最后一行 DONE。
 import unreal, os, json, math, glob, traceback
 SAVED = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())
@@ -74,7 +74,7 @@ def main():
         if i == 28: director.debug_camera(unreal.Vector(foot()[0] + math.cos(yaw) * 380, foot()[1] + math.sin(yaw) * 380, foot()[2] + 110), unreal.Vector(foot()[0], foot()[1], foot()[2] + 95), 45.0)
         if i == 40: unreal.SystemLibrary.execute_console_command(w, "Shot")
     director.debug_camera_off()
-    check(len(seen) > 8 and set(seen) == {"A_Run"} and abs(sp - 310) < 8, "走（%.0f cm/s）：放的是 %s（走路动作的自然速度只有 1.7 m/s，所以用慢一点的 A_Run）" % (sp, sorted(set(seen))))
+    check(len(seen) > 8 and set(seen) == {"A_Run"} and abs(sp - 310) < 8, "走（%.0f cm/s）：放的主要是 %s（走路那段动作本身只有 1.0 m/s，游戏里走是 3.1 m/s，按速度混下来九成是 A_Run）" % (sp, sorted(set(seen))))
     yield from wait(25)
     check(clip() == "A_Idle", "停下来回到 %s" % clip())
     # 慢慢走（手柄轻推）：应该是走路的动作
@@ -142,6 +142,74 @@ def main():
     yield from wait(30)
     yield from shoot(w, "主角_在水庭")
     director.debug_camera_off()
+
+    # 8 脚和头发（2026-10-10）：站着脚不滑、跑的时候脚着地、头发会摆
+    anim = mesh.get_anim_instance()
+    mv = pawn.get_component_by_class(unreal.DysisCharacterMovement)
+    def dt(): return max(unreal.GameplayStatics.get_world_delta_seconds(w), 1e-4)
+    def bone(n):
+        l = mesh.get_socket_location(n); return (l.x, l.y, l.z)
+    def gait(): return json.loads(str(anim.describe_gait()))
+    def hair(): return json.loads(str(pawn.describe_hair()))
+    def ring(secs, each=None):
+        # 沿水庭靠墙的一圈（半径 1450：柱子在 1300、墙在 1550，中间没东西挡）走 secs 秒；每帧叫一次 each(过了多久)
+        t = 0.0
+        while t < secs:
+            l = pawn.get_actor_location(); a = math.atan2(l.y, l.x); r = math.hypot(l.x, l.y)
+            tx, ty = -math.sin(a), math.cos(a); corr = (1450.0 - r) / 300.0
+            pawn.add_movement_input(unreal.Vector(tx + math.cos(a) * corr, ty + math.sin(a) * corr, 0), 1.0, False)
+            yield
+            t += dt()
+            if each: each(t)
+    g0 = gait()
+    check(g0["idleSwayX"][1] - g0["idleSwayX"][0] > 15 and 6 < g0["drop"]["run"] < 12 and g0["drop"]["walk"] < 1.5,
+          "开场时从动作里量出来：站着那一段骨盆左右该还原 %.0f…%.0f cm、跑的那一段该放低 %.1f cm（走 %.1f）" % (g0["idleSwayX"][0], g0["idleSwayX"][1], g0["drop"]["run"], g0["drop"]["walk"]))
+    mats = [str(x) for x in unreal.MaterialEditingLibrary.get_vector_parameter_names(unreal.load_asset("/Game/Dysis/Characters/Hero/M_DysisHero"))]
+    check(all(k in mats for k in ("HairLag", "HairSwayA", "HairSwayB")) and hair()["on"], "主角的材质带头发的摆动：%s" % sorted(mats))
+    # 站着：先走两步再停（“站着”那一段从头放），等它放到换重心的那一段（4.5–9 秒），看踩着地的那只脚挪了多少
+    go(polar(215.0, 1450.0, 0.0), 8.0)
+    yield from wait(40)
+    yield from ring(0.3)
+    t = 0.0; prev = None; slide = 0.0; fastest = 0.0; sway = 0.0; lag_idle = 0.0
+    while t < 9.2:
+        yield
+        d = dt(); t += d
+        if t < 4.5: continue
+        cur = {n: bone(n) for n in ("foot_l", "foot_r")}
+        if prev:
+            low = "foot_l" if cur["foot_l"][2] < cur["foot_r"][2] - 1.0 else ("foot_r" if cur["foot_r"][2] < cur["foot_l"][2] - 1.0 else None)
+            if low:
+                m = math.hypot(cur[low][0] - prev[low][0], cur[low][1] - prev[low][1]); slide += m; fastest = max(fastest, m / d)
+        prev = cur
+        sway = max(sway, abs(gait()["offset"][0])); lag_idle = max(lag_idle, hair()["lagCm"])
+    check(slide < 6.0 and fastest < 12.0 and sway > 12.0, "站着换重心的那几秒：踩着地的那只脚一共只挪了 %.1f cm（最快 %.1f cm/s；没修之前约 20 cm、17 cm/s），身子挪到一只脚上 %.0f cm" % (slide, fastest, sway))
+    check(lag_idle < 2.0 and 0.5 < hair()["breeze"] < 2.5, "站着时头发只是轻轻飘（发梢 %.1f cm），没有被甩出去（%.1f cm）" % (hair()["breeze"], lag_idle))
+    # 走、跑：脚踝最低时离地多高（脚踩平时是 14.6 cm；没修之前“跑”那一段最低也有 23 cm，人是悬着的）
+    hh2 = pawn.get_component_by_class(unreal.CapsuleComponent).get_scaled_capsule_half_height()
+    for label, spd, want_stride in (("走", 310.0, 1.0), ("跑", 520.0, 1.202)):
+        mv.set_editor_property("max_walk_speed", spd)
+        go(polar(215.0, 1450.0, 0.0), 8.0)
+        yield from wait(40)
+        low = [99.0]; lags = []; seen = {}
+        def each(t):
+            g = gait()
+            if t > 0.8 and g["weights"]["Run"] + g["weights"]["Walk"] > 0.995:
+                fz = pawn.get_actor_location().z - hh2
+                low[0] = min(low[0], bone("foot_l")[2] - fz, bone("foot_r")[2] - fz)
+                seen["g"] = g
+                h = hair(); yaw = math.radians(pawn.get_actor_rotation().yaw)
+                lags.append((h["lagCm"], h["lag"][0] * math.cos(yaw) + h["lag"][1] * math.sin(yaw)))
+        yield from ring(2.6, each)
+        g = seen.get("g", gait()); back = sorted(x[1] for x in lags)[len(lags) // 2] if lags else 0.0
+        check(12.0 < low[0] < 17.5 and g["clip"] == "A_Run" and abs(g["stride"] - want_stride) < 0.06,
+              "%s（%.0f cm/s）：脚踝最低离地 %.1f cm（踩到地了）；步幅 ×%.2f、每秒 %.2f 个循环、走跑混合 %.2f" % (label, spd, low[0], g["stride"], g["cycleRate"], g["runBlend"]))
+        check(back < -3.0 and max(x[0] for x in lags) <= 22.0, "%s的时候头发往后飘：发梢往后 %.1f cm（最多偏 %.1f cm）" % (label, -back, max(x[0] for x in lags)))
+        t = 0.0
+        while t < 2.0:
+            yield
+            t += dt()
+        check(hair()["lagCm"] < 1.5, "停下 2 秒后头发晃回原位（还偏 %.1f cm）" % hair()["lagCm"])
+    mv.set_editor_property("max_walk_speed", 310.0)
     say("全部通过" if bad[0] == 0 else "有 %d 条没过" % bad[0])
 
 class R:
