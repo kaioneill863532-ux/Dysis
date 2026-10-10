@@ -212,6 +212,10 @@ void ADysisDirector::UpdateSwan(float Dt)
 		const float K = DysisGB::Smoothstep(0.0f, 2.6f, SwanOpenT);
 		if (AActor* Dr = SwanDoor.Get()) Dr->SetActorLocation(SwanDoorBase - FVector(0.0, 0.0, 260.0 * K));
 		if (AActor* Rl = SwanRelief.Get()) Rl->SetActorLocation(SwanReliefBase - FVector(0.0, 0.0, 305.0 * K));
+		// 沉到底以后就在下一层的墙面上露出来了（2026-10-10 用户：四层的天鹅浮雕落下后穿模出现在三层）——到底就不画了
+		if (K >= 0.999f)
+			for (AActor* A : { SwanDoor.Get(), SwanRelief.Get() })
+				if (A && !A->IsHidden()) A->SetActorHiddenInGame(true);
 		if (K > 0.5f)
 			for (AActor* A : { SwanDoor.Get(), SwanRelief.Get() })
 				if (A && A->GetActorEnableCollision())
@@ -272,6 +276,7 @@ void ADysisDirector::UpdateStairs(float Dt)
 			if (AActor* A = Set.Seal.Get())
 			{
 				A->SetActorLocation(Set.SealBase - FVector(0.0, 0.0, 260.0 * DysisGB::Smoothstep(0.0f, 1.0f, Set.SealOpen)));
+				if (Set.SealOpen >= 1.0f && !A->IsHidden()) A->SetActorHiddenInGame(true);   // 沉到底就不画了，免得在下一层露头
 				if (Set.SealOpen > 0.5f && A->GetActorEnableCollision())
 				{
 					A->SetActorEnableCollision(false);

@@ -1,9 +1,12 @@
 ﻿// 机关总管 · 音效：每帧看一遍各个机关的状态，哪个变了就在它那里放对应的一次性音效。
 // 以前这些音效是 ADysisSfxDirector 盯着旧的机关 Actor（拉杆、驱动器、神龛……）放的；旧 Actor 换成机关总管以后，
-// 那些绑定都落空了，改在这里按机关总管自己的状态来放。循环的声音（踏步升降、推雕像的摩擦声、金苹果的嗡鸣）还没接。
+// 那些绑定都落空了，改在这里按机关总管自己的状态来放。
+// 循环的声音：推雕像的摩擦声、捧着金苹果的那一层在这里开关；瀑布的水声、水雾、湿脚步在 ADysisSfxDirector 里，这里每帧把进度告诉它
+// （2026-10-10 用户发现瀑布只响一声就没了，查下来这几条循环都是断的）。踏步升降、光圈叶片的还是它按模型的名字盯着放。
 #include "DysisDirector.h"
 #include "DysisGreybox.h"
 #include "Audio/DysisSfxSubsystem.h"
+#include "Audio/DysisSfxDirector.h"
 #include "Audio/DysisMusicManager.h"
 #include "UI/DysisHUD.h"
 #include "UI/DysisDialogueComponent.h"
@@ -57,6 +60,11 @@ void ADysisDirector::UpdateSfx()
 	const UDysisWorldState* State = UDysisWorldState::Get(this);
 	auto Stone = [this](FName Id) -> const FMoonstone* { for (const FMoonstone& Ms : Moonstones) if (Ms.Id == Id) return &Ms; return nullptr; };
 
+	if (ADysisSfxDirector* Watcher = ADysisSfxDirector::Get(this))
+		Watcher->SyncFromDirector(State ? State->FlowK : 0.0f, bCaught, bSeleneOn, bGoddessLit);
+	UDysisSfxSubsystem* Loops = UDysisSfxSubsystem::Get(this);
+	static const FName LoopPush(TEXT("Director.StatuePush")), LoopApple(TEXT("Director.AppleHold"));
+
 	// ── 水闸、L1 的机关和两块石板 ──
 	if (State && SfxRose(TEXT("sluice"), State->bSluiceOpen ? 1.0f : 0.0f, 0.5f))
 	{
@@ -77,6 +85,18 @@ void ADysisDirector::UpdateSfx()
 	if (SfxRose(TEXT("doorOpen"), DoorOpen, 0.05f)) Sfx(TEXT("Mech.Gate.Open"), PieceLoc(TEXT("SM_Mech_RoofBridgeDoor_Leaf"), Me));
 	if (SfxRose(TEXT("doorLock"), bDoorLocked ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Mech.Gate.Close"), PieceLoc(TEXT("SM_Mech_RoofBridgeDoor_Leaf"), Me));
 	if (SfxRose(TEXT("caught"), bCaught ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Story.Apple.Take"), Roof);
+	// 捧着金苹果：很轻的一层，从取下来一直响到放上水亭（跟着苹果走）
+	if (Loops)
+	{
+		const bool bHold = bCaught && !bApplePlaced;
+		if (bHold)
+		{
+			const FVector At = Apple ? Apple->GetComponentLocation() : Me;
+			if (!Loops->IsLoopActive(LoopApple)) Loops->StartLoop(LoopApple, TEXT("Story.Apple.HoldLoop"), At, 3.0f);
+			else Loops->SetLoopLocation(LoopApple, At);
+		}
+		else if (Loops->IsLoopActive(LoopApple)) Loops->StopLoop(LoopApple, 2.0f);
+	}
 
 	// ── 三相像、日之龛 ──
 	const FVector Statue = PieceLoc(TEXT("SM_Mech_Mirror_Statue"), Me);
@@ -141,6 +161,16 @@ void ADysisDirector::UpdateSfx()
 		if (bMoved && Still >= 0.3f) Sfx(TEXT("Mech.Statue.PushStart"), PolluxAt);
 		if (!bMoved && Still < 0.3f && StillNow >= 0.3f) Sfx(TEXT("Mech.Statue.PushStop"), PolluxAt);
 		SfxPrev.FindOrAdd(TEXT("polluxStill")) = StillNow;
+		// 推着走的那一段：石头在地上磨的声音，跟着像走；停了三分之一秒就收
+		if (Loops)
+		{
+			if (TwinState == 3 && StillNow < 0.3f)
+			{
+				if (!Loops->IsLoopActive(LoopPush)) Loops->StartLoop(LoopPush, TEXT("Mech.Statue.PushLoop"), PolluxAt, 0.15f);
+				else Loops->SetLoopLocation(LoopPush, PolluxAt);
+			}
+			else if (Loops->IsLoopActive(LoopPush)) Loops->StopLoop(LoopPush, 0.3f);
+		}
 	}
 	if (SfxRose(TEXT("twins"), bTwinsJoined ? 1.0f : 0.0f, 0.5f))
 	{
@@ -151,7 +181,11 @@ void ADysisDirector::UpdateSfx()
 	// ── 女神、半桥、影桥、放苹果 ──
 	const FVector Goddess = PieceLoc(TEXT("SM_Mech_Goddess_Statue"), Me);
 	if (SfxRose(TEXT("glint"), bGoddessGlint ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Story.Waterfall.HoleOpen"), Goddess);
-	if (SfxRose(TEXT("goddess"), bGoddessLit ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Mech.HalfBridge.Extend"), PieceLoc(TEXT("SM_Mech_HalfBridge_Deck"), Goddess));
+	if (SfxRose(TEXT("goddess"), bGoddessLit ? 1.0f : 0.0f, 0.5f))
+	{
+		Sfx(TEXT("Story.Selene.Lock"), Goddess);   // 月光对准了女神像的那一声（原来绑在旧的半桥驱动器上，落空了）
+		Sfx(TEXT("Mech.HalfBridge.Extend"), PieceLoc(TEXT("SM_Mech_HalfBridge_Deck"), Goddess));
+	}
 	if (SfxRose(TEXT("shadow"), ShadowOn, 0.99f)) Sfx(TEXT("Story.ShadowBridge.Join"), Me);
 	if (SfxRose(TEXT("placed"), bApplePlaced ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Story.Apple.Place"), FVector(0.0, 0.0, 180.0));
 }

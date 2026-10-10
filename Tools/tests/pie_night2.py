@@ -140,7 +140,7 @@ def main():
     took = now() - t0
     yield from wait(60)
     d = tw(); exp = fl["push"]
-    # 推着像走是按人走路的速度走的：灰盒走 310 cm/s，游戏里 2026-10-10 起走 160（用户要真正走路的动作），时间按比例长
+    # 推着像走是按人走路的速度走的：灰盒走 310 cm/s，游戏里 2026-10-10 起走 190（用户要真正走路的动作：先降到 160，后来又要快一点），时间按比例长
     want_s = exp["seconds"] * 310.0 / pawn.get_editor_property("walk_speed")
     check(d["joined"] and abs(d["polluxAz"] - TW["endAz"]) < 0.06 and d["lit"] > 0.99 and d["litC"] > 0.99 and abs(took - want_s) < 1.5 and behind,
           "顺时针一路推回卡斯托耳身边：用了 %.1f 秒（灰盒 %.1f 秒 × 走路慢了的倍数），停在方位 %.1f°，并肩=%s，月光照着 波吕丢刻斯 %.2f / 卡斯托耳 %.2f，人一直在他身后=%s；%s" % (took, want_s, d["polluxAz"], d["joined"], d["lit"], d["litC"], behind, state()[:30]))

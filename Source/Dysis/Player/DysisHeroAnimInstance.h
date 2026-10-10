@@ -31,7 +31,7 @@ public:
 	FString DescribeGait();
 
 	/** 两段动作本身的速度：脚踩在地上那一段往后蹬得有多快（厘米/秒，从动作里量出来的）。
-	 *  游戏里走是 1.6 m/s、跑是 5.2 m/s：走的时候全是“走”那一段（步幅放大、步子放快来凑速度），
+	 *  游戏里走是 1.9 m/s、跑是 5.2 m/s：走的时候全是“走”那一段（步幅放大、步子放快来凑速度），
 	 *  速度过了 WalkBlendFromSpeed 才开始混进“跑”，到“跑”本身的速度以上全是“跑”。
 	 *  “跑”的 360 是在游戏里试出来的：按 300–380 各跑一遍，量踩地时脚掌在地上滑多快，360 时最小（走 3.1 m/s 时每秒约 20 cm）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
@@ -42,7 +42,7 @@ public:
 
 	/** 速度到这个数为止全是“走”那一段（比游戏里走的速度高一点，免得走着走着混进跑的样子）。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
-	float WalkBlendFromSpeed = 190.0f;
+	float WalkBlendFromSpeed = 220.0f;
 
 	/** 步幅放大以后腿要够得着，人得矮一点：步幅每放大三成，骨盆放低这么多厘米。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
@@ -65,7 +65,7 @@ public:
 	float StrideMin = 0.85f;
 
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
-	float StrideMax = 1.3f;
+	float StrideMax = 1.4f;
 
 	/** 人是一按键就到全速的；动作用的速度慢一拍跟上（每秒涨这么多厘米/秒），起步时先迈一小步再跑起来。 */
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")

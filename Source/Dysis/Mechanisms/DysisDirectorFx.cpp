@@ -336,8 +336,21 @@ void ADysisDirector::UpdateFx(float Dt)
 			}
 		// 开了闸、水下来以后：瀑布这一块（连同后面的水槽和女神像）人进不去了
 		const ECollisionEnabled::Type Mode = Flow > 0.15f ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision;
+		// 镜头也进不去（2026-10-10 用户：镜头在瀑布外面的时候，转视角也不要让它钻进瀑布里）：水帘对镜头来说就是一堵墙。
+		// 人自己在里面的时候不拦（水下来时正好站在里面，要走出来）——不然镜头会被顶到脸上。
+		bool bInside = false;
+		if (Time)
+		{
+			const float Az = DysisGB::AzOf(Time->FootCm), R = DysisGB::ROf(Time->FootCm);
+			bInside = Time->Zone == TEXT("wfback") || (R > FxFallR - 30.0f && R < FxFallWallR + 30.0f && Az > FxFallA0 - 1.0f && Az < FxFallA1 + 1.0f);
+		}
+		const ECollisionResponse Cam = bInside ? ECR_Ignore : ECR_Block;
 		for (const TWeakObjectPtr<UBoxComponent>& B : FallBlocks)
-			if (B.IsValid() && B->GetCollisionEnabled() != Mode) B->SetCollisionEnabled(Mode);
+			if (B.IsValid())
+			{
+				if (B->GetCollisionEnabled() != Mode) B->SetCollisionEnabled(Mode);
+				if (B->GetCollisionResponseToChannel(ECC_Camera) != Cam) B->SetCollisionResponseToChannel(ECC_Camera, Cam);
+			}
 	}
 	if (FallMist && FallMistMID)
 	{
@@ -550,7 +563,7 @@ void ADysisDirector::SetupWaterfallLook()
 			M->SetScalarParameterValue(TEXT("R0"), FxFallR);
 		}
 	}
-	// ③ 挡人的墙（只挡人，不挡光、不挡镜头；开闸以后才生效）：两头各一道，前面沿水帘四段
+	// ③ 挡人的墙（不挡光；开闸以后才生效，人在外面的时候也挡镜头）：两头各一道，前面沿水帘四段
 	auto Block = [this](const FVector& Center, float YawDeg, const FVector& Half)
 	{
 		UBoxComponent* Box = MakeWall();

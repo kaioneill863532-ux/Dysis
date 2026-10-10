@@ -539,6 +539,23 @@ public:
 	FString DescribeWaterfall() const;
 private:
 
+	// 建筑上的小修补（2026-10-10 第七轮试玩反馈）：暗门和楼梯窗的拱、各层栏杆上跳不出去的护栏、岛边的护栏、
+	// 月桥口的石板、弧形的台面 —— DysisDirectorDetails.cpp
+	void SetupDetails();
+	void UpdateDetails(float Dt);
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> DetailComps;
+	struct FJumpGuard { TWeakObjectPtr<UBoxComponent> Box; int32 Floor = 0; };
+	TArray<FJumpGuard> JumpGuards;               // 光路越过栏杆的那几段：人不在光上的时候拦着
+	TArray<TWeakObjectPtr<UStaticMeshComponent>> GapSlab;   // 月桥口那一段补上的栏杆石板
+	float GapSlabT = 0.0f;                       // 双子并肩以后过了多久（石板收进地里）
+	int32 DetailArches = 0, DetailEdgeWalls = 0, DetailLedgeParts = 0;
+public:
+	/** 测试用：这些小修补的状态（护栏几段、现在开着几段、岛边几段、拱几个、月桥口的石板在不在、台面几段）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DescribeDetails() const;
+private:
+
 	// 殿外的配景和夕照的配色：山、石、草坡、云；建筑换上美术那版外景的调色板 —— DysisDirectorScenery.cpp
 	void SetupScenery();
 	void UpdateScenery();

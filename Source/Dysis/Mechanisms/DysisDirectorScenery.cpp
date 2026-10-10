@@ -37,7 +37,10 @@ namespace
 	// 柱廊的轴线（方位 22.5°，朝小岛）；台基的尺寸（沿轴线离殿心多远 = D，往两边 = S，厘米）：
 	// 柱廊的地面到 D 2980、S ±1490，三级台阶落到 D 3100、S ±1610；台基的墙面在 D 3205（和岛的前沿齐）、S ±1775
 	constexpr float ScnPorticoAz = 22.5f, ScnBaseD0 = 2500.0f, ScnBaseD1 = 3205.0f, ScnBaseS = 1775.0f;
-	constexpr float ScnBaseTopZ = -120.5f;   // 比台地的顶面（−120）低半厘米：叠在一起的地方不闪
+	// 岛的顶面原来在 −120，和圆基座最下面那一圈（半径 24–24.4 m）、柱廊最下面那一级的面是同一个高度：岛缩小、挪过以后它正好铺在这两处底下，
+	// 两个面叠在一起闪（2026-10-10 用户：建筑外面新增的阶梯有些闪烁）。岛整个往下沉 1.2 cm；台基的压顶再比岛低 1.8 cm（原来只差半厘米，远看也会闪）。
+	constexpr float ScnTerraceDropCm = 1.2f;
+	constexpr float ScnBaseTopZ = -123.0f;
 	// 小岛（顶面的圆心在方位 23.7°、离殿心 52.6 m）：从殿心朝它去的这一条线两边各 ScnLaneHalfW 以内不放东西（开场的光从这里伸到岛上）
 	const FVector2D ScnIsleC(4815.0, 2114.0);
 	constexpr float ScnLaneHalfW = 1100.0f;
@@ -112,7 +115,11 @@ void ADysisDirector::SetupScenery()
 			if (!bPortico && !Label.StartsWith(TEXT("SM_PeriCol_"))) continue;
 			// 这根柱子的轴在哪：看它自己那个模型（根部件）在世界里的位置。不能随手找一个部件——挂在它身上的低模是另一套坐标（转过 90° 的）
 			USceneComponent* Root = It->GetRootComponent();
-			if (!Root || !FMath::IsNearlyEqual(It->GetActorScale3D().X, 1.0)) break;           // 已经摆过了（这个函数可能叫第二遍）
+			// 只动画出来的那一层（挂在原模型上的低模）。头一版是把整根柱子（连原模型）一起缩、一起转的：原模型管挡光，
+			// 外圈的柱子细了 5%，日1 那束光有四个时刻就比灰盒多漏进来二十分之一（pie_beams 的 b1 对不上）。原模型一点不动，光路就还是灰盒的。
+			UStaticMeshComponent* Skin = nullptr;
+			for (UStaticMeshComponent* S : SkinComps) if (S && S->GetOwner() == *It) { Skin = S; break; }
+			if (!Root || !Skin || !FMath::IsNearlyEqual(Skin->GetComponentScale().X, 1.0)) break;   // 没有低模，或者已经摆过了（这个函数可能叫第二遍）
 			const FVector2D Axis(Root->Bounds.Origin);
 			const float Slim = 0.95f;
 			float Turn = 0.0f;
@@ -123,9 +130,8 @@ void ADysisDirector::SetupScenery()
 				Turn = FMath::Fmod(ScnPorticoAz - Now + 45.0f + 3600.0f, 90.0f) - 45.0f;
 			}
 			const FVector2D Moved = Axis - (Axis * Slim).GetRotated(Turn);                     // 转、缩都以轴为中心：原点要跟着挪
-			Root->SetMobility(EComponentMobility::Movable);
 			// 关卡里每个部件自己本来就转着 90°（模型的坐标和世界差 90°）、位置在殿心：在它原来的朝向上再转
-			It->SetActorTransform(FTransform(FRotator(0.0f, float(It->GetActorRotation().Yaw) + Turn, 0.0f), FVector(Moved.X, Moved.Y, 0.0), FVector(Slim, Slim, 1520.3 / 1544.0)));
+			Skin->SetWorldTransform(FTransform(FRotator(0.0f, float(It->GetActorRotation().Yaw) + Turn, 0.0f), FVector(Moved.X, Moved.Y, 0.0), FVector(Slim, Slim, 1520.3 / 1544.0)));
 			break;
 		}
 	// 岛：缩小、挪到以殿心为圆心
@@ -134,7 +140,7 @@ void ADysisDirector::SetupScenery()
 		const float K = ScnTerraceR / ScnTerraceModelR;
 		if (USceneComponent* Root = Terrain->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
 		Terrain->SetActorScale3D(FVector(K, K, 1.0));
-		Terrain->SetActorLocation(FVector(ScnTerraceC.X - ScnTerraceModelC.X * K, ScnTerraceC.Y - ScnTerraceModelC.Y * K, 0.0));
+		Terrain->SetActorLocation(FVector(ScnTerraceC.X - ScnTerraceModelC.X * K, ScnTerraceC.Y - ScnTerraceModelC.Y * K, -ScnTerraceDropCm));
 	}
 	// 柱廊下面的石砌台基：按古典台基的三段——基座、墙身、压顶（各带一道线脚），正面的壁柱一根对着上面一根柱子。
 	// 墙身是沙色的石头，线脚和壁柱是暖白的；一直砌到海里。挡人、挡镜头，不挡光。
@@ -158,13 +164,19 @@ void ADysisDirector::SetupScenery()
 		Stone(D0, D1 + 24.0f, -S - 24.0f, S + 24.0f, ShoeZ, FootZ, Trim, false);           // 基座上沿的一道线脚
 		Stone(D0, D1 + 48.0f, -S - 48.0f, S + 48.0f, Sea - 200.0f, ShoeZ, Wall, true);     // 基座
 		// 柱廊的地面（灰盒的模型）只是薄薄的一片：两侧底下是空的，从旁边一看人像踩在悬着的板上。
-		// 底下填实；正面那三级台阶（每级 40 高、40 宽）顺着两侧接过去，一直接到圆基座的台阶上。
-		Stone(1850.0f, 2975.0f, -1489.0f, 1489.0f, Top - 4.0f, -1.0f, Trim, true);   // 比那片地面往里收 1 cm、矮 1 cm：不和它的面叠着闪
+		// 底下填实；正面那三级台阶（每级 40 高、40 宽）顺着两侧接过去，一直接进圆基座的台阶里。
+		// 2026-10-10 用户：新做的台阶和原来的台阶接得生硬、看得出是断开的。量下来两处：
+		//   · 柱廊那片地面的后沿在离殿心 19.4 m，圆基座的顶面只到半径 23.2 m——两侧各有一个三角的坑，原来的填块只从 18.5 m 起、顶面还矮 1 cm；
+		//   · 两侧的台阶也只从 18.5 m 起，可同一级的圆台阶要到 17.8–18.2 m 才和它碰上，中间露出一截断头。
+		// 现在都从 17 m 起（整个埋进圆基座里才算完），台阶的顶面比圆基座的同一级低 3 mm：叠着的地方看到的是圆基座的面，不闪，也看不出台阶。
+		Stone(1700.0f, 2975.0f, -1489.0f, 1489.0f, Top - 4.0f, -0.4f, Trim, true);    // 比那片地面往里收 1 cm、矮 4 mm：不和它的面叠着闪
 		for (const float Side : { -1.0f, 1.0f })
 		{
-			auto Step = [&](float S0, float S1, float D1x, float TopZ) { Stone(1850.0f, D1x, FMath::Min(Side * S0, Side * S1), FMath::Max(Side * S0, Side * S1), Top - 4.0f, TopZ, Trim, true); };
+			// 每一级往里多伸 10 cm（埋在上一级里面）：两级之间不留缝
+			auto Step = [&](float S0, float S1, float D1x, float TopZ) { Stone(1700.0f, D1x, FMath::Min(Side * (S0 - 10.0f), Side * S1), FMath::Max(Side * (S0 - 10.0f), Side * S1), Top - 4.0f, TopZ - 0.3f, Trim, true); };
 			Step(1490.0f, 1530.0f, 2980.0f, -40.0f);
 			Step(1530.0f, 1570.0f, 3020.0f, -80.0f);
+			Step(1570.0f, 1610.0f, 3060.0f, -120.0f);    // 最下面那一级只比地面高一指：正面那一级顺着拐过来
 		}
 		// 门廊的屋顶和圆殿接上（2026-10-10 用户：门廊的顶和神殿本身是分开的，参考现实里这类建筑怎么合为一体）。
 		// 灰盒的模型里人字屋顶的后端停在离殿心 18.85 m，圆殿的外墙在 17.1 m——中间空着一米七，屋顶像是搁在外圈柱子上的一顶帽子。
@@ -176,16 +188,20 @@ void ADysisDirector::SetupScenery()
 			UMaterialInterface* RoofStone = ScnPalette(TEXT("MI_MATCH_PedimentStone"));
 			const float RidgeZ = 2320.0f, EaveS = 1568.0f, TanT = 600.0f / EaveS, CosT = 1.0f / FMath::Sqrt(1.0f + TanT * TanT), SinT = TanT * CosT;
 			const float RoofBackD = 1890.0f, WallMidR = 1640.0f, WallInR = DysisGB::R_IN;
-			auto BackAt = [&](float S) { return FMath::Sqrt(FMath::Max(WallMidR * WallMidR - S * S, 0.0f)); };
 			for (const float Side : { -1.0f, 1.0f })
 			{
 				float S0 = 0.0f;
 				while (S0 < EaveS - 1.0f)
 				{
+					// 西侧靠檐口的那一段，墙里是夜里的楼梯 TS（墙厚的中间是空的：半径 15.8–16.8 m）。屋面伸到墙厚的中间就捅进楼梯里了
+					// （2026-10-10 用户：暗门楼梯里有穿模出来的东西）——这一段只伸进外面那层墙皮（16.8–17.1 m），条切得窄一些。
+					const bool bStairs = Side < 0.0f && S0 >= 1290.0f;
+					const float BackR = bStairs ? 1703.0f : WallMidR, KeepR = bStairs ? 1684.0f : WallInR + 15.0f;
+					auto BackOf = [&](float S) { return FMath::Sqrt(FMath::Max(BackR * BackR - S * S, 0.0f)); };
 					float S1 = FMath::Min(S0 + 260.0f, EaveS);
-					// 这一条的后端按它外边那一侧定；里边那一侧不能越过内墙面
-					while (S1 > S0 + 20.0f && BackAt(S1) < FMath::Sqrt(FMath::Max(WallInR * WallInR - S0 * S0, 0.0f)) + 15.0f) S1 -= 10.0f;
-					const float BackD = BackAt(S1);
+					// 这一条的后端按它外边那一侧定；里边那一侧不能越过内墙面（有楼梯的那一段：不能越过外面那层墙皮的里面）
+					while (S1 > S0 + 6.0f && BackOf(S1) < FMath::Sqrt(FMath::Max(KeepR * KeepR - S0 * S0, 0.0f))) S1 -= bStairs ? 2.0f : 10.0f;
+					const float BackD = BackOf(S1);
 					const float Sa = S0 > 0.0f ? S0 : -12.0f;                                            // 屋脊那一条往对面多伸一点，两坡在脊上咬住，不留缝
 					const float Sm = (Sa + S1) * 0.5f;
 					const FVector Out = V * (Side * CosT) - FVector(0.0, 0.0, SinT);                     // 顺着屋面往檐口去的方向

@@ -769,6 +769,21 @@ void ADysisSfxDirector::SetWaterfall(bool bOn, bool bFromSluice)
 	}
 }
 
+void ADysisSfxDirector::SyncFromDirector(float FlowK, bool bLightCaught, bool bSeleneAwake, bool bMoonLocked)
+{
+	bDirectorDriven = true;
+	bCaught = bLightCaught;
+	bIndigoFired = bSeleneAwake;
+	bSeleneLocked = bMoonLocked;
+	if (Water.IsValid() || !GetWorld()) return;
+	// 瀑布：水放出来了就算开（2026-10-10 用户：瀑布只在开闸时响一声就没了——持续的水声一直等着旧的水面 Actor 来开）。
+	// 开闸那一声（Mech.Waterfall.Start）先响，一秒半以后接上近、远两层循环；关了就放“瀑布停”、循环淡出。
+	const bool bFlow = FlowK > 0.05f;
+	if (bFlow == bWaterfallOn) return;
+	if (bFlow) WaterfallLoopsAt = GetWorld()->GetTimeSeconds() + 1.5;
+	SetWaterfall(bFlow, true);
+}
+
 void ADysisSfxDirector::UpdateWater()
 {
 	ADysisMoonSurface* W = Water.Get();
@@ -930,7 +945,7 @@ void ADysisSfxDirector::UpdateGate()
 {
 	// 屋顶桥门：接光之前转动 = 打开（现在导入姿态就是开着的，接上开门动画后自动有声）。
 	const AActor* Door = FindAnchor(TEXT("BridgeDoor"));
-	if (!Door || !bDoorKnown) return;
+	if (!Door || !bDoorKnown || bDirectorDriven) return;   // 机关总管自己放开门 / 关门的声音；这里再按“门转了”放一遍，关门时会多出一声开门
 	const FRotator R = Door->GetActorRotation();
 	if (!R.Equals(DoorRot, 0.5f))
 	{

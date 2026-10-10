@@ -587,14 +587,14 @@ if want("M_DysisFallFoam"):
 float d = R0 - rr;                                                            // 离落点多远：正 = 朝中庭这边，负 = 水帘后面
 float din = max(d, 0.0), dback = max(-d, 0.0);
 float u = radians(ang) * rr;
-float near = exp(-din / 70.0) * exp(-dback / 150.0);                          // 落点跟前一片白
+float nearK = exp(-din / 70.0) * exp(-dback / 150.0);                         // 落点跟前一片白（变量名别用 line / near / far：HLSL 的保留字，材质会编不过、变成灰格子）
 float churn = NZ.n(float3(u * 0.02, (din - Time * 60.0) * 0.016, Time * 0.5));
 float fine = NZ.n(float3(u * 0.07, (din - Time * 95.0) * 0.05, Time * 0.9));
 float blobs = smoothstep(0.42, 0.75, churn);                                  // 一团一团翻着的白沫
 float ring = 0.5 + 0.5 * sin((din - Time * 85.0) * 0.07 + churn * 3.0);       // 一圈一圈往外推的波
-float line = smoothstep(0.80, 0.98, ring);                                    // 只留波峰那一条细线
-float far = exp(-din / max(Reach, 1.0));
-float a = saturate(near * (0.35 + 0.55 * blobs) + far * (0.16 * line * (0.4 + 0.6 * fine) + 0.14 * blobs * smoothstep(0.5, 0.8, fine)));
+float crest = smoothstep(0.80, 0.98, ring);                                   // 只留波峰那一条细线
+float farK = exp(-din / max(Reach, 1.0));
+float a = saturate(nearK * (0.35 + 0.55 * blobs) + farK * (0.16 * crest * (0.4 + 0.6 * fine) + 0.14 * blobs * smoothstep(0.5, 0.8, fine)));
 a *= smoothstep(0.0, 1.0, saturate(min(ang - A0 + 3.0, A1 + 3.0 - ang) / 5.0)) * smoothstep(Reach * 1.9, Reach * 0.8, din);
 return float4(Tint * (0.8 + 0.4 * fine), a);
 """, ins + named(P), F4, -900, 0)

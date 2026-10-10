@@ -442,7 +442,7 @@ void ADysisHUD::DrawMainMenu(float RealDt)
 	}
 }
 
-// ───────────────────────── 设置页（游戏里按 P / Esc） ─────────────────────────
+// ───────────────────────── 设置页（游戏里按 P / Tab / Esc） ─────────────────────────
 
 void ADysisHUD::DrawSettings(float RealDt)
 {
@@ -470,7 +470,7 @@ void ADysisHUD::DrawSettings(float RealDt)
 		for (int32 i = 0; i < 2; ++i)
 			if (VolumeDrag < 0 && MouseIn(OX + SetRowX * S, SetRowY[i] * S, SetRowW * S, SetRowH * S)) { SettingsIndex = i; VolumeFocus = -1; if (bClick) bConfirm = true; }
 		if (VolumeFocus < 0 && (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::E))) bConfirm = true;
-		if (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Escape) || PC->WasInputKeyJustPressed(EKeys::BackSpace)) bResume = true;
+		if (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape) || PC->WasInputKeyJustPressed(EKeys::BackSpace)) bResume = true;
 	}
 
 	SelectorX = Approach(SelectorX, SettingsIndex * SetRowStep, 1000.0f, RealDt);
@@ -774,7 +774,8 @@ void ADysisHUD::DrawHUD()
 		DrawSettings(RealDt);
 		break;
 	case EDysisScreen::Playing:
-		if (PC && StartPhase == 0 && (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Escape))) { OpenSettings(); break; }
+		// P、Tab、Esc 都能开设置（2026-10-10 用户：在编辑器里试玩时 Esc 是“退出试玩”，按不到设置——用 P 或 Tab）
+		if (PC && StartPhase == 0 && (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape))) { OpenSettings(); break; }
 		DrawInGame(Dt);
 		break;
 	}

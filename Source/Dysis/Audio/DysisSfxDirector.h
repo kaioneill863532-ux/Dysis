@@ -133,6 +133,11 @@ public:
 
 	bool IsWaterfallFlowing() const { return bWaterfallOn; }
 
+	/** 机关总管每帧说一声现在的进度。旧的机关 Actor（水面、接光点、棱镜、驱动器……）换成机关总管以后，这里自己盯不到了，
+	 *  靠它们开关的声音就都断了：瀑布的两层水声和水雾、湿脚步、塞勒涅的梦话该停不停、月桥上的持续音该停不停。
+	 *  FlowK = 瀑布放到几成；bLightCaught = 接住最后一缕光了；bSeleneAwake = 浮雕上的塞勒涅醒了；bMoonLocked = 月光对准了水边的女神像。 */
+	void SyncFromDirector(float FlowK, bool bLightCaught, bool bSeleneAwake, bool bMoonLocked);
+
 	/** 灰盒的“区域 → 第几关”（0=序，1–5=日1–日5，6–10=月1–月5，-1=不算）。关卡标题用。 */
 	static int32 LevelOf(const FString& Zone, bool bNight);
 
@@ -237,6 +242,7 @@ private:
 	bool bPrologueRevealPlayed = false;
 	bool bIndigoFired = false;
 	bool bSeleneLocked = false;
+	bool bDirectorDriven = false;            // 机关总管在管事（桥门的声音它自己放，这里不重复）
 	FRotator DoorRot = FRotator::ZeroRotator;
 	bool bDoorKnown = false;
 

@@ -148,7 +148,8 @@ def main():
 
     # ── D 虹之龛 ──
     check(not director.debug_interact("prism"), "棱镜还没升起来：转不了")
-    go(G["flow"][3]["pts"][2]["foot"]); look(165.0, 4.0)
+    # 2026-10-10 起石沿和窗一样宽（用户要的），不再往西伸到龛的正下方：站在虹桥落下来的那一点开龛（灰盒里这一点也够得着）
+    go(G["flow"][3]["pts"][0]["foot"]); look(165.0, 4.0)
     yield from wait(30)
     yield from shoot(w, "石沿上_虹之龛跟前")
     check(director.debug_interact("irisNiche"), "按 E 打开虹之龛")

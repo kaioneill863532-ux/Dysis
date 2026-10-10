@@ -117,6 +117,7 @@ void ADysisDirector::BeginPlay()
 	SetupLowPolySkin();
 	SetupScenery();
 	SetupMechLook();
+	SetupDetails();
 	BuildInteracts();
 }
 
@@ -315,6 +316,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateEndingStars(DeltaTime);
 	UpdateFx(DeltaTime);
 	UpdateScenery();
+	UpdateDetails(DeltaTime);
 	UpdateViews();
 	UpdateSfx();
 	UpdateMusic();
