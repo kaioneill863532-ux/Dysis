@@ -18,6 +18,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
@@ -96,6 +97,37 @@ void ADysisDirector::SetupScenery()
 		return C;
 	};
 
+	// 外面一圈柱子、门口柱廊的柱子（2026-10-10 用户发现的三处，都在柱头顶上那块方板上；灰盒的模型里每根柱子是按“朝着殿心”摆的）：
+	//   · 方板（24 cm 厚，底在 1520、顶在 1544）整个埋在檐部里，檐部的底面也在 1520——两个面叠在同一个高度上，从下面看那一块会闪。
+	//     把柱子竖着压矮一点点（1544 → 1520.3，百分之一点五）：方板整个露在檐部下面，本来柱头的方板就该托在檐部底下。
+	//   · 门口柱廊是方的，可十根柱子的方板各朝各的（都朝着殿心，一根一个角度），转过来的角还探出屋顶的底面。
+	//     每根绕自己的轴转到和柱廊一个方向（方板的边顺着柱廊的边）。外面那一圈是圆的，方板朝着殿心是对的，不转。
+	//   · 方板比檐部的底面宽几厘米：柱子整个收细百分之五，方板就都在檐部 / 屋顶的底面以内了。
+	// 柱子的模型原点在殿心（位置是做在模型里的），所以“绕自己的轴转、缩”要连位置一起算。
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		for (const FName& Tag : It->Tags)
+		{
+			const FString Label = Tag.ToString();
+			const bool bPortico = Label.StartsWith(TEXT("SM_PorticoCol_"));
+			if (!bPortico && !Label.StartsWith(TEXT("SM_PeriCol_"))) continue;
+			// 这根柱子的轴在哪：看它自己那个模型（根部件）在世界里的位置。不能随手找一个部件——挂在它身上的低模是另一套坐标（转过 90° 的）
+			USceneComponent* Root = It->GetRootComponent();
+			if (!Root || !FMath::IsNearlyEqual(It->GetActorScale3D().X, 1.0)) break;           // 已经摆过了（这个函数可能叫第二遍）
+			const FVector2D Axis(Root->Bounds.Origin);
+			const float Slim = 0.95f;
+			float Turn = 0.0f;
+			if (bPortico)
+			{
+				// 现在朝着殿心（= 它自己的方位）；转到柱廊的方位。方板是方的，转 90° 等于没转，取最小的那个角
+				const float Now = float(FMath::RadiansToDegrees(FMath::Atan2(Axis.Y, Axis.X)));
+				Turn = FMath::Fmod(ScnPorticoAz - Now + 45.0f + 3600.0f, 90.0f) - 45.0f;
+			}
+			const FVector2D Moved = Axis - (Axis * Slim).GetRotated(Turn);                     // 转、缩都以轴为中心：原点要跟着挪
+			Root->SetMobility(EComponentMobility::Movable);
+			// 关卡里每个部件自己本来就转着 90°（模型的坐标和世界差 90°）、位置在殿心：在它原来的朝向上再转
+			It->SetActorTransform(FTransform(FRotator(0.0f, float(It->GetActorRotation().Yaw) + Turn, 0.0f), FVector(Moved.X, Moved.Y, 0.0), FVector(Slim, Slim, 1520.3 / 1544.0)));
+			break;
+		}
 	// 岛：缩小、挪到以殿心为圆心
 	if (AActor* Terrain = Piece(TEXT("SM_Terrain")))
 	{
@@ -133,6 +165,39 @@ void ADysisDirector::SetupScenery()
 			auto Step = [&](float S0, float S1, float D1x, float TopZ) { Stone(1850.0f, D1x, FMath::Min(Side * S0, Side * S1), FMath::Max(Side * S0, Side * S1), Top - 4.0f, TopZ, Trim, true); };
 			Step(1490.0f, 1530.0f, 2980.0f, -40.0f);
 			Step(1530.0f, 1570.0f, 3020.0f, -80.0f);
+		}
+		// 门廊的屋顶和圆殿接上（2026-10-10 用户：门廊的顶和神殿本身是分开的，参考现实里这类建筑怎么合为一体）。
+		// 灰盒的模型里人字屋顶的后端停在离殿心 18.85 m，圆殿的外墙在 17.1 m——中间空着一米七，屋顶像是搁在外圈柱子上的一顶帽子。
+		// 现实里“圆殿 + 门廊”（罗马万神殿、帕拉第奥和杰斐逊的圆厅）都是屋顶和檐部一直走到主体里：
+		//   · 两坡屋面顺着原来的坡度往后伸，一直伸进圆殿的墙里（墙是圆的，所以切成一条一条，每条的后端都落在墙厚的中间，不捅进殿里）；
+		//   · 两侧檐口下面的那道梁也往后接，接到外圈柱子顶上的那一圈檐部上（高度本来就一样）。
+		// 只管看，不挡人不挡光。
+		{
+			UMaterialInterface* RoofStone = ScnPalette(TEXT("MI_MATCH_PedimentStone"));
+			const float RidgeZ = 2320.0f, EaveS = 1568.0f, TanT = 600.0f / EaveS, CosT = 1.0f / FMath::Sqrt(1.0f + TanT * TanT), SinT = TanT * CosT;
+			const float RoofBackD = 1890.0f, WallMidR = 1640.0f, WallInR = DysisGB::R_IN;
+			auto BackAt = [&](float S) { return FMath::Sqrt(FMath::Max(WallMidR * WallMidR - S * S, 0.0f)); };
+			for (const float Side : { -1.0f, 1.0f })
+			{
+				float S0 = 0.0f;
+				while (S0 < EaveS - 1.0f)
+				{
+					float S1 = FMath::Min(S0 + 260.0f, EaveS);
+					// 这一条的后端按它外边那一侧定；里边那一侧不能越过内墙面
+					while (S1 > S0 + 20.0f && BackAt(S1) < FMath::Sqrt(FMath::Max(WallInR * WallInR - S0 * S0, 0.0f)) + 15.0f) S1 -= 10.0f;
+					const float BackD = BackAt(S1);
+					const float Sa = S0 > 0.0f ? S0 : -12.0f;                                            // 屋脊那一条往对面多伸一点，两坡在脊上咬住，不留缝
+					const float Sm = (Sa + S1) * 0.5f;
+					const FVector Out = V * (Side * CosT) - FVector(0.0, 0.0, SinT);                     // 顺着屋面往檐口去的方向
+					const FVector Center = U * ((BackD + RoofBackD) * 0.5) + V * (Side * Sm) + FVector(0.0, 0.0, RidgeZ - Sm * TanT - 30.0f - 0.6f);
+					UStaticMeshComponent* C = Place(Cube, Center, 0.0f, FVector((RoofBackD - BackD) / 100.0, (S1 - Sa) / CosT / 100.0, 60.0 * CosT / 100.0), true, false);
+					C->SetWorldRotation(FRotationMatrix::MakeFromXY(U, Out * Side).ToQuat());
+					if (RoofStone) C->SetMaterial(0, RoofStone);
+					S0 = S1;
+				}
+				// 檐口下面的梁：从门廊侧面那道梁的后端（离殿心 21 m）接到外圈柱子顶上的檐部里
+				Stone(1500.0f, 2101.0f, FMath::Min(Side * 1392.0f, Side * 1500.0f), FMath::Max(Side * 1392.0f, Side * 1500.0f), 1520.5f, 1659.0f, Trim, false);
+			}
 		}
 		// 壁柱：正面六根，对着柱廊前排的六根柱子；两个侧面各一根，对着前排柱子那一线
 		for (const float At : { -1320.0f, -790.0f, -264.0f, 264.0f, 790.0f, 1320.0f })
