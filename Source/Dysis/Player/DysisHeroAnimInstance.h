@@ -133,6 +133,8 @@ public:
 	int32 StepCount = 0;          // 脚落地了多少下（一直往上加）
 	float GroundSlope = 0.0f;     // 脚下的坡度（升高 ÷ 往前走的距离；上台阶 0.4 上下，平地 0，下台阶是负的）
 	float SlopeRise = 0.0f, SlopeRun = 0.0f;    // 最近零点几秒里升了多少、走了多远（越早的占得越少）
+	float AirSeconds = 0.0f;      // 这一回腾空多久了
+	bool bAirShown = false;       // 这一回腾空放过起跳 / 下落的动作了（放过才接“落地”）
 	FVector SlopePrev = FVector::ZeroVector;
 	bool bSlopePrev = false;
 

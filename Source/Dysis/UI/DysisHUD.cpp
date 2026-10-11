@@ -3,6 +3,8 @@
 #include "DysisDialogueComponent.h"
 #include "Audio/DysisSfxSubsystem.h"
 #include "Audio/DysisUserVolume.h"
+#include "Mechanisms/DysisDirector.h"
+#include "EngineUtils.h"
 #include "Interaction/DysisInteractComponent.h"
 #include "Mechanisms/DysisInteractable.h"
 #include "Save/DysisSaveGame.h"
@@ -61,9 +63,7 @@ namespace
 	constexpr float MainRowX = 1200.0f, MainRowW = 450.0f, MainRowH = 78.0f, MainRowStep = 98.0f;
 	constexpr float SetRowY[2] = { 562.0f, 678.0f };                       // “回到游戏”“回到主界面”
 	constexpr float SetRowX = 700.0f, SetRowW = 520.0f, SetRowH = 86.0f, SetRowStep = 116.0f;
-	// 设置页下面的两条音量（设计稿像素）：一条线、一个滑块，左边是名字、右边是数（0–150，100 = 原样）
-	constexpr float VolRowY[2] = { 838.0f, 912.0f };
-	constexpr float VolTrackX = 800.0f, VolTrackW = 320.0f, VolStep = 0.05f;
+	constexpr float SetScale = 0.70f, SetBoxCX = 958.5f, SetBoxCY = 549.5f;   // 设置页整幅缩多少；内容（标题 + 两行按钮）在整幅画面里的正中
 
 	const FLinearColor Cream(0.96f, 0.90f, 0.76f, 1.0f);
 
@@ -374,7 +374,7 @@ void ADysisHUD::StartGame(bool bInstant)
 void ADysisHUD::OpenSettings()
 {
 	if (Screen != EDysisScreen::Playing) return;
-	Screen = EDysisScreen::Settings; SettingsIndex = 0; SelectorX = 0.0f; VolumeFocus = -1; VolumeDrag = -1;
+	Screen = EDysisScreen::Settings; SettingsIndex = 0; SelectorX = 0.0f;
 	UGameplayStatics::SetGamePaused(this, true);
 }
 
@@ -382,7 +382,6 @@ void ADysisHUD::CloseSettings()
 {
 	if (Screen != EDysisScreen::Settings) return;
 	Screen = EDysisScreen::Playing;
-	DysisUserVolume::Save();
 	UGameplayStatics::SetGamePaused(this, false);
 }
 
@@ -448,9 +447,14 @@ void ADysisHUD::DrawSettings(float RealDt)
 {
 	APlayerController* PC = GetOwningPlayerController();
 	const float S = Canvas->SizeY / MenuH;
-	const float OX = (Canvas->SizeX - MenuW * S) * 0.5f;   // 内容居中
 	DrawRect(FLinearColor(0.05f, 0.02f, 0.01f, 0.55f), 0, 0, Canvas->SizeX, Canvas->SizeY);
-	auto Layer = [&](UTexture2D* T, float DY, float A) { DrawUIImage(T, OX, DY * S, MenuW * S, MenuH * S, FLinearColor(1, 1, 1, A)); };
+	// 2026-10-11 用户：图片和按钮再小一点、居中排，按主界面按钮的字那么大，SETTING 那一行同比例缩。
+	// 量过几张图里的字：“回到游戏”四个字宽 245（设计稿像素），主界面“开始游戏”宽 171 → 缩到 0.7 倍。
+	// 这几张都是 1920×1080 的整幅画面，内容（标题 + 两行按钮 + 选择标）在画面里占 x 624–1293、y 357–742：
+	// 整幅按 0.7 倍画，挪到“内容的正中 = 屏幕的正中”。音量那两条滑条拿掉了（音量定成了音乐 70、音效 40）。
+	const float K = S * SetScale;
+	const float OX = Canvas->SizeX * 0.5f - SetBoxCX * K, OY = Canvas->SizeY * 0.5f - SetBoxCY * K;
+	auto Layer = [&](UTexture2D* T, float DY, float A) { DrawUIImage(T, OX, OY + DY * K, MenuW * K, MenuH * K, FLinearColor(1, 1, 1, A)); };
 
 	UTexture2D* Title = UITex("Settings", TEXT("/Game/Dysis/UI/Menu/Settings.Settings"));
 	UTexture2D* Resume = UITex("BackToGame", TEXT("/Game/Dysis/UI/Menu/BackToGame.BackToGame"));
@@ -460,16 +464,12 @@ void ADysisHUD::DrawSettings(float RealDt)
 	bool bConfirm = false, bResume = false;
 	if (PC)
 	{
-		// 上下键在四样东西之间走：回到游戏、回到主界面、音乐、音效
-		const int32 Step = (PC->WasInputKeyJustPressed(EKeys::Down) || PC->WasInputKeyJustPressed(EKeys::S) ? 1 : 0) - (PC->WasInputKeyJustPressed(EKeys::Up) || PC->WasInputKeyJustPressed(EKeys::W) ? 1 : 0);
-		if (Step != 0)
-		{
-			const int32 At = ((VolumeFocus >= 0 ? 2 + VolumeFocus : SettingsIndex) + Step + 4) % 4;
-			if (At < 2) { SettingsIndex = At; VolumeFocus = -1; } else VolumeFocus = At - 2;
-		}
+		// 上下键 / W S 在两行之间换
+		if (PC->WasInputKeyJustPressed(EKeys::Up) || PC->WasInputKeyJustPressed(EKeys::W) || PC->WasInputKeyJustPressed(EKeys::Down) || PC->WasInputKeyJustPressed(EKeys::S))
+			SettingsIndex = 1 - SettingsIndex;
 		for (int32 i = 0; i < 2; ++i)
-			if (VolumeDrag < 0 && MouseIn(OX + SetRowX * S, SetRowY[i] * S, SetRowW * S, SetRowH * S)) { SettingsIndex = i; VolumeFocus = -1; if (bClick) bConfirm = true; }
-		if (VolumeFocus < 0 && (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::E))) bConfirm = true;
+			if (MouseIn(OX + SetRowX * K, OY + SetRowY[i] * K, SetRowW * K, SetRowH * K)) { SettingsIndex = i; if (bClick) bConfirm = true; }
+		if (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::E)) bConfirm = true;
 		if (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape) || PC->WasInputKeyJustPressed(EKeys::BackSpace)) bResume = true;
 	}
 
@@ -477,53 +477,15 @@ void ADysisHUD::DrawSettings(float RealDt)
 	if (Title && Resume && ToMenu)
 	{
 		Layer(Title, 0.0f, 1.0f);
-		Layer(Resume, 0.0f, SettingsIndex == 0 && VolumeFocus < 0 ? 1.0f : 0.72f);
-		Layer(ToMenu, 0.0f, SettingsIndex == 1 && VolumeFocus < 0 ? 1.0f : 0.72f);
-		Layer(Selector, SelectorX, VolumeFocus < 0 ? 1.0f : 0.35f);
+		Layer(Resume, 0.0f, SettingsIndex == 0 ? 1.0f : 0.72f);
+		Layer(ToMenu, 0.0f, SettingsIndex == 1 ? 1.0f : 0.72f);
+		Layer(Selector, SelectorX, 1.0f);
 	}
 	else
 	{
-		DrawUIText(TEXT("SETTING"), Cream, Canvas->SizeX * 0.5f, 360.0f * S, 72.0f, 0.5f);
-		DrawUIText(TEXT("回到游戏"), SettingsIndex == 0 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, 585.0f * S, 36.0f, 0.5f);
-		DrawUIText(TEXT("回到主界面"), SettingsIndex == 1 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, 700.0f * S, 36.0f, 0.5f);
-	}
-
-	// 两条音量：鼠标按住拖，或者选中以后按左右键（一下 5）。数显示在右边，方便报数
-	{
-		static const TCHAR* const VolName[2] = { TEXT("音乐"), TEXT("音效") };
-		float Vol[2] = { DysisUserVolume::Music(), DysisUserVolume::Sfx() };
-		const float Was[2] = { Vol[0], Vol[1] };
-		if (!PC || !PC->IsInputKeyDown(EKeys::LeftMouseButton)) VolumeDrag = -1;
-		for (int32 i = 0; i < 2; ++i)
-		{
-			const float X0 = OX + VolTrackX * S, W = VolTrackW * S, Y = VolRowY[i] * S;
-			if (bClick && MouseIn(X0 - 18.0f * S, Y - 28.0f * S, W + 36.0f * S, 56.0f * S)) { VolumeDrag = i; VolumeFocus = i; }
-			if (VolumeDrag == i && bMouseValid) Vol[i] = FMath::Clamp(float(MousePos.X - X0) / W, 0.0f, 1.0f) * DysisUserVolume::Max;
-			if (VolumeFocus == i && PC)
-			{
-				if (PC->WasInputKeyJustPressed(EKeys::Left) || PC->WasInputKeyJustPressed(EKeys::A)) Vol[i] -= VolStep;
-				if (PC->WasInputKeyJustPressed(EKeys::Right) || PC->WasInputKeyJustPressed(EKeys::D)) Vol[i] += VolStep;
-			}
-			Vol[i] = FMath::Clamp(FMath::RoundToFloat(Vol[i] / VolStep) * VolStep, 0.0f, DysisUserVolume::Max);
-			const FLinearColor C = VolumeFocus == i ? Cream : Cream.CopyWithNewOpacity(0.72f);
-			const float K = Vol[i] / DysisUserVolume::Max, Line = FMath::Max(2.0f, 3.0f * S);
-			DrawUIText(VolName[i], C, X0 - 40.0f * S, Y - 19.0f * S, 30.0f, 1.0f);
-			DrawRect(C.CopyWithNewOpacity(C.A * 0.3f), X0, Y - Line * 0.5f, W, Line);
-			DrawRect(C, X0, Y - Line * 0.5f, W * K, Line);
-			DrawRect(C.CopyWithNewOpacity(C.A * 0.55f), X0 + W / DysisUserVolume::Max - S, Y - 9.0f * S, 2.0f * S, 18.0f * S);   // 100 的刻度
-			DrawRect(C, X0 + W * K - 5.0f * S, Y - 13.0f * S, 10.0f * S, 26.0f * S);
-			DrawUIText(FString::FromInt(FMath::RoundToInt(Vol[i] * 100.0f)), C, X0 + W + 40.0f * S, Y - 19.0f * S, 30.0f, 0.0f);
-		}
-		if (Vol[0] != Was[0] || Vol[1] != Was[1])
-		{
-			DysisUserVolume::Set(Vol[0], Vol[1]);
-			// 音效那一条一动就试听一声（音乐那一条不用：音乐本来就在放）
-			if (Vol[1] != Was[1] && FApp::GetCurrentTime() - VolumePreviewAt > 0.22)
-			{
-				VolumePreviewAt = FApp::GetCurrentTime();
-				if (UDysisSfxSubsystem* Sfx = UDysisSfxSubsystem::Get(this)) Sfx->PlayAudition(FName(TEXT("UI.Confirm")));
-			}
-		}
+		DrawUIText(TEXT("SETTING"), Cream, Canvas->SizeX * 0.5f, OY + 360.0f * K, 72.0f * SetScale, 0.5f);
+		DrawUIText(TEXT("回到游戏"), SettingsIndex == 0 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, OY + 585.0f * K, 36.0f * SetScale, 0.5f);
+		DrawUIText(TEXT("回到主界面"), SettingsIndex == 1 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, OY + 700.0f * K, 36.0f * SetScale, 0.5f);
 	}
 
 	if (bResume || (bConfirm && SettingsIndex == 0)) CloseSettings();
@@ -774,6 +736,13 @@ void ADysisHUD::DrawHUD()
 		DrawSettings(RealDt);
 		break;
 	case EDysisScreen::Playing:
+		// M：海面在“原来的样子 / 镜湖”之间换（2026-10-11 用户要的快捷键；也可以在控制台打 Dysis.SeaMirror 0|1）
+		if (PC && StartPhase == 0 && PC->WasInputKeyJustPressed(EKeys::M))
+			for (TActorIterator<ADysisDirector> It(GetWorld()); It; ++It)
+			{
+				It->DebugSetSeaMirror(!It->IsSeaMirrorOn());
+				Notify(GetWorld(), It->IsSeaMirrorOn() ? TEXT("海面：镜湖") : TEXT("海面：原来的样子"), 2.0f);
+			}
 		// P、Tab、Esc 都能开设置（2026-10-10 用户：在编辑器里试玩时 Esc 是“退出试玩”，按不到设置——用 P 或 Tab）
 		if (PC && StartPhase == 0 && (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape))) { OpenSettings(); break; }
 		DrawInGame(Dt);

@@ -217,6 +217,13 @@ void ADysisSkyActor::SetStarSpin(float Degrees)
 {
 	StarSpinDeg = Degrees;
 	ApplyStarRotation();
+	// 月亮跟着满天的星一起转（2026-10-11 用户：结局里星星在转、月亮没动）。只挪天上画的那轮月亮和它的光晕；照东西的月光方向不动（影子不跟着转）
+	ApplyMoonDisc();
+	if (NightDomeMID)
+	{
+		const FVector Shown = FQuat(FVector::UpVector, FMath::DegreesToRadians(StarSpinDeg)).RotateVector(MoonDir);
+		NightDomeMID->SetVectorParameterValue(TEXT("MoonDir"), FLinearColor(float(Shown.X), float(Shown.Y), float(Shown.Z), 0.f));
+	}
 }
 
 void ADysisSkyActor::ApplyStarRotation()
@@ -438,7 +445,8 @@ void ADysisSkyActor::ApplyNightSky()
 			NightDomeMID->SetVectorParameterValue(TEXT("Twilight"), TwilightSkyColor);
 			NightDomeMID->SetScalarParameterValue(TEXT("Halo"), MoonDiscOpacity);
 			NightDomeMID->SetScalarParameterValue(TEXT("MoonUp"), Smooth(-0.05f, 0.1f, float(MoonDir.Z)));
-			NightDomeMID->SetVectorParameterValue(TEXT("MoonDir"), FLinearColor(float(MoonDir.X), float(MoonDir.Y), float(MoonDir.Z), 0.f));
+			const FVector Shown = FQuat(FVector::UpVector, FMath::DegreesToRadians(StarSpinDeg)).RotateVector(MoonDir);
+			NightDomeMID->SetVectorParameterValue(TEXT("MoonDir"), FLinearColor(float(Shown.X), float(Shown.Y), float(Shown.Z), 0.f));
 		}
 		NightDome->SetVisibility(NightDomeMID && Opacity > 0.001f);
 	}
@@ -483,7 +491,7 @@ void ADysisSkyActor::ApplyMoonDisc()
 {
 	if (!MoonDisc) return;
 	const float Diameter = 2.f * MoonDiscDistanceCm * FMath::Tan(FMath::DegreesToRadians(MoonDiscAngularDiameterDeg * 0.5f));
-	MoonDisc->SetRelativeLocation(MoonDir * MoonDiscDistanceCm);
+	MoonDisc->SetRelativeLocation(FQuat(FVector::UpVector, FMath::DegreesToRadians(StarSpinDeg)).RotateVector(MoonDir) * MoonDiscDistanceCm);   // StarSpinDeg：结局里跟着星星转过去多少
 	MoonDisc->SetRelativeScale3D(FVector(Diameter / 100.f));   // 引擎的 Sphere 直径 100 cm
 	if (MoonDiscMaterial && (!MoonDiscMID || MoonDiscMID->Parent != MoonDiscMaterial))
 	{

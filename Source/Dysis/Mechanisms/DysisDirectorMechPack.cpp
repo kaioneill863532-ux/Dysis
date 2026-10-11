@@ -54,7 +54,8 @@ namespace
 	//     代价是整个人比原来低 1.3 m：脚落到和水庭的地面一样高（脚下的圆台只高出地面几厘米），头顶离天花板一米半。
 	//     放大没有用（圆盘会更高、更偏），所以没放大。月光全照到她是在月桥的第 67–68 步（原来 58，灰盒 61）。
 	//     圆盘的圆心：方位 131.0°、离殿心 14.4 m、高 340（灰盒 137.2° / 13.24 m / 471.5）。
-	constexpr float MpGodDiscRightCm = 63.8f, MpGodDiscFwdCm = 48.5f, MpGodDiscUpCm = 339.1f, MpGodBaseRadiusCm = 122.0f;
+	//     （2026-10-11 重新转过一遍——衣褶细了——圆盘的位置跟着差了不到 1 cm：右 64.6、前 48.2、离脚 338.4）
+	constexpr float MpGodDiscRightCm = 64.6f, MpGodDiscFwdCm = 48.2f, MpGodDiscUpCm = 338.4f, MpGodBaseRadiusCm = 122.0f;
 	constexpr float MpGodShiftAz = -6.2f, MpGodShiftR = 116.4f, MpGodShiftZ = -131.5f, MpGodScale = 1.0f;
 	// 四层的天鹅像往墙那边挪多少（见 DebugMoveSwan）：台座原来压在栏杆上，天鹅转到朝殿心的那几格时身子还穿过栏杆（天鹅身长的一半有 80 cm）
 	constexpr float MpSwanShiftCm = 45.0f;
@@ -70,13 +71,29 @@ namespace
 	// 三相像（2026-10-10 用户：太小了，要大一些；圆底座缩小、不要和旁边的手轮穿在一起；像站在底座正中）：
 	// 模型原来做成 1.5 m 高，放大到 1.4 倍（2.1 m）；圆底座半径 1.72 → 1.07 m、高 0.9 → 0.4 m（看得见的、挡人的都是；挡光的还是原来那个大的，光路不变）。
 	// 镜子的中心在身前 27 cm、离脚 1.48 m：底座矮了半米以后，它离地的高度正好还是灰盒里反光出去的那个高度（底座面上 0.95 m → 离三层地面 1.85 m）。
-	constexpr float MpMirrorScale = 1.4f, MpPlinthXY = 0.62f, MpPlinthH = 40.0f, MpPlinthWasH = 90.0f;
+	// 2026-10-11 用户（他说的“抱镜女神像”就是三相像）：脚下那两层台子换成一层——只留上面那一层、再小一点；这样像矮下去了，
+	// 镜子要是够不着光就把像再放大一点；镜面要平整的石面、不要花纹（转换时抹平了）。
+	// ——灰盒的圆台是两层（下层半径 1.72 m、上层 1.25 m，各 45 cm 高）。现在只画一层：半径 70 cm、高 20 cm（挡人的也是这么大；挡光的还是原来那个，光路不变）。
+	// 像比原来矮了 20 cm，放大到 1.567 倍（2.35 m 高）：镜子的中心离脚 105.7 × 1.567 = 165.6 cm，加上 20 cm 的台子还是离地 1.85 m——灰盒里反光出去的那个高度。
+	constexpr float MpMirrorScale = 1.567f, MpPlinthRadius = 70.0f, MpPlinthH = 20.0f, MpPlinthWasH = 90.0f;
+	// 立像的棱角软一点（2026-10-11 用户：三相像、双子、抱月女神的棱角不要那么分明，尤其披风、衣服）：
+	// 材质的 Facet = 1 是纯按面着色（一块面一个明暗，棱最硬），0 是全用模型的平滑法线；这几尊用 0.45——面还分得出来，棱是软的
+	constexpr float MpSoftFacet = 0.45f;
+	// 波吕丢刻斯缩到 0.9（龛只有 1.36 m 宽、进深不到 1.3 m，原大小的圆台座顶着龛的后壁）
+	constexpr float MpPolluxScale = 0.90f;
+	// 水闸的开关（换成拉杆的模型）：多大、推倒多少度
+	constexpr float MpSluiceLeverScale = 0.62f, MpSluiceTiltDeg = 68.0f;
 	// 日之龛：盒子的中心比原来靠墙 12 cm（盖子朝着人掀开、竖起来时不蹭墙）；盖子最多掀 80°
 	constexpr float MpNicheBackCm = 12.0f, MpNicheTopCm = 43.0f, MpNicheLidHalfCm = 31.0f, MpNicheOpenRad = 1.40f;
 	// 拉杆：缩到 0.62、装到墙上——底座的底面贴着墙（嵌进去 1.5 cm），杆从墙上伸出来、上下扳；离地 1.05 m。模型里转轴在底座的底面上面 37.2 cm
 	constexpr float MpLeverScale = 0.62f, MpLeverUpCm = 105.0f, MpLeverPivotCm = 37.2f, MpLeverSinkCm = 1.5f;
 	// 外立面神像：去了底座以后人直接站在窗台上（窗台面比部件的原点高 15 cm），往墙里收：衣摆的后沿嵌进墙里 12 cm
 	constexpr float MpFacadeBackCm = 56.0f, MpFacadeInsetCm = 12.0f, MpFacadeSillCm = 15.0f;
+	// 2026-10-11 用户：外面的装饰小神像再缩小一点、放在各自窗洞（盲拱）的正中；窗洞是开着的那一间不放。
+	// 像高 302 cm × 倍数。各层盲拱从窗台到拱顶多高（灰盒 FACADE：起拱高 − 窗台 + 半个拱宽）：二层 4.25 m、三层 4.6 m、四层 4.15 m。
+	// 像悬在拱的正中偏下一点（脚离窗台 = 空余高度的 45%），脚下垫一块小托石（不然像飘着）
+	constexpr float MpFacadeModelH = 302.0f, MpFacadeScaleL1 = 0.70f, MpFacadeScaleL2 = 0.66f, MpFacadeScaleL3 = 0.60f;
+	constexpr float MpFacadeNicheL1 = 425.0f, MpFacadeNicheL2 = 460.0f, MpFacadeNicheL3 = 415.0f;
 	constexpr bool MpAppleHalo = false;
 	// 虹之龛（三层虹的窗旁边墙上那个带两扇小门的龛）。灰盒里它只有 5 cm 深，碎片有 22 cm 大——关着门的时候碎片穿在门和背板外面
 	// （2026-10-10 用户：龛里挖一点空间出来放碎片）。墙是实心的挖不进去，改成往外做：四面加上龛壁，做成一个 28 cm 深的小柜子，
@@ -94,15 +111,17 @@ namespace
 	// 屋顶细桥：桥头在哪、朝哪（在关卡里量的：桥面宽 108 cm、长 690 cm、顶面高 3045）；桥门：拱洞中线离门轴 58 cm
 	const FVector MpBridgeHead(-790.1 - 38.0 * 0.6788, -750.9 - 38.0 * 0.7343, 3045.0);
 	constexpr float MpBridgeYaw = 47.25f, MpBridgeLenCm = 690.0f, MpBridgeWideCm = 124.0f;
-	constexpr float MpGateCenterCm = 58.0f, MpGateFootZ = 3030.0f, MpGateOutCm = 14.0f, MpBridgeMoreCm = 30.0f;
+	// 桥门（2026-10-11 第二回）：拱立在脚下那块不动的平台正中——平台占方位 219.7°–227.66°（一边是夜里会沉下去的楼梯，一边是白天会升起来的踏步），
+	// 拱心放在 223.68°、离殿心 11.6 m（最靠里的面 11.43 m，叶片盘的铜边到 11.18 m）。门板挂在拱朝外的那个面上（半个进深 17 + 半个板厚 3.5）。
+	constexpr float MpGateCenterCm = 58.0f, MpGateFootZ = 3030.0f, MpGateAz = 223.68f, MpGateR = 1160.0f, MpGateHalfDeepCm = 17.0f, MpGateDoorHalfCm = 3.5f, MpBridgeMoreCm = 62.0f;
 	// 水亭的浑天仪：中心、太阳在多大的圈上（灰盒 R = 0.52 m）、月托在多大的圈上（0.92 R）；太阳的直径（= 金苹果的高）；月托的碟口比苹果的中心低多少
 	const FVector MpPavArm(0.0, 0.0, 180.0);
 	constexpr float MpPavSunR = 52.0f, MpPavMoonR = 47.84f, MpPavSunCm = 14.0f, MpHolderBelowCm = 4.2f;
 	// 二层外立面也放神像（2026-10-11 用户：隔一个窗洞放一个，不然玩家基本看不见它们）：和三层一样放在单数的开间（22.5° + 30°k）里，
 	// 正门上面那一间（22.5°）是真的窗洞，不放。窗台高 8.2 m（灰盒 FACADE[1].sill），像缩到 0.8（高 2.4 m；这一层的盲拱高 4.4 m）
-	constexpr float MpFacadeL1SillZ = 820.0f, MpFacadeL1Scale = 0.80f, MpFacadeL1R = 1712.0f;
-	// （142.5° 那一间上半截开着墙里楼梯的窗，像会挡在窗口前面，不放）
-	constexpr float MpFacadeL1Az[] = { 52.5f, 82.5f, 112.5f, 172.5f, 202.5f, 232.5f, 262.5f, 292.5f, 322.5f, 352.5f };
+	constexpr float MpFacadeL1SillZ = 820.0f, MpFacadeL1R = 1712.0f;
+	// （142.5° 那一间上半截开着墙里楼梯的窗，像会挡在窗口前面，不放；172.5° 那一间是真的窗洞（开着的），也不放——2026-10-11 用户）
+	constexpr float MpFacadeL1Az[] = { 52.5f, 82.5f, 112.5f, 202.5f, 232.5f, 262.5f, 292.5f, 322.5f, 352.5f };
 }
 
 void ADysisDirector::SetupMechPack()
@@ -150,6 +169,14 @@ void ADysisDirector::SetupMechPack()
 	};
 	auto AzOfActor = [](const AActor* A) { return DysisGB::AzOf(A->GetActorLocation()); };
 	const FVector One = FVector::OneVector;
+	// 棱角软一点的那几尊立像（见 MpSoftFacet）
+	auto Soft = [](UStaticMeshComponent* C)
+	{
+		if (!C) return;
+		UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0));
+		if (!MID) MID = C->CreateDynamicMaterialInstance(0);
+		if (MID) MID->SetScalarParameterValue(TEXT("Facet"), MpSoftFacet);
+	};
 
 	// ── 三相像：三个姿势各一件，哪一相就画哪一件（UpdateMechPack 里切）；原来的像和那面铜镜不画了 ──
 	if (AActor* S = MirrorStatue.Get())
@@ -166,25 +193,29 @@ void ADysisDirector::SetupMechPack()
 				Src->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 				if (UBoxComponent* Wall = MakeWall())
 				{
-					const float Half = 172.0f * MpPlinthXY * 0.9f;
+					const float Half = MpPlinthRadius * 0.9f;
 					Wall->SetBoxExtent(FVector(Half, Half, MpPlinthH * 0.5f));
 					Wall->SetWorldLocationAndRotation(Pl->GetActorLocation() + FVector(0.0, 0.0, MpPlinthH * 0.5f), FRotator(0.0f, AzOfActor(Pl), 0.0f));
 				}
 				HideLook(Pl);
-				UStaticMeshComponent* V = NewObject<UStaticMeshComponent>(Pl);
-				V->SetupAttachment(Src);
-				V->SetMobility(EComponentMobility::Movable);
-				V->SetStaticMesh(Src->GetStaticMesh());
-				for (int32 i = 0; i < Src->GetNumMaterials(); ++i) V->SetMaterial(i, Src->GetMaterial(i));
-				V->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
-				V->RegisterComponent();
-				V->SetRelativeScale3D(FVector(MpPlinthXY, MpPlinthXY, MpPlinthH / MpPlinthWasH));
-				MechPackComps.Add(V);
+				// 看得见的台子：只有一层的小圆台（引擎的圆柱：直径 100、高 100）
+				if (UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+				{
+					UStaticMeshComponent* V = NewObject<UStaticMeshComponent>(Pl);
+					V->SetupAttachment(Src);
+					V->SetMobility(EComponentMobility::Movable);
+					V->SetStaticMesh(Cyl);
+					V->SetMaterial(0, Src->GetMaterial(0));
+					V->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					V->RegisterComponent();
+					V->SetWorldTransform(FTransform(FQuat::Identity, Pl->GetActorLocation() + FVector(0.0, 0.0, MpPlinthH * 0.5f), FVector(MpPlinthRadius / 50.0, MpPlinthRadius / 50.0, MpPlinthH / 100.0)));
+					MechPackComps.Add(V);
+				}
 				Drop = MpPlinthWasH - MpPlinthH;
 			}
 		const FVector Loc = S->GetActorLocation() - FVector(0.0, 0.0, Drop);      // 站在底座正中（转的时候绕这根轴转）
 		const TCHAR* Names[3] = { TEXT("MirrorDark"), TEXT("MirrorSun"), TEXT("MirrorMoon") };      // 和 MirrorW3 一个顺序：暗、日、月
-		for (int32 i = 0; i < 3; ++i) MirrorForms[i] = Put(S, Names[i], Loc, MirrorYawNow - 90.0f, FVector(MpMirrorScale), EMpLook::Stone);
+		for (int32 i = 0; i < 3; ++i) { MirrorForms[i] = Put(S, Names[i], Loc, MirrorYawNow - 90.0f, FVector(MpMirrorScale), EMpLook::Stone); Soft(MirrorForms[i].Get()); }
 	}
 
 	// ── 瀑布后面的女神、双子：都朝殿心站 ──
@@ -204,6 +235,7 @@ void ADysisDirector::SetupMechPack()
 		}
 		Axis.Z = Disc.Z - MpGodDiscUpCm * MpGodScale;      // 脚底
 		UStaticMeshComponent* Body = Put(G, TEXT("Goddess"), Axis, Az + 90.0f, FVector(MpGodScale), EMpLook::Stone);
+		Soft(Body);
 		// 脚下的圆台：只有一层，比衣摆大一圈，从水面以下一直到脚底（脚踩进去 3 cm）
 		if (UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
 			if (USceneComponent* Root = G->GetRootComponent())
@@ -220,12 +252,19 @@ void ADysisDirector::SetupMechPack()
 				MechPackComps.Add(C);
 			}
 	}
-	if (AActor* A = Castor.Get()) { HideLook(A); Put(A, TEXT("TwinCastor"), A->GetActorLocation(), AzOfActor(A) + 90.0f, One, EMpLook::Stone); }
-	if (AActor* A = Pollux.Get()) { HideLook(A); PolluxModel = Put(A, TEXT("TwinPollux"), A->GetActorLocation(), AzOfActor(A) + 90.0f, One, EMpLook::Stone); }
+	if (AActor* A = Castor.Get()) { HideLook(A); Soft(Put(A, TEXT("TwinCastor"), A->GetActorLocation(), AzOfActor(A) + 90.0f, One, EMpLook::Stone)); }
+	if (AActor* A = Pollux.Get()) { HideLook(A); PolluxModel = Put(A, TEXT("TwinPollux"), A->GetActorLocation(), AzOfActor(A) + 90.0f, FVector(MpPolluxScale), EMpLook::Stone); Soft(PolluxModel.Get()); }
 
 	// ── 天鹅和它的圆台座（女神像没有新模型，还是原来那个；月光照到她变天鹅的时候两件一个缩、一个长，新天鹅挂在原来的天鹅身上跟着长） ──
 	DebugMoveSwan(MpSwanShiftCm);
 	if (AActor* P = Piece(TEXT("SM_Mech_Swan_Plinth"))) { HideLook(P); Put(P, TEXT("SwanPlinth"), P->GetActorLocation(), AzOfActor(P) + 90.0f, FVector(0.92, 0.92, 1.0), EMpLook::Stone); }
+	// 变成天鹅以前的那尊女神像（2026-10-11 美术补的模型）：站在同一个圆台座上，脸朝着天鹅头朝的那一边；月光照到她的时候跟着原件一起缩下去
+	if (AActor* Gs = SwanGoddess.Get())
+		if (MpMesh(TEXT("SwanGoddess")))
+		{
+			HideLook(Gs);
+			Soft(Put(Gs, TEXT("SwanGoddess"), Gs->GetActorLocation(), SwanYawNow - 90.0f, One, EMpLook::Stone));
+		}
 	if (AActor* B = SwanBird.Get())
 	{
 		// 模型里天鹅的头朝 −X；游戏里头朝 SwanYawNow 那个方向（影子按这个算）。放大到 1.28 倍：头正好在灰盒说的“往前 58 cm、高 138 cm”附近
@@ -287,7 +326,7 @@ void ADysisDirector::SetupMechPack()
 		{
 			TArray<FVector> V, N;
 			TArray<int32> I;
-			const float R = DysisGB::R_IN - 0.25f;
+			const float R = DysisGB::R_IN - 0.45f;
 			const FVector Nrm = -DysisGB::PolarCm(MpSpotAz, 1.0, 0.0);
 			auto At = [R](float U, float Z) { return DysisGB::PolarCm(MpSpotAz + FMath::RadiansToDegrees(U / R), R, Z); };      // U = 顺着墙往方位增大的方向多少厘米
 			auto Fan = [&](const TArray<FVector2D>& Poly)      // 一个凸多边形：从第一个点扇开
@@ -318,6 +357,29 @@ void ADysisDirector::SetupMechPack()
 			UMaterialInstanceDynamic* Dark = UMaterialInstanceDynamic::Create(Warm, this);
 			Dark->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.43f, 0.35f, 0.26f));      // 墙色的六成：像墙上浅浅挖下去的一个人形
 			ShadowSpot->SetMaterial(0, Dark);
+			// 外面一小圈金边（2026-10-11 用户）：比人形大 1.8 cm 的同一个形状，垫在它后面（更贴墙 2.5 mm），露出来的就是一圈边
+			{
+				TArray<FVector> V2, N2;
+				TArray<int32> I2;
+				const float R2 = DysisGB::R_IN - 0.2f, Grow = 1.8f;
+				auto At2 = [R2](float U, float Z) { return DysisGB::PolarCm(MpSpotAz + FMath::RadiansToDegrees(U / R2), R2, Z); };
+				auto Fan2 = [&](const TArray<FVector2D>& Poly)
+				{
+					const int32 k = V2.Num();
+					for (const FVector2D& P : Poly) { V2.Add(At2(float(P.X), float(P.Y))); N2.Add(Nrm); }
+					for (int32 i = 1; i + 1 < Poly.Num(); ++i)
+					{
+						const bool bFlip = FVector::DotProduct(FVector::CrossProduct(V2[k + i] - V2[k], V2[k + i + 1] - V2[k]), Nrm) > 0.0;
+						if (bFlip) I2.Append({ k, k + i + 1, k + i }); else I2.Append({ k, k + i, k + i + 1 });
+					}
+				};
+				Fan2({ FVector2D(-27.0 - Grow, MpSpotFootZ - 1.0), FVector2D(27.0 + Grow, MpSpotFootZ - 1.0), FVector2D(11.0 + Grow, MpSpotHeadZ - 12.0), FVector2D(-11.0 - Grow, MpSpotHeadZ - 12.0) });
+				TArray<FVector2D> Head2;
+				for (int32 i = 0; i < 24; ++i) Head2.Add(FVector2D((MpSpotHeadR + Grow) * FMath::Cos(2.0 * PI * i / 24.0), MpSpotHeadZ + (MpSpotHeadR + Grow) * FMath::Sin(2.0 * PI * i / 24.0)));
+				Fan2(Head2);
+				ShadowSpot->CreateMeshSection_LinearColor(1, V2, I2, N2, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+				if (UMaterialInterface* Gold = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Temple_v0_12/M_gold.M_gold"), nullptr, LOAD_NoWarn | LOAD_Quiet)) ShadowSpot->SetMaterial(1, Gold);
+			}
 		}
 	}
 	if (AActor* A = SwanRelief.Get())
@@ -327,7 +389,9 @@ void ADysisDirector::SetupMechPack()
 		// 浮雕原来摆得比这一点高半米多（影子的头只到浮雕上天鹅的肚子）、中间的空位也偏右 46 cm。现在往下、往左挪：
 		// 中间的空位正对那一点，浮雕上天鹅的头和影子的头一样高（天鹅的身子落到地面上，像浮在水面）。
 		HideLook(A);
-		Relief(A, TEXT("SwanRelief"), 257.39f, 2300.0f - 40.0f);
+		// 2026-10-11 用户：浮雕再往右一点，让天鹅的影子落在空位的正中，现在有点歪。——判定用的那一点是“头顶”的影子；
+		// 看得见的影子是头连着喙的一整块（喙比头顶还往前伸 30 cm），它的正中比那一点偏右。浮雕往右（方位增大）挪 0.35°（9.5 cm）
+		Relief(A, TEXT("SwanRelief"), 257.74f, 2300.0f - 40.0f);
 	}
 
 	// ── 月亮浮雕 → 月门：门板填在门洞里（和墙一个颜色）、银边的门框压在洞口外面、月牙在门板上。月光照够了它们跟着原来的两件一起隐去 ──
@@ -450,6 +514,21 @@ void ADysisDirector::SetupMechPack()
 			}
 	}
 
+	// ── 水闸的开关：原来是一根标记用的小铜柱，换成拉杆（2026-10-11 用户：水没开的时候杆立着，开了以后杆推倒到一边，之后不能再碰）──
+	// 底座平放在石沿上，两片圆鼓的轴顺着半径；杆立在轴上，开闸的时候顺着石沿倒下去（UpdateMechPack）——背着瀑布、朝台阶那一边
+	// （头一版朝瀑布倒；2026-10-11 用户：扳手方向掉转一下）。开过以后“按 E”的那一项本来就没了。
+	SluiceArmModel = nullptr;
+	if (SluiceMarker && MpMesh(TEXT("LeverBase")))
+	{
+		const FVector At = SluiceMarker->GetComponentLocation() - FVector(0.0, 0.0, 45.0);      // 小铜柱的脚底 = 石沿的面
+		const float Az = float(DysisGB::AzOf(At));
+		SluiceMarker->SetVisibility(false);
+		Put(nullptr, TEXT("LeverBase"), At, Az, FVector(MpSluiceLeverScale), EMpLook::AsIs);
+		SluiceArmModel = Put(nullptr, TEXT("LeverArm"), At + FVector(0.0, 0.0, MpLeverPivotCm * MpSluiceLeverScale), Az, FVector(MpSluiceLeverScale), EMpLook::AsIs);
+		SluiceArmRot0 = FRotator(0.0f, Az, 0.0f).Quaternion();
+		SluiceArmAxis = DysisGB::PolarCm(Az, 1.0, 0.0);
+	}
+
 	// ── 棱镜：台座挂在铜柱身上（一起从石沿里升起来），水晶和手轮挂在棱镜身上（一起转）；原来的铜缝、转盘不画了 ──
 	if (PrismParts.Num() >= 4)
 	{
@@ -512,25 +591,43 @@ void ADysisDirector::SetupMechPack()
 		}
 
 	// ── 外立面的 20 尊神像：背贴着外墙、脸朝外。新的比原来的厚，缩到四分之三（高 2.4 m）才不探出檐口太多；四层那一圈本来就矮一点 ──
+	// 一尊：On = 原来的部件（没有就挂在机关总管身上）、方位、外墙面的半径、窗台面的高、这一层盲拱从窗台到拱顶多高、缩多少
+	UStaticMesh* FacadeCube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UMaterialInterface* FacadeWarm = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_WarmWhite.MI_MATCH_WarmWhite"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	auto Facade = [&](AActor* On, float Az, float R, float SillZ, float NicheH, float S)
+	{
+		const float FootZ = SillZ + 0.45f * (NicheH - MpFacadeModelH * S);
+		if (UStaticMeshComponent* C = Put(On, TEXT("FacadeStatue"), DysisGB::PolarCm(Az, R - MpFacadeInsetCm + MpFacadeBackCm * S, FootZ), Az - 90.0f, FVector(S), EMpLook::AllStone))
+			if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0))) MID->SetScalarParameterValue(TEXT("Detail"), 0.0f);
+		// 脚下的小托石：一块从墙里伸出来的石板（宽比像的衣摆窄一点、伸出 30 cm、厚 9 cm），像的脚踩进去 2 cm
+		AActor* Host = On ? On : this;
+		if (FacadeCube && Host->GetRootComponent())
+		{
+			UStaticMeshComponent* K = NewObject<UStaticMeshComponent>(Host);
+			K->SetupAttachment(Host->GetRootComponent());
+			K->SetMobility(EComponentMobility::Movable);
+			K->SetStaticMesh(FacadeCube);
+			if (FacadeWarm) K->SetMaterial(0, FacadeWarm);
+			K->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			K->RegisterComponent();
+			K->SetWorldTransform(FTransform(FRotator(0.0f, Az, 0.0f), DysisGB::PolarCm(Az, R + 9.0f, FootZ + 2.0f - 4.5f), FVector(0.42, 0.86 * S, 0.09)));
+			MechPackComps.Add(K);
+		}
+	};
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		for (const FName& Tag : It->Tags)
 		{
 			const FString Label = Tag.ToString();
 			if (!Label.StartsWith(TEXT("SM_Facade_Statue_"))) continue;
-			const float S = Label.Contains(TEXT("_L3_")) ? 0.69f : 0.75f, Az = AzOfActor(*It);
+			const bool bL3 = Label.Contains(TEXT("_L3_"));
 			HideLook(*It);
 			// 2026-10-10 用户：和神殿一个颜色、尽量融在一起；底座撤掉，整个往殿心收一点、不要那么凸出来。——
-			// 模型去掉了脚下那块方底座（人直接站在窗台上、脚沉进去 2 cm），衣摆的后沿嵌进墙里；颜色全按墙的暖白，不留贴图上的深浅
-			if (UStaticMeshComponent* C = Put(*It, TEXT("FacadeStatue"), DysisGB::PolarCm(Az, DysisGB::ROf(It->GetActorLocation()) - MpFacadeInsetCm + MpFacadeBackCm * S, It->GetActorLocation().Z + MpFacadeSillCm - 2.0),
-				Az - 90.0f, FVector(S), EMpLook::AllStone))
-				if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0))) MID->SetScalarParameterValue(TEXT("Detail"), 0.0f);
+			// 模型去掉了脚下那块方底座，衣摆的后沿嵌进墙里；颜色全按墙的暖白，不留贴图上的深浅
+			Facade(*It, float(AzOfActor(*It)), float(DysisGB::ROf(It->GetActorLocation())), float(It->GetActorLocation().Z) + MpFacadeSillCm, bL3 ? MpFacadeNicheL3 : MpFacadeNicheL2, bL3 ? MpFacadeScaleL3 : MpFacadeScaleL2);
 			break;
 		}
 	// 二层外立面：关卡里没有这一圈的部件，直接挂在机关总管身上
-	for (const float Az : MpFacadeL1Az)
-		if (UStaticMeshComponent* C = Put(nullptr, TEXT("FacadeStatue"), DysisGB::PolarCm(Az, MpFacadeL1R - MpFacadeInsetCm + MpFacadeBackCm * MpFacadeL1Scale, MpFacadeL1SillZ + MpFacadeSillCm - 2.0f),
-			Az - 90.0f, FVector(MpFacadeL1Scale), EMpLook::AllStone))
-			if (UMaterialInstanceDynamic* MID = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0))) MID->SetScalarParameterValue(TEXT("Detail"), 0.0f);
+	for (const float Az : MpFacadeL1Az) Facade(nullptr, Az, MpFacadeL1R, MpFacadeL1SillZ + MpFacadeSillCm, MpFacadeNicheL1, MpFacadeScaleL1);
 
 	// ── 屋顶细桥的桥门：一座石拱立在桥头，门板装在拱洞里、挂在原来那扇门身上跟着它开关；原来那扇 4.35 m 长的铜栅不画了（它还拦着） ──
 	// 2026-10-11 用户：往神殿外的方向挪一点（现在和叶片穿在一起）；拱的边缘弄平滑、或者干脆就是弧面，再缩窄一点，现在看着臃肿。
@@ -542,8 +639,13 @@ void ADysisDirector::SetupMechPack()
 		HideLook(Door);
 		const FVector Dir = Door->GetActorRightVector();                                  // 关着的时候门扇顺着哪边伸出去（门轴在 Actor 的原点）
 		const float Yaw = float(FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)));
-		FVector Loc = Door->GetActorLocation() + Dir * MpGateCenterCm;
-		Loc += Loc.GetSafeNormal2D() * MpGateOutCm; Loc.Z = MpGateFootZ;
+		// 第二回（见 MpGateAz 那一行的说明）：拱立在平台正中；门轴（= 原来那扇门的原点）挪到“拱洞靠门轴那一侧的边上、拱朝外的那个面外头半个板厚”——
+		// 门板挂在拱的外面，朝外推开以后整扇都在拱外，不再埋在柱子里。看不见的那扇拦人的门跟着门轴一起挪了（往外 30 来厘米）
+		const FVector In(-Dir.Y, Dir.X, 0.0);                                             // 垂直于门扇、朝殿心的那一边
+		const FVector Loc = DysisGB::PolarCm(MpGateAz, MpGateR, MpGateFootZ);
+		FVector Hinge = Loc - Dir * MpGateCenterCm - In * (MpGateHalfDeepCm + MpGateDoorHalfCm);
+		Hinge.Z = Door->GetActorLocation().Z;
+		Door->SetActorLocation(Hinge);
 		for (UStaticMeshComponent* C : { Put(nullptr, TEXT("GateArch"), Loc, Yaw, One, EMpLook::AllStone), Put(Door, TEXT("GateDoor"), Loc, Yaw, One, EMpLook::AllStone) })
 			if (UMaterialInstanceDynamic* MID = C ? Cast<UMaterialInstanceDynamic>(C->GetMaterial(0)) : nullptr) MID->SetScalarParameterValue(TEXT("Facet"), 0.0f);
 	}
@@ -702,6 +804,16 @@ void ADysisDirector::SetupMechPack()
 							MID->SetVectorParameterValue(TEXT("HoleCenter"), FLinearColor(DysisGB::PolarCm(NAz, DysisGB::R_IN, NZ)));
 							MID->SetVectorParameterValue(TEXT("HoleOut"), FLinearColor(NOut));
 							MID->SetVectorParameterValue(TEXT("HoleHalf"), FLinearColor(0.0f, 0.0f, 0.0f));
+							// 第二个洞：波吕丢刻斯的龛（2026-10-11 用户：他在墙里还是穿模，把墙再挖空一点或者把他缩小一点）。
+							// 龛是做在厚墙那个部件里的（里面有龛的四壁），可它的后半截在圆殿的墙面后面——墙面在离殿心 15.5 m 处把龛拦腰截断，
+							// 像（中心在 15.65 m）只露出前面一小截。把这一块墙面（1.32 × 2.68 m）不画，龛就是通的；封着龛口的那块石头在更前面，没化开以前照样挡着。
+							if (const AActor* Px = Pollux.Get())
+							{
+								const float PAz = float(DysisGB::AzOf(Px->GetActorLocation()));
+								MID->SetVectorParameterValue(TEXT("Hole2Center"), FLinearColor(DysisGB::PolarCm(PAz, DysisGB::R_IN, float(Px->GetActorLocation().Z) + 135.0f)));
+								MID->SetVectorParameterValue(TEXT("Hole2Out"), FLinearColor(DysisGB::PolarCm(PAz, 1.0, 0.0)));
+								MID->SetVectorParameterValue(TEXT("Hole2Half"), FLinearColor(66.0f, 24.0f, 134.0f));
+							}
 						}
 						bIrisHoleOn = false;
 						IrisNicheWalls.Reset();
@@ -765,6 +877,14 @@ void ADysisDirector::UpdateMechPack(float Dt)
 	// 2026-10-11 用户：原来杆是垂直于墙面伸出来的（再往下压一点），太突兀。底座上那两片半圆的侧板正好是给它转这半圈的。
 	if (UStaticMeshComponent* C = LeverArmModel.Get())
 		C->SetWorldRotation(FQuat(LeverAxis, HALF_PI - PI * DysisGB::Smoothstep(0.0f, 1.0f, SliderPos)) * LeverMountRot);
+
+	// 水闸的开关：没开的时候杆立着，开了以后顺着石沿朝瀑布那边推倒（不到一秒）
+	if (UStaticMeshComponent* C = SluiceArmModel.Get())
+	{
+		const UDysisWorldState* WS = UDysisWorldState::Get(this);
+		SluiceLeverK = DysisGB::Toward(SluiceLeverK, WS && WS->bSluiceOpen ? 1.0f : 0.0f, 1.3f, Dt);
+		C->SetWorldRotation(FQuat(SluiceArmAxis, FMath::DegreesToRadians(MpSluiceTiltDeg) * DysisGB::Smoothstep(0.0f, 1.0f, SluiceLeverK)) * SluiceArmRot0);
+	}
 
 	// 水亭浑天仪上的太阳和月托：跟着日月走（灰盒：bead.position = sunV × R，moonBead.position = moonV × 0.92 R）
 	if (const UDysisTimeComponent* T = PlayerTime())

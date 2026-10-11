@@ -430,6 +430,45 @@ def round_disc(P, C, T, name):
     print("    （%s 的圆盘：正面的圆心 (%.3f, %.3f, %.3f)，朝向 (%.3f, %.3f, %.3f)，半径 %.3f，这块平面 %.2f m²（圆 %.2f m²），换掉原来的 %d 个面）" % (name, cen[0], cen[1], cen[2], n[0], n[1], n[2], R, A, math.pi * R * R, gone))
     return P, C, keep, (cen, n, R)
 
+def flat_mirror(P, C, T, name):
+    """三相像手里那面镜子：镜面在贴图上是一片发蓝的反光、带一个放射状的花纹（转成顶点色以后在游戏里是一道道深浅）。
+    2026-10-11 用户：镜子要是一个平整的石面，花纹不要。——镜面本来就是平的，花纹只是颜色：按发蓝的点找出镜面（圆心、朝向、半径），
+    这个圆里贴着镜面的点一律改成标准的石头灰、压到同一个平面上。镜框（外面那一圈凸起来的边）不动。
+    要在减面之前做：颜色统一了以后，减面才会把镜面并成几块大平面（不然花纹的颜色会被当成“点缀”护着）。"""
+    blue = [i for i, c in enumerate(C) if c[2] > 1.25 * c[0] and c[2] > 0.08]
+    if len(blue) < 30:
+        print("    （%s：发蓝的点只有 %d 个，没找到镜面）" % (name, len(blue))); return P, C
+    cen = tuple(sum(P[i][k] for i in blue) / len(blue) for k in range(3))
+    bset = set(blue)
+    n = [0.0, 0.0, 0.0]
+    for k in range(0, len(T) - 2, 3):
+        if T[k] in bset and T[k + 1] in bset and T[k + 2] in bset:
+            a, b, c = P[T[k]], P[T[k + 1]], P[T[k + 2]]
+            e1 = (b[0] - a[0], b[1] - a[1], b[2] - a[2]); e2 = (c[0] - a[0], c[1] - a[1], c[2] - a[2])
+            m = (e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0])
+            s = 1.0 if m[2] >= 0.0 else -1.0      # 都按朝正面的算
+            n[0] += m[0] * s; n[1] += m[1] * s; n[2] += m[2] * s
+    l = math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+    if l < 1e-12: return P, C
+    n = (n[0] / l, n[1] / l, n[2] / l)
+    # 只留贴着这个平面的发蓝的点，再量一遍圆心和半径
+    on = [i for i in blue if abs((P[i][0] - cen[0]) * n[0] + (P[i][1] - cen[1]) * n[1] + (P[i][2] - cen[2]) * n[2]) < 0.02]
+    cen = tuple(sum(P[i][k] for i in on) / len(on) for k in range(3))
+    rr = sorted(rad_of([P[i] for i in on], cen, n))
+    R = rr[int(len(rr) * 0.97)] * 1.03
+    P = list(P); C = list(C); done = 0
+    for i, p in enumerate(P):
+        d = (p[0] - cen[0]) * n[0] + (p[1] - cen[1]) * n[1] + (p[2] - cen[2]) * n[2]
+        r_ = math.sqrt(max(0.0, sum((p[k] - cen[k]) ** 2 for k in range(3)) - d * d))
+        c = C[i]
+        if abs(d) <= 0.03 and r_ <= R:      # 镜面上的点：压平、改成石头灰（镜面中间比边上凹一点，容差给到 3 cm）
+            P[i] = (p[0] - n[0] * d, p[1] - n[1] * d, p[2] - n[2] * d)
+            C[i] = (STONE_GREY, STONE_GREY, STONE_GREY); done += 1
+        elif c[2] > 1.12 * c[0] and c[2] > 0.06 and r_ <= R * 1.6 and abs(d) < 0.12:      # 镜子附近剩下的发蓝的点（镜框内沿、反光溅到的地方）：只改颜色
+            C[i] = (STONE_GREY, STONE_GREY, STONE_GREY); done += 1
+    print("    （%s 的镜面：圆心 (%.3f, %.3f, %.3f)，朝向 (%.3f, %.3f, %.3f)，半径 %.3f；%d 个点抹成了石头面）" % (name, cen[0], cen[1], cen[2], n[0], n[1], n[2], R, done))
+    return P, C
+
 def rad_of(pts, cen, n):
     out = []
     for q in pts:
@@ -501,20 +540,26 @@ ALL = lambda n: True
 PIECES = [
     # eps：保平面减面允许偏离多少米（见 simplify）。带 eps 的件在这里就减到位了，导入时不再让引擎减（2026-10-10 用户：双子、伊莉丝、塞勒涅“棱角太多、成了碎块”，
     # 要照外立面神像那样——外立面神像之所以好，是它原有的大平面碰巧在引擎按面数硬减时保住了；这几件没保住）
-    dict(name="MirrorSun",  src="三相像_上", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, fix_black=True),
-    dict(name="MirrorMoon", src="三相像_中", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, fix_black=True),
-    dict(name="MirrorDark", src="三相像_下", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, fix_black=True),
+    # 2026-10-11 用户：三相像、双子、瀑布后女神的棱角不要那么分明（尤其披风、衣服），像塞勒涅浮雕那样。
+    # ——和塞勒涅一样加上 crease=2（护住弯的棱线：衣褶细一些、不再是几大块硬面），游戏里再把这几尊的法线调软一点（材质的 Facet，见 DysisDirectorMechPack.cpp）。
+    # 三相像手里的镜子：镜面抹成平整的石头面（flat_mirror）。
+    dict(name="MirrorSun",  src="三相像_上", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, crease=2.0, fix_black=True, flat_mirror=True),
+    dict(name="MirrorMoon", src="三相像_中", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, crease=2.0, fix_black=True, flat_mirror=True),
+    dict(name="MirrorDark", src="三相像_下", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, crease=2.0, fix_black=True, flat_mirror=True),
+    # 四层的天鹅女神像（变成天鹅之前的人形，2026-10-11 美术补的《天鹅湖_女神.glb》）：原模型连两级方座高 1.9 m。
+    # 方座不要（她站在天鹅那个圆台座上）：放大到“连座 2.2 m”再把 25.5 cm 的座切掉，人自己高 1.95 m（灰盒那尊就这么高）。
+    dict(name="SwanGoddess", src="天鹅湖_女神", want=ALL, kind="statue", size=("h", 2.20), cell=0.004, eps=0.002, crease=2.0, fix_black=True, cut_base=0.255),
     # 瀑布后面的女神（2026-10-10 用户：怀里那面圆的内部有点碎，修成平整的圆面；底座和手里的月亮都改成正圆）：
     # 也改成保平面的减法；怀里的圆盘、脚下三级的台座另做成规整的圆（round_disc / round_base）
     # 2026-10-11 用户：下面那两层台子不要了，换成一层小一点的。——这里干脆不带台座（脚底在 0），台座在游戏里另放一个圆台（要多大、多高好调）。
     # 倍数还是按“连原来的台座一共 5.40 m”算的：人自己高 4.815 m，怀里圆盘的圆心离脚 3.368 m、在身子的轴线右边 0.638 m、前面 0.485 m，半径 0.514 m
-    dict(name="Goddess",    src="瀑布后女神", want=ALL, kind="statue", size=("h", 5.40), cell=0.008, eps=0.004, fix_black=True, round_disc=True, cut_base=0.585),
+    dict(name="Goddess",    src="瀑布后女神", want=ALL, kind="statue", size=("h", 5.40), cell=0.008, eps=0.0028, crease=2.0, fix_black=True, round_disc=True, cut_base=0.585),
     # 外立面神像：2026-10-10 用户要把脚下那块方底座撤掉（人直接站在窗台上、往墙里收），所以也改成在这里减面
     dict(name="FacadeStatue", src="外立面神像", want=ALL, kind="statue", size=("h", 3.20), cell=0.006, eps=0.003, cut_base=0.20, fix_black=True),
     # 双子：原来方的台座换成圆的（用户要的）
-    dict(name="TwinCastor", src="双子_左", want=ALL, kind="statue", size=("k", 2.15 / 1.895), cell=0.004, eps=0.002, fix_black=True,
+    dict(name="TwinCastor", src="双子_左", want=ALL, kind="statue", size=("k", 2.15 / 1.895), cell=0.004, eps=0.002, crease=2.0, fix_black=True,
          cut_base=0.27, round_base=[(0.48, 0.0, 0.10), (0.44, 0.10, 0.19), (0.40, 0.19, 0.27)]),
-    dict(name="TwinPollux", src="双子_右", want=ALL, kind="statue", size=("k", 2.15 / 1.895), cell=0.004, eps=0.002, fix_black=True,
+    dict(name="TwinPollux", src="双子_右", want=ALL, kind="statue", size=("k", 2.15 / 1.895), cell=0.004, eps=0.002, crease=2.0, fix_black=True,
          cut_base=0.23, round_base=[(0.61, 0.0, 0.11), (0.57, 0.11, 0.23)]),
     # 浮雕：背板整个不要（drop_back：贴在墙面上不到这么高的面都丢掉），墙自己当背板；上下那两道横框、两侧的边框也整个压平丢掉（frame = 两侧 / 底 / 顶各多宽，米）；
     # 背板不是绝对平的（塞勒涅的背板本身就是一块块高低差一两厘米的面），bias 是整体再往墙里沉多少，沉到背板全在墙面以下为止（用 zhist=1 查）
@@ -687,6 +732,8 @@ def convert(pc, src_dir, out_dir, report):
     if pc.get("fix_black", pc["kind"] == "relief"):
         C, nfix = fix_black(P, C, T)
         if nfix: note += " 填掉黑点 %d 个" % nfix
+    if pc.get("flat_mirror"):
+        P, C = flat_mirror(P, C, T, pc["name"])
     if pc.get("eps"):
         n0 = len(T) // 3; P, C, T = simplify(P, C, T, pc["eps"], accent_sat=pc.get("accent_sat", 0.38), crease=pc.get("crease", 0.0), crease_cos=pc.get("crease_cos", 0.80)); note += " 保平面减面 %d → %d" % (n0, len(T) // 3)
     if pc.get("round_disc"):

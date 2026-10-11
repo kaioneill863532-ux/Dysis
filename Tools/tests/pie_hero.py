@@ -86,14 +86,27 @@ def main():
     yield from wait(25)
 
     # 3 跳：起跳 → 下落 → 落地 → 站着
-    order = []
+    order = []; hand = []
+    def hand_up(): return (mesh.get_socket_location("hand_l").z + mesh.get_socket_location("hand_r").z) * 0.5 - mesh.get_socket_location("spine_03").z
+    h0 = hand_up()
     pawn.jump()
     for i in range(140):
         yield
         c = clip()
         if not order or order[-1] != c: order.append(c)
+        hand.append(hand_up())
         if i == 14: yield from view("主角_跳起来", 60.0, 380.0, 150.0, look_up=130.0, frames=1)
     check(order[:3] == ["A_JumpStart", "A_FallLoop", "A_Land"] and order[-1] == "A_Idle", "跳：动作的先后 %s" % " → ".join(order))
+    # 手（相对胸口的高低）整个跳下来只抬一回、放一回：来回超过 3 cm 才算掉头。
+    # 美术那三段动作照原样放的时候，一次跳里手上下甩五回、“下落”循环一圈还跳 11 cm（2026-10-11 用户：跳起来手和上半身会甩和抽搐几下）
+    turns = 0; ext = h0; way = 0
+    for h in hand:
+        if way == 0:
+            if abs(h - h0) > 3.0: way = 1 if h > h0 else -1; ext = h
+        elif (h - ext) * way > 0.0: ext = h
+        elif (ext - h) * way > 3.0: turns += 1; way = -way; ext = h
+    check(turns <= 1 and 12.0 < max(hand) - h0 < 28.0 and abs(hand[-1] - h0) < 2.0,
+          "跳：手只抬一回、放一回（掉头 %d 次）；最高比垂着时高 %.0f cm，落地后放回原处（差 %.1f cm）" % (turns, max(hand) - h0, hand[-1] - h0))
 
     # 4 上台阶：水庭去水闸的那几级石阶（方位 100°–112°），从下往上走
     go(polar(96.0, 1330.0, 0.0), 8.0)

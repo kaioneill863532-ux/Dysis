@@ -882,11 +882,19 @@ if want("M_DysisWallCut"):
     hc = rgb_of(mat, vector(mat, "HoleCenter", (0.0, 0.0, -1000000.0), -1100, 250), -850, 250)
     ho = rgb_of(mat, vector(mat, "HoleOut", (1.0, 0.0, 0.0), -1100, 450), -850, 450)
     hh = rgb_of(mat, vector(mat, "HoleHalf", (0.0, 0.0, 0.0), -1100, 650), -850, 650)
+    # 第二个洞（Hole2…）：波吕丢刻斯的龛。龛是做在厚墙那个部件里的，可它有一大半在圆殿的墙面后面——墙面不挖开，像就只露出前面一小截
+    hc2 = rgb_of(mat, vector(mat, "Hole2Center", (0.0, 0.0, -1000000.0), -1100, 850), -850, 850)
+    ho2 = rgb_of(mat, vector(mat, "Hole2Out", (1.0, 0.0, 0.0), -1100, 1050), -850, 1050)
+    hh2 = rgb_of(mat, vector(mat, "Hole2Half", (0.0, 0.0, 0.0), -1100, 1250), -850, 1250)
     c = custom(mat, """
 float3 d = WP - HoleCenter;
 float3 o = normalize(float3(HoleOut.x, HoleOut.y, 0.0));
 float3 t = float3(-o.y, o.x, 0.0);
-return (abs(dot(d, t)) < HoleHalf.x && abs(dot(d, o)) < HoleHalf.y && abs(d.z) < HoleHalf.z) ? 0.0 : 1.0;
-""", [("WP", wp), ("HoleCenter", hc), ("HoleOut", ho), ("HoleHalf", hh)], F1, -500, 300)
+if (abs(dot(d, t)) < HoleHalf.x && abs(dot(d, o)) < HoleHalf.y && abs(d.z) < HoleHalf.z) return 0.0;
+d = WP - Hole2Center;
+o = normalize(float3(Hole2Out.x, Hole2Out.y, 0.0));
+t = float3(-o.y, o.x, 0.0);
+return (abs(dot(d, t)) < Hole2Half.x && abs(dot(d, o)) < Hole2Half.y && abs(d.z) < Hole2Half.z) ? 0.0 : 1.0;
+""", [("WP", wp), ("HoleCenter", hc), ("HoleOut", ho), ("HoleHalf", hh), ("Hole2Center", hc2), ("Hole2Out", ho2), ("Hole2Half", hh2)], F1, -500, 300)
     mel.connect_material_property(c, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     finish(mat, full)

@@ -207,9 +207,6 @@ private:
 	// 主界面 / 设置页
 	int32 MenuIndex = 0;        // 0 = 开始游戏，1 = 退出游戏
 	int32 SettingsIndex = 0;    // 0 = 回到游戏，1 = 回到主界面
-	int32 VolumeFocus = -1;     // 设置页里选中的是哪条音量（0 = 音乐，1 = 音效；-1 = 选中的是上面两个按钮）
-	int32 VolumeDrag = -1;      // 鼠标正拖着哪一条
-	double VolumePreviewAt = 0.0;   // 上次试听音效是什么时候（拖的时候别响成一串）
 	float SelectorX = 0.0f;     // 选择标的平滑位置（设计稿像素）
 	int32 StartPhase = 0;       // 0 = 没在开始；1 = 正在黑下去；2 = 正在亮起来
 	float MenuTurn = 0.0f;      // 主界面上天已经转过的角度（度，0–360）

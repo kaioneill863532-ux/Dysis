@@ -239,7 +239,8 @@ void ADysisDirector::UpdateGoddess(float Dt)
 	}
 	GoddessLit = Lit; GoddessSweep = Sweep;
 	// 要让月光整个罩住那轮月亮，并且停在那里 1 秒（走过去的时候只会亮一下）：人得在月桥上找到那一步、站住
-	GoddessDwell = Lit > 0.99f ? GoddessDwell + Dt : FMath::Max(0.0f, GoddessDwell - 2.0f * Dt);
+	// 2026-10-11 用户：这一处的判定再松一点。——灰盒要五个点全照到（Lit = 1）；现在四个就算（月桥上能站住的那一段从一步宽到三四步）
+	GoddessDwell = Lit > 0.75f ? GoddessDwell + Dt : FMath::Max(0.0f, GoddessDwell - 2.0f * Dt);
 	if (!bGoddessLit && Lit > 0.3f && !bGoddessGlint)
 	{
 		bGoddessGlint = true;

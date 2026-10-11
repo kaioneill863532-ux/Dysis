@@ -140,7 +140,13 @@ def crescent(out):
     m.write(out, "MoonGateCrescent")
 
 # ───────────────────────── 桥门：石拱和门板 ─────────────────────────
-GATE_A, GATE_PW, GATE_DP, GATE_HS = 0.62, 0.22, 0.34, 1.85       # 拱洞半宽、柱宽、进深、起拱的高度（米）
+# 拱洞半宽、柱宽、进深、起拱的高度（米）。
+# 2026-10-11 第二回：夜里屋顶往下的楼梯出现时，桥门有一部分悬空——桥门脚下那块不动的平台在离殿心 11.6 m 处只有 1.62 m 宽，
+# 原来的拱连柱脚宽 1.75 m，一只脚踩到了旁边会沉下去的那一级上。拱洞收到 1.16 m、柱子 20 cm：连柱脚 1.59 m，整个落在平台里。
+# 门推开以后和拱穿在一起——原来门板在拱的进深正中、门轴在拱洞边上：一推开，门板根上那一截就埋在柱子和柱脚里。
+# 现在门板挂在拱朝外（朝环道）的那个面上，门轴在这个面上、拱洞的边：门是朝外开的，推开以后整扇都在拱的外面。
+# 柱脚、腰线只往两侧和朝桥的那一面凸出来，朝外的那一面（挂门的）和拱洞里面是平的。
+GATE_A, GATE_PW, GATE_DP, GATE_HS = 0.58, 0.20, 0.34, 1.85
 def gate(out):
     A, PW, DP, HS = GATE_A, GATE_PW, GATE_DP, GATE_HS
     rc = A + PW * 0.5; ch = 0.03
@@ -167,13 +173,16 @@ def gate(out):
         m.patch(rows, STONE, hint)
     # 柱脚（各一块矮墩）和起拱那里的一道腰线
     for sx in (-1.0, 1.0):
-        cx = sx * rc
-        m.box((cx - 0.145, 0.0, -0.205), (cx + 0.145, 0.15, 0.205), STONE, faces="xXYzZ")
-        m.box((cx - 0.132, HS - 0.055, -0.192), (cx + 0.132, HS + 0.025, 0.192), STONE, faces="xXyYzZ")
+        cx = sx * rc; inner = cx - sx * hu           # 柱子朝拱洞的那个面
+        for grow, y0, y1, top_bottom in ((0.015, 0.0, 0.15, "Y"), (0.012, HS - 0.055, HS + 0.025, "yY")):
+            xa, xb = sorted((inner, cx + sx * (hu + grow)))
+            side = "X" if sx > 0 else "x"            # 朝两侧的那个面
+            m.box((xa, y0, -hv), (xb, y1, hv + grow + 0.02), STONE, faces=side + top_bottom + "Z")
     m.write(out, "GateArch")
 
     # 门板：拱顶的一块石板（半宽比拱洞小 1.5 cm），正反两面各有一圈边框、中间的板心凹下去 1.5 cm
-    b, th, e, dz = A - 0.015, 0.07, 0.085, 0.015
+    b, th, e, dz = A + 0.025, 0.07, 0.085, 0.015      # 挂在外面的门板比拱洞四周各大 2.5 cm（把洞口盖严）
+    zc = -(DP * 0.5 + th * 0.5)                       # 门板的正中：拱朝外的那个面再往外半个板厚
     def outline(hw, y0, n=32):
         L = [(-hw, y0), (hw, y0), (hw, HS)]
         for i in range(1, n): L.append((hw * math.cos(math.pi * i / n), HS + hw * math.sin(math.pi * i / n)))
@@ -183,14 +192,14 @@ def gate(out):
     cen = (0.0, HS * 0.55)
     d = Mesh()
     for sgn in (1.0, -1.0):
-        zf = sgn * th * 0.5
+        zf = zc + sgn * th * 0.5
         at = lambda L, z: [(p[0], p[1], z) for p in L]
         ring = lambda L, z: at(L, z) + [at(L, z)[0]]
         d.patch([ring(Lo, zf), ring(Li, zf)], STONE, (0.0, 0.0, sgn))
         d.patch([ring(Li, zf), ring(Lp, zf - sgn * dz)], STONE, lambda p, sgn=sgn: (cen[0] - p[0], cen[1] - p[1], sgn * 0.6))
         d.fan((cen[0], cen[1], zf - sgn * dz), at(Lp, zf - sgn * dz), STONE, (0.0, 0.0, sgn))
     # 四周的侧面：底、两边、拱顶各一片（转角是硬棱）
-    front = [(p[0], p[1], th * 0.5) for p in Lo]; back = [(p[0], p[1], -th * 0.5) for p in Lo]
+    front = [(p[0], p[1], zc + th * 0.5) for p in Lo]; back = [(p[0], p[1], zc - th * 0.5) for p in Lo]
     seg = [(0, 1), (1, 2), (2, len(Lo) - 1), (len(Lo) - 1, len(Lo))]
     for i0, i1 in seg:
         idx = [i % len(Lo) for i in range(i0, i1 + 1)]

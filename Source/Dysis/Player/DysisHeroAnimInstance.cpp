@@ -24,6 +24,21 @@ namespace
 	constexpr float HeroBlendSeconds = 0.16f;
 	constexpr int32 HeroGroundHz = 30;
 
+	/** 起跳、下落、落地这三段：每段只取顺的那一截，放到这一截的头就停住（不照原速放，“下落”也不循环）。
+	 *  美术这三段是从一整段原地跳里切出来的（每秒 24 帧，15 + 8 + 16 帧），里面两只手一直在胸前上下摆：起跳那一段手抬起、放下、又抬起；
+	 *  “下落”那一段首尾接不上，循环一圈手跳 11 cm、胸口跳 5 cm；落地那一段手又上下两回、两只脚来回倒。
+	 *  原来起跳按 1.8 倍、落地按 2.4 倍放——一次原地跳（0.7 秒）里手上下甩了五回，落地时整个人前后晃 10 cm，
+	 *  下落久了每 0.33 秒还抽一下（2026-10-11 用户：跳起来手和上半身会甩和抽搐几下）。
+	 *  现在：起跳 = 第 0→4 帧（手抬到一半、身子前倾）；下落 = 第 3→4.5 帧（手再抬一点、腿略收，脚离地不到 6 cm）；
+	 *  落地 = 第 0→4 帧（左脚收回站姿）。一次跳下来手只抬一回、放一回。
+	 *  From / To：这一截在动作里的起止时刻（秒）；Seconds：放完这一截用多久（先快后慢）。 */
+	struct FDysisHeroAirScrub { float From, To, Seconds; };
+	const FDysisHeroAirScrub* HeroAirScrub(int32 i)
+	{
+		static const FDysisHeroAirScrub Jump{ 0.0f, 4.0f / 24.0f, 0.22f }, Fall{ 3.0f / 24.0f, 4.5f / 24.0f, 0.30f }, Land{ 0.0f, 4.0f / 24.0f, 0.25f };
+		return i == int32(EDysisHeroClip::JumpStart) ? &Jump : i == int32(EDysisHeroClip::FallLoop) ? &Fall : i == int32(EDysisHeroClip::Land) ? &Land : nullptr;
+	}
+
 	/** 一段动作的“落地表”，开场时从动作里量出来，每 1/30 秒一格（模型自己的坐标：脚踩的地面是 z = 0，脸朝 +Y，厘米）。
 	 *  美术给的动作里骨盆是钉死不动的——原本“人在动、脚踩着地”，变成了“人不动、脚在地上滑”。这张表记的是骨盆该挪回去多少：
 	 *    · 站着的那几段：两只脚里低的那只算踩着地的，它往哪边滑，骨盆就往反方向挪同样多（它就不动了）；
@@ -127,8 +142,9 @@ namespace
 		TArray<FAnimNode_SequencePlayer_Standalone> Players;
 		TArray<FDysisHeroGround> Ground;
 		TArray<float> Weights, Want;
+		TArray<float> Held;           // 起跳、下落、落地：这一段被选中多久了（秒）——它放到哪儿由这个数定（HeroAirScrub）
 		TArray<FVector2D> Keep;       // 站着的几段之间换的时候：新的一段整个平移多少，两脚的中点才接得上
-		int32 Target = 0;
+		int32 Target = 0, SeenTarget = INDEX_NONE;
 		float Rate = 1.0f;
 		int32 RestartSerial = 0, SeenRestartSerial = 0;
 
@@ -155,6 +171,7 @@ namespace
 		{
 			Weights.Init(0.0f, Players.Num());
 			Want.Init(0.0f, Players.Num());
+			Held.Init(0.0f, Players.Num());
 			Keep.Init(FVector2D::ZeroVector, Players.Num());
 			if (Weights.Num() > 0) Weights[0] = 1.0f;
 			for (FAnimNode_SequencePlayer_Standalone& P : Players) P.Initialize_AnyThread(Context);
@@ -213,8 +230,12 @@ namespace
 			}
 			if (Weights[HeroClip_Idle] + Weights[HeroClip_Land] + Weights[HeroClip_Touch] < KINDA_SMALL_NUMBER) bIdleHeld = false;   // 走开过了
 			if (Weights[HeroClip_Walk] + Weights[HeroClip_Run] < KINDA_SMALL_NUMBER) Phase = 0.0;                            // 起步：从左脚踩在正下方开始
+			if (Target != SeenTarget) { Held[Target] = 0.0f; SeenTarget = Target; }                                          // 起跳、下落、落地：从那一截的头放起
 
-			const float Step = Dt / HeroBlendSeconds;
+			// 换动作用多久：平时 0.16 秒。换到“下落”、落地以后回到站或走，慢一点——手是慢慢抬上去、慢慢放下来的
+			const float AirW = Weights[int32(EDysisHeroClip::JumpStart)] + Weights[int32(EDysisHeroClip::FallLoop)] + Weights[HeroClip_Land];
+			const float BlendSeconds = Target == int32(EDysisHeroClip::FallLoop) ? 0.22f : (!HeroAirScrub(Target) && AirW > KINDA_SMALL_NUMBER) ? 0.24f : HeroBlendSeconds;
+			const float Step = Dt / BlendSeconds;
 			float Sum = 0.0f;
 			for (int32 i = 0; i < Players.Num(); ++i)
 			{
@@ -252,6 +273,14 @@ namespace
 					// 走、跑：时刻由相位定，播放器自己不往前走
 					const double At = FMath::Fmod(Phase + (i == HeroClip_Run ? double(RunPhaseLead) : 0.0), Cycles) / Cycles;
 					Players[i].SetAccumulatedTime(float(At) * Ground[i].Length);
+					Players[i].SetPlayRate(0.0f);
+				}
+				else if (const FDysisHeroAirScrub* Air = HeroAirScrub(i))
+				{
+					// 起跳、下落、落地：放到哪儿由“选中了多久”定，到这一截的头就停住；不是正在用的那一段停在原处淡出去
+					if (i == Target) Held[i] += Dt;
+					const float X = FMath::Clamp(Held[i] / Air->Seconds, 0.0f, 1.0f);
+					Players[i].SetAccumulatedTime(FMath::Lerp(Air->From, Air->To, X * (2.0f - X)));
 					Players[i].SetPlayRate(0.0f);
 				}
 				else if (i == Target) Players[i].SetPlayRate(Rate);
@@ -493,8 +522,10 @@ void UDysisHeroAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (!Move) return;
 	const FVector V = Hero->GetVelocity();
 	const float Speed = float(V.Size2D());
-	// 动作用的速度：往上慢一拍跟（起步先迈一小步），往下立刻跟
-	GaitSpeed = Speed > GaitSpeed ? FMath::Min(Speed, GaitSpeed + GaitAccel * DeltaSeconds) : Speed;
+	// 动作用的速度：往上慢一拍跟（起步先迈一小步），往下立刻跟。腾空的时候不往上跟：跳起来人是按“跃”的速度飞的（比走快将近一倍），
+	// 着地的头一帧速度还没降回来——照着它算，那一帧会混进一点“跑”的姿势，头往前点一下
+	if (Speed <= GaitSpeed) GaitSpeed = Speed;
+	else if (!Move->IsFalling()) GaitSpeed = FMath::Min(Speed, GaitSpeed + GaitAccel * DeltaSeconds);
 	// 脚下的坡度：最近 0.3 秒里升了多少 ÷ 走了多远。台阶是一级一级“跳”上去的（逐帧看是 0、0、17 cm…），要摊开算；传送、腾空不算
 	{
 		const FVector Loc = Hero->GetActorLocation();
@@ -514,13 +545,20 @@ void UDysisHeroAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	PlaybackRate = 1.0f;
 	StrideScale = 1.0f;
 	CycleRate = 0.0f;
-	if (Move->IsFalling())
+	// 腾空：起跳马上算；只是脚下空了一小下（地面的接缝、一两厘米的坎，0.12 秒以内就又踩实了）不算——
+	// 不换成“下落”、落下来也不放“落地”，接着放原来的站 / 走（不然每过一道缝手都白抬一下）
+	const bool bFalling = Move->IsFalling();
+	AirSeconds = bFalling ? AirSeconds + DeltaSeconds : 0.0f;
+	if (bFalling) bAirShown = bAirShown || V.Z > 80.0 || AirSeconds > 0.12f;
+	else if (Hero->GetLandingSeconds() <= 0.0f) bAirShown = false;
+	if (bFalling && bAirShown)
 	{
-		// 往上升的那一段放起跳，其余时间放下落
+		// 往上升的那一段放起跳，其余时间放下落（这两段和落地放到哪儿不看 PlaybackRate：见 HeroAirScrub）
 		Clip = V.Z > 80.0 ? EDysisHeroClip::JumpStart : EDysisHeroClip::FallLoop;
-		if (Clip == EDysisHeroClip::JumpStart) PlaybackRate = 1.8f;
 	}
-	else if (Hero->GetLandingSeconds() > 0.0f && Speed < 80.0f) { Clip = EDysisHeroClip::Land; PlaybackRate = 2.4f; }
+	// 落地：着地时人是停着的（或刚着地那 0.1 秒里停下来了）才放；跑着落地接着跑。着地 0.1 秒以后才停下的不再补放（只剩一闪，手白抬一下）
+	else if (!bFalling && bAirShown && Hero->GetLandingSeconds() > 0.0f && Speed < 80.0f
+		&& (ActiveClip == int32(EDysisHeroClip::Land) || Hero->GetLandingSeconds() > 0.15f)) Clip = EDysisHeroClip::Land;
 	else if (Hero->IsTouching()) Clip = EDysisHeroClip::TouchForward;
 	else if (!bStairGait && Hero->IsAscendingSteps()) { Clip = EDysisHeroClip::RunUpstairs; PlaybackRate = FMath::Clamp(Speed / 320.0f, 0.7f, 2.0f); }
 	else if (Speed > 8.0f && Clips.IsValidIndex(HeroClip_Run) && Clips[HeroClip_Walk] && Clips[HeroClip_Run])

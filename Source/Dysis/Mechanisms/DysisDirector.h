@@ -327,6 +327,7 @@ public:
 	/** 海面用哪一版：false = 原来的（有波纹、迎着看是青蓝的），true = 镜湖（平得像镜子，天和云映在里面）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Fx")
 	void DebugSetSeaMirror(bool bOn);
+	bool IsSeaMirrorOn() const { return bSeaMirror; }
 
 	/** 殿里各层的地面：true = 和墙一个颜色（默认），false = 美术原来给地面单配的那种偏紫的灰。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Scenery")
@@ -595,6 +596,11 @@ private:
 	TWeakObjectPtr<UStaticMeshComponent> PolluxModel;    // 波吕丢刻斯的新模型：还封在墙里的时候不画
 	TWeakObjectPtr<UStaticMeshComponent> PavSunBead, PavMoonHolder;      // 水亭浑天仪上的太阳（和金苹果一样大）、薄薄的月托：跟着日月走
 	TWeakObjectPtr<class UCapsuleComponent> ArmTopBlocker;               // 殿顶浑天仪脚下只挡人的圆柱（原来算在虹门那个部件里）
+	// 水闸的开关（换成了拉杆的模型）：杆、推倒了多少、立着时的朝向、绕哪根轴倒
+	TWeakObjectPtr<UStaticMeshComponent> SluiceArmModel;
+	float SluiceLeverK = 0.0f;
+	FQuat SluiceArmRot0 = FQuat::Identity;
+	FVector SluiceArmAxis = FVector::ForwardVector;
 	float IrisNicheSinkCm = 0.0f;                // 虹之龛的碎片：门开之前比“在龛里的位置”往墙里多沉多少（门开的时候从墙里出来）
 	// 虹之龛在墙上挖的洞：墙（低模那一层）换成能挖洞的材质；龛里的五块板；洞现在开着没有（石沿伸到头、两扇门到位了才开）
 	UPROPERTY()

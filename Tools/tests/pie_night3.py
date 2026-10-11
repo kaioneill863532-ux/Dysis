@@ -88,6 +88,10 @@ def main():
           "月桥上 %d 步：每一步的时刻 %d 步和灰盒一致；月光全照到她怀里那轮月亮的是第 %s 步（女神像挪过以后应当是第 68 步前后）；只是走过去她不会亮（只亮一下）" % (n, ok, full))
     for x in notes[:8]: say("     " + x)
     st = dict(fl["stand"]); st["i"] = STAND; st["H"] = next(s["H"] for s in fl["scanBridge"]["scan"] if s["i"] == STAND)
+    # 2026-10-11 用户要这一处的判定松一点：五个点里照到四个就开始计时（灰盒要五个全照到）。上面一步步扫过来的时候，
+    # 旁边那几步已经攒了零点几秒——先退到照不到的地方站 1 秒把它清掉，再站到那一步上从头数
+    go(PTS[40], 10.0)
+    yield from hold(1.2)
     go(PTS[st["i"]], 10.0); look(100.0, -6.0)
     t0 = now()
     for _ in range(600):

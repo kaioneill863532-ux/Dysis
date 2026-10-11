@@ -4,18 +4,14 @@
 namespace
 {
 	const TCHAR* const UserVolumeSection = TEXT("Dysis.Audio");
-	float GUserMusic = 1.0f, GUserSfx = 1.0f;
+	// 2026-10-11 用户用滑条试出来的：音乐 70、音效 40 最合适——定成这两个数，设置页里的两条滑条拿掉了。
+	// 以前存在设置文件里的值不再读（不然试的时候存下的数会一直盖着这两个）、也不再写。
+	float GUserMusic = 0.70f, GUserSfx = 0.40f;
 	bool bUserVolumeLoaded = false;
 
 	void LoadUserVolume()
 	{
-		if (bUserVolumeLoaded) return;
 		bUserVolumeLoaded = true;
-		if (!GConfig) return;
-		GConfig->GetFloat(UserVolumeSection, TEXT("MusicVolume"), GUserMusic, GGameUserSettingsIni);
-		GConfig->GetFloat(UserVolumeSection, TEXT("SfxVolume"), GUserSfx, GGameUserSettingsIni);
-		GUserMusic = FMath::Clamp(GUserMusic, 0.0f, DysisUserVolume::Max);
-		GUserSfx = FMath::Clamp(GUserSfx, 0.0f, DysisUserVolume::Max);
 	}
 }
 
@@ -31,9 +27,5 @@ void DysisUserVolume::Set(float InMusic, float InSfx)
 
 void DysisUserVolume::Save()
 {
-	LoadUserVolume();
-	if (!GConfig) return;
-	GConfig->SetFloat(UserVolumeSection, TEXT("MusicVolume"), GUserMusic, GGameUserSettingsIni);
-	GConfig->SetFloat(UserVolumeSection, TEXT("SfxVolume"), GUserSfx, GGameUserSettingsIni);
-	GConfig->Flush(false, GGameUserSettingsIni);
+	// 音量定死了，不存（见上）
 }
