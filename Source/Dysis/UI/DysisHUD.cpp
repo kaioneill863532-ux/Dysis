@@ -371,11 +371,20 @@ void ADysisHUD::StartGame(bool bInstant)
 	FadeTo(1.0f, 0.4f);
 }
 
+// 界面的按钮声（2026-10-11 核对音效时发现：移到按钮上、确认、返回、开始游戏这几个声音文件都在，表里也有，
+// 但只做成了给蓝图界面调的函数——主界面和设置页是这里用代码画的，从来没调过，所以一直是哑的）。
+// 界面类的声音在游戏暂停时照样响（UDysisSfxSubsystem 里按类别标的）。
+static void DysisUiSfx(const UObject* Context, const TCHAR* Key)
+{
+	if (UDysisSfxSubsystem* Sfx = UDysisSfxSubsystem::Get(Context)) Sfx->Play(FName(Key), FVector::ZeroVector);
+}
+
 void ADysisHUD::OpenSettings()
 {
 	if (Screen != EDysisScreen::Playing) return;
 	Screen = EDysisScreen::Settings; SettingsIndex = 0; SelectorX = 0.0f;
 	UGameplayStatics::SetGamePaused(this, true);
+	DysisUiSfx(this, TEXT("UI.Confirm"));
 }
 
 void ADysisHUD::CloseSettings()
@@ -383,6 +392,7 @@ void ADysisHUD::CloseSettings()
 	if (Screen != EDysisScreen::Settings) return;
 	Screen = EDysisScreen::Playing;
 	UGameplayStatics::SetGamePaused(this, false);
+	DysisUiSfx(this, TEXT("UI.Back"));
 }
 
 void ADysisHUD::ReturnToMainMenu()
@@ -409,6 +419,7 @@ void ADysisHUD::DrawMainMenu(float RealDt)
 	// 输入：上下键 / W S 换行，回车 / 空格 / E 确认；鼠标移上去选中，点一下确认
 	const bool bBusy = StartPhase != 0;
 	bool bConfirm = false;
+	const int32 MenuWas = MenuIndex;
 	if (PC && !bBusy)
 	{
 		if (PC->WasInputKeyJustPressed(EKeys::Up) || PC->WasInputKeyJustPressed(EKeys::W) || PC->WasInputKeyJustPressed(EKeys::Down) || PC->WasInputKeyJustPressed(EKeys::S))
@@ -417,6 +428,7 @@ void ADysisHUD::DrawMainMenu(float RealDt)
 			if (MouseIn(OX + MainRowX * S, MainRowY[i] * S, MainRowW * S, MainRowH * S)) { MenuIndex = i; if (bClick) bConfirm = true; }
 		if (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::E)) bConfirm = true;
 	}
+	if (MenuIndex != MenuWas) DysisUiSfx(this, TEXT("UI.Hover"));      // 换到另一个按钮上（键盘或鼠标）
 
 	if (Logo) DrawUIImage(Logo, OX + LogoBox.X * S, LogoBox.Y * S, LogoBox.W * S, LogoBox.H * S);
 	else DrawUIText(TEXT("狄西斯的日落回廊"), Cream, OX + 1430.0f * S, 300.0f * S, 56.0f, 0.5f, true);
@@ -436,6 +448,7 @@ void ADysisHUD::DrawMainMenu(float RealDt)
 
 	if (bConfirm)
 	{
+		DysisUiSfx(this, MenuIndex == 0 ? TEXT("UI.StartGame") : TEXT("UI.Confirm"));
 		if (MenuIndex == 0) StartGame(false);
 		else if (PC) UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, false);
 	}
@@ -462,6 +475,7 @@ void ADysisHUD::DrawSettings(float RealDt)
 	UTexture2D* Selector = UITex("SelectorSettings", TEXT("/Game/Dysis/UI/Menu/SelectorSettings.SelectorSettings"));
 
 	bool bConfirm = false, bResume = false;
+	const int32 SettingsWas = SettingsIndex;
 	if (PC)
 	{
 		// 上下键 / W S 在两行之间换
@@ -488,8 +502,9 @@ void ADysisHUD::DrawSettings(float RealDt)
 		DrawUIText(TEXT("回到主界面"), SettingsIndex == 1 ? Cream : Cream.CopyWithNewOpacity(0.6f), Canvas->SizeX * 0.5f, OY + 700.0f * K, 36.0f * SetScale, 0.5f);
 	}
 
-	if (bResume || (bConfirm && SettingsIndex == 0)) CloseSettings();
-	else if (bConfirm && SettingsIndex == 1) ReturnToMainMenu();
+	if (SettingsIndex != SettingsWas) DysisUiSfx(this, TEXT("UI.Hover"));
+	if (bResume || (bConfirm && SettingsIndex == 0)) CloseSettings();                                    // “返回”那一声在 CloseSettings 里
+	else if (bConfirm && SettingsIndex == 1) { DysisUiSfx(this, TEXT("UI.Confirm")); ReturnToMainMenu(); }
 }
 
 // ───────────────────────── 局内 ─────────────────────────
@@ -721,7 +736,11 @@ void ADysisHUD::DrawHUD()
 		float MX = 0.0f, MY = 0.0f;
 		if (PC->GetMousePosition(MX, MY)) { bMouseValid = true; MousePos = FVector2D(MX, MY); }
 		bClick = PC->WasInputKeyJustPressed(EKeys::LeftMouseButton);
+#if !UE_BUILD_SHIPPING
+		// F3：左下角那一行调试信息（在哪个区、什么时刻、脚下的坐标）。只在编辑器里试玩和开发版里有；导出给玩家的版本里没有这个键
+		//（2026-10-11 用户：导出的时候把调试用的显示都关掉）。
 		if (PC->WasInputKeyJustPressed(EKeys::F3)) bShowDebug = !bShowDebug;
+#endif
 	}
 	ApplyInputForScreen();
 
@@ -736,13 +755,16 @@ void ADysisHUD::DrawHUD()
 		DrawSettings(RealDt);
 		break;
 	case EDysisScreen::Playing:
-		// M：海面在“原来的样子 / 镜湖”之间换（2026-10-11 用户要的快捷键；也可以在控制台打 Dysis.SeaMirror 0|1）
+#if !UE_BUILD_SHIPPING
+		// M：海面在“原来的样子 / 镜湖”之间换（2026-10-11 用户要的快捷键；也可以在控制台打 Dysis.SeaMirror 0|1）。
+		// 这是挑海面时对比用的，已经定了用镜湖：导出给玩家的版本里没有这个键（同一天：导出的时候把调试用的都关掉）。
 		if (PC && StartPhase == 0 && PC->WasInputKeyJustPressed(EKeys::M))
 			for (TActorIterator<ADysisDirector> It(GetWorld()); It; ++It)
 			{
 				It->DebugSetSeaMirror(!It->IsSeaMirrorOn());
 				Notify(GetWorld(), It->IsSeaMirrorOn() ? TEXT("海面：镜湖") : TEXT("海面：原来的样子"), 2.0f);
 			}
+#endif
 		// P、Tab、Esc 都能开设置（2026-10-10 用户：在编辑器里试玩时 Esc 是“退出试玩”，按不到设置——用 P 或 Tab）
 		if (PC && StartPhase == 0 && (PC->WasInputKeyJustPressed(EKeys::P) || PC->WasInputKeyJustPressed(EKeys::Tab) || PC->WasInputKeyJustPressed(EKeys::Escape))) { OpenSettings(); break; }
 		DrawInGame(Dt);

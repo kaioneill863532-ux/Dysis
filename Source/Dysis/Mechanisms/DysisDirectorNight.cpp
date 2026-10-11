@@ -341,7 +341,7 @@ void ADysisDirector::SetMoonstoneState(FMoonstone& Ms, float K)
 		if (AActor* A = B.Get())
 		{
 			const bool bVisible = K < 0.98f;
-			if (A->IsHidden() == bVisible) A->SetActorHiddenInGame(!bVisible);
+			if (!Ms.bBlocksFadeSlowly && A->IsHidden() == bVisible) A->SetActorHiddenInGame(!bVisible);
 			if (A->GetActorEnableCollision() == bShown) A->SetActorEnableCollision(!bShown);
 		}
 	if (bWasShown != bShown)

@@ -188,6 +188,9 @@ void ADysisDirector::UpdateSfx()
 	}
 	if (SfxRose(TEXT("shadow"), ShadowOn, 0.99f)) Sfx(TEXT("Story.ShadowBridge.Join"), Me);
 	if (SfxRose(TEXT("placed"), bApplePlaced ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Story.Apple.Place"), FVector(0.0, 0.0, 180.0));
+	// 三片碎片都集齐的那个结局：星星连成星座的时候响“星座亮起”的那一声。
+	// （原来是绑在旧的“龛”部件上的——集齐第三片的时候响；那套部件没有了，这一声就一直没响过。2026-10-11 检查音效时补上）
+	if (SfxRose(TEXT("starShow"), StarShowT >= 0.0f ? 1.0f : 0.0f, 0.5f)) Sfx(TEXT("Story.Dodecahedron"), FVector(0.0, 0.0, 180.0));
 }
 
 // ───────────────────────── 背景音乐 ─────────────────────────

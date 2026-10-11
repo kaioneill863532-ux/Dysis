@@ -437,7 +437,7 @@ def flat_mirror(P, C, T, name):
     要在减面之前做：颜色统一了以后，减面才会把镜面并成几块大平面（不然花纹的颜色会被当成“点缀”护着）。"""
     blue = [i for i, c in enumerate(C) if c[2] > 1.25 * c[0] and c[2] > 0.08]
     if len(blue) < 30:
-        print("    （%s：发蓝的点只有 %d 个，没找到镜面）" % (name, len(blue))); return P, C
+        print("    （%s：发蓝的点只有 %d 个，没找到镜面）" % (name, len(blue))); return P, C, None
     cen = tuple(sum(P[i][k] for i in blue) / len(blue) for k in range(3))
     bset = set(blue)
     n = [0.0, 0.0, 0.0]
@@ -449,7 +449,7 @@ def flat_mirror(P, C, T, name):
             s = 1.0 if m[2] >= 0.0 else -1.0      # 都按朝正面的算
             n[0] += m[0] * s; n[1] += m[1] * s; n[2] += m[2] * s
     l = math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
-    if l < 1e-12: return P, C
+    if l < 1e-12: return P, C, None
     n = (n[0] / l, n[1] / l, n[2] / l)
     # 只留贴着这个平面的发蓝的点，再量一遍圆心和半径
     on = [i for i in blue if abs((P[i][0] - cen[0]) * n[0] + (P[i][1] - cen[1]) * n[1] + (P[i][2] - cen[2]) * n[2]) < 0.02]
@@ -466,8 +466,28 @@ def flat_mirror(P, C, T, name):
             C[i] = (STONE_GREY, STONE_GREY, STONE_GREY); done += 1
         elif c[2] > 1.12 * c[0] and c[2] > 0.06 and r_ <= R * 1.6 and abs(d) < 0.12:      # 镜子附近剩下的发蓝的点（镜框内沿、反光溅到的地方）：只改颜色
             C[i] = (STONE_GREY, STONE_GREY, STONE_GREY); done += 1
-    print("    （%s 的镜面：圆心 (%.3f, %.3f, %.3f)，朝向 (%.3f, %.3f, %.3f)，半径 %.3f；%d 个点抹成了石头面）" % (name, cen[0], cen[1], cen[2], n[0], n[1], n[2], R, done))
-    return P, C
+    # 2026-10-11 用户：镜子有点缺，也不是正圆——镜面抹平以后边上还是美术做的那一圈花边（一瓣一瓣、凸一块凹一块的），减面以后缺缺丫丫。
+    # 镜子（连镜框）整个换成一块规整的圆板（mirror_plate，减面以后再加）。这里先把原来镜子、镜框上的点前后压进板的厚度里：
+    # 量出来镜框到镜面半径的 1.2 倍为止、前后各 2–3 cm。压扁的只是这一片里的点（托着镜子的手指贴着镜框的那一面也跟着贴到板上，
+    # 手指别的地方不动），它们都落在新圆板的里面，外面看不见——不删面，所以不会漏洞。
+    squashed = 0
+    for i, p in enumerate(P):
+        d = (p[0] - cen[0]) * n[0] + (p[1] - cen[1]) * n[1] + (p[2] - cen[2]) * n[2]
+        r_ = math.sqrt(max(0.0, sum((p[k] - cen[k]) ** 2 for k in range(3)) - d * d))
+        if r_ <= R * MIRROR_PLATE_R and abs(d) <= 0.036 and abs(d) > MIRROR_PLATE_HALF - 0.003:
+            t = (MIRROR_PLATE_HALF - 0.003) * (1.0 if d > 0 else -1.0) - d
+            P[i] = (p[0] + n[0] * t, p[1] + n[1] * t, p[2] + n[2] * t); squashed += 1
+    print("    （%s 的镜面：圆心 (%.3f, %.3f, %.3f)，朝向 (%.3f, %.3f, %.3f)，半径 %.3f；%d 个点抹成了石头面，%d 个点压进圆板里）" % (name, cen[0], cen[1], cen[2], n[0], n[1], n[2], R, done, squashed))
+    return P, C, (cen, n, R)
+
+# 新圆板：半径 = 镜面半径 × MIRROR_PLATE_R（盖住原来的镜框），前后各厚 MIRROR_PLATE_HALF（米，像还没放大之前的尺寸；游戏里再乘 1.567）
+MIRROR_PLATE_R, MIRROR_PLATE_HALF = 1.24, 0.013
+def mirror_plate(P, C, T, mir):
+    cen, n, R = mir
+    P = list(P); C = list(C); T = list(T)
+    base = (cen[0] - n[0] * MIRROR_PLATE_HALF, cen[1] - n[1] * MIRROR_PLATE_HALF, cen[2] - n[2] * MIRROR_PLATE_HALF)
+    add_cylinder(P, C, T, base, n, R * MIRROR_PLATE_R, 2.0 * MIRROR_PLATE_HALF, 56, (STONE_GREY, STONE_GREY, STONE_GREY))
+    return P, C, T
 
 def rad_of(pts, cen, n):
     out = []
@@ -732,10 +752,13 @@ def convert(pc, src_dir, out_dir, report):
     if pc.get("fix_black", pc["kind"] == "relief"):
         C, nfix = fix_black(P, C, T)
         if nfix: note += " 填掉黑点 %d 个" % nfix
+    mir = None
     if pc.get("flat_mirror"):
-        P, C = flat_mirror(P, C, T, pc["name"])
+        P, C, mir = flat_mirror(P, C, T, pc["name"])
     if pc.get("eps"):
         n0 = len(T) // 3; P, C, T = simplify(P, C, T, pc["eps"], accent_sat=pc.get("accent_sat", 0.38), crease=pc.get("crease", 0.0), crease_cos=pc.get("crease_cos", 0.80)); note += " 保平面减面 %d → %d" % (n0, len(T) // 3)
+    if mir:
+        P, C, T = mirror_plate(P, C, T, mir); note += " 镜子换成规整的圆板（半径 %.3f、厚 %.3f）" % (mir[2] * MIRROR_PLATE_R, 2.0 * MIRROR_PLATE_HALF)
     if pc.get("round_disc"):
         P, C, T, disc = round_disc(P, C, T, pc["name"])
         if disc: note += " 圆盘正面的圆心 (%.3f, %.3f, %.3f) 半径 %.3f" % (disc[0][0], disc[0][1], disc[0][2], disc[2])

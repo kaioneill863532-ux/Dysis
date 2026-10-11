@@ -476,6 +476,7 @@ private:
 		float DoorAz = 0.0f, DoorHalfDeg = 3.0f, DoorZ = 0.0f;
 		TArray<TWeakObjectPtr<AActor>> Parts;       // 显形以后才有的（能踩）
 		TArray<TWeakObjectPtr<AActor>> Blocks;      // 显形以后就没了的（平时挡着）
+		bool bBlocksFadeSlowly = false;             // 挡着的那几块“画不画”不在这里管（另有一段慢慢化开的效果：双子的厚墙）
 		const TCHAR* PermCopy = nullptr;            // 头一次照到时的提示
 	};
 	void SetupNight();
@@ -599,6 +600,11 @@ private:
 	FQuat LeverMountRot = FQuat::Identity;       // 装在墙上的拉杆：没扳的时候朝哪
 	TWeakObjectPtr<UStaticMeshComponent> PolluxModel;    // 波吕丢刻斯的新模型：还封在墙里的时候不画
 	TWeakObjectPtr<UStaticMeshComponent> PavSunBead, PavMoonHolder;      // 水亭浑天仪上的太阳（和金苹果一样大）、薄薄的月托：跟着日月走
+	// 两座浑天仪的三件（铜架、金环、银环）：慢慢转、殿顶那座还轻轻地浮（UpdateMechPack）。[0] 殿顶、[1] 水亭
+	TWeakObjectPtr<UStaticMeshComponent> ArmPart[2][3];
+	FVector ArmPartLoc[2][3];
+	FQuat ArmPartRot[2][3];
+	float ArmTopBobCm = 0.0f;      // 殿顶那座这一刻整个浮起来多少（等着被取的金苹果跟着它浮）
 	TWeakObjectPtr<class UCapsuleComponent> ArmTopBlocker;               // 殿顶浑天仪脚下只挡人的圆柱（原来算在虹门那个部件里）
 	// 水闸的开关（换成了拉杆的模型）：杆、推倒了多少、立着时的朝向、绕哪根轴倒
 	TWeakObjectPtr<UStaticMeshComponent> SluiceArmModel;
@@ -616,6 +622,10 @@ private:
 	float GodScale = 1.0f;                            // 判定月光的那几个点朝圆盘的圆心收多少（像缩小了，点也跟着收）
 	float GodHome[4] = { 0.0f, 0.0f, 0.0f, 1.0f };    // 游戏里定的：转几度、往墙挪多少、抬高多少、缩到几倍
 	float PolluxPushHold = 0.0f;      // 最近一次“推着他走”是多久以前（倒着数；松手 0.2 秒以后才算不推了，免得一帧一帧地闪）
+	// 封着波吕丢刻斯那个龛口的石头：月光照到以后慢慢化开（看上去的那一份；判定照旧）
+	float TwinWallLook = 0.0f;
+	UPROPERTY()
+	TObjectPtr<class UMaterialInstanceDynamic> TwinWallFadeMID;
 	// 三相像边上的手轮：转像的时候跟着转
 	TWeakObjectPtr<UStaticMeshComponent> MirrorCrankWheel;
 	float MirrorCrankDeg = 0.0f;
@@ -657,6 +667,8 @@ private:
 	TArray<TObjectPtr<UStaticMeshComponent>> SceneryComps;
 	UPROPERTY()
 	TArray<TObjectPtr<class UMaterialInstanceDynamic>> CloudMIDs;   // 云的三档颜色
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> CloudSkyMIDs;   // 每朵云里面另套的一份“算作天”的（只给天光的环境图用，见 SetupScenery）
 	int32 SceneryOnTerrace = 0, ScenerySeaRocks = 0, ScenerySkipped = 0, ScenerySolid = 0, PaletteSlots = 0, InteriorColumnsFixed = 0;
 	bool bFloorsLikeWalls = true;
 

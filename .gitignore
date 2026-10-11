@@ -3,7 +3,11 @@ Binaries/
 Intermediate/
 Saved/
 DerivedDataCache/
-Build/
+# Build/ 里只留游戏图标（Build/Windows/Application.ico：打包时编进 exe；原图在 Art/UI/source/游戏图标/）
+Build/*
+!Build/Windows/
+Build/Windows/*
+!Build/Windows/Application.ico
 Plugins/**/Binaries/
 Plugins/**/Intermediate/
 

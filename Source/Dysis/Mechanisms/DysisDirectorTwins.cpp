@@ -77,6 +77,7 @@ void ADysisDirector::SetupTwins()
 		Ms.bHasDoor = true; Ms.DoorAz = TwnWallAz; Ms.DoorHalfDeg = 2.6f; Ms.DoorZ = TwnFloorZ;
 		if (AActor* Block = Piece(TEXT("SM_Mech_Twins_WallBlock"))) { TwnMovable(Block); Ms.Blocks.Add(Block); }
 		else UE_LOG(LogTemp, Warning, TEXT("Dysis 双子：关卡里找不到 SM_Mech_Twins_WallBlock"));
+		Ms.bBlocksFadeSlowly = true;      // 这块石头怎么消失看 UpdateTwins
 		Moonstones.Add(MoveTemp(Ms));
 	}
 	{
@@ -255,6 +256,37 @@ void ADysisDirector::UpdateTwins(float Dt)
 	const FMoonstone* Wall = FindMoonstone(TEXT("twinWall"));
 	AActor* P = Pollux.Get();
 	FVector Pos = P ? P->GetActorLocation() : TwnNiche;
+
+	// 封着龛口的那块石头：月光照到以后慢慢化开（一秒多，从中间往四周，化的边是碎的、带一点月色），照不到了再慢慢长回来。
+	// 灰盒的月石是 0.4 秒以后整块就不算数了——挡不挡人、挡不挡光照旧按那个来（SetMoonstoneState），原来画面上也是到那一刻整块一下子没了
+	// （2026-10-11 用户：墙面被月光照射后渐渐隐藏起来的动画好像丢了）。这里只管看上去怎么消失。
+	if (Wall)
+	{
+		TwinWallLook = DysisGB::Toward(TwinWallLook, Wall->K > 0.5f ? 1.0f : 0.0f, 0.75f, Dt);
+		for (const TWeakObjectPtr<AActor>& B : Wall->Blocks)
+			if (AActor* A = B.Get())
+			{
+				if (!TwinWallFadeMID)
+					if (UMaterialInterface* Fade = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisStoneFade.M_DysisStoneFade"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+						if (UStaticMeshComponent* C = A->FindComponentByClass<UStaticMeshComponent>())
+						{
+							// 颜色照它现在的样子（和墙一个颜色）
+							FLinearColor Col(0.72f, 0.60f, 0.44f); float Rough = 0.92f;
+							if (const UMaterialInterface* Cur = C->GetMaterial(0)) { Cur->GetVectorParameterValue(FName(TEXT("BaseColor")), Col); Cur->GetScalarParameterValue(FName(TEXT("Roughness")), Rough); }
+							TwinWallFadeMID = UMaterialInstanceDynamic::Create(Fade, this);
+							TwinWallFadeMID->SetVectorParameterValue(TEXT("BaseColor"), Col);
+							TwinWallFadeMID->SetScalarParameterValue(TEXT("Roughness"), Rough);
+							FVector Origin, Extent;
+							A->GetActorBounds(false, Origin, Extent);
+							TwinWallFadeMID->SetVectorParameterValue(TEXT("Center"), FLinearColor(float(Origin.X), float(Origin.Y), float(Origin.Z)));
+							TwinWallFadeMID->SetScalarParameterValue(TEXT("Radius"), float(Extent.Size()));
+							for (int32 Slot = 0; Slot < C->GetNumMaterials(); ++Slot) C->SetMaterial(Slot, TwinWallFadeMID);
+						}
+				if (TwinWallFadeMID) TwinWallFadeMID->SetScalarParameterValue(TEXT("Fade"), TwinWallLook);
+				const bool bShow = TwinWallFadeMID ? TwinWallLook < 0.995f : Wall->K < 0.98f;      // 材质没建的话照原来的：整块一下子没
+				if (A->IsHidden() == bShow) A->SetActorHiddenInGame(!bShow);
+			}
+	}
 
 	if (TwinState == TwnHidden && Wall && Wall->K > 0.6f)
 	{

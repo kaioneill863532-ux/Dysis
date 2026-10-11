@@ -55,6 +55,8 @@ namespace
 	constexpr float FxRoofRingZ = 3030.0f, FxRoofTopZEnd = 720.0f;
 	// 灰盒合成那一遍里虹的总亮度（uRainK）；Boost：UE 的曝光下再提多少才和灰盒看着一样亮
 	constexpr float FxRainK = 2.4f, FxBowBoost = 1.5f;
+	// 镜湖的波光：白天、黄昏、夜里（月光）闪光的颜色（数是“屏幕上看着多亮”，1 = 白）
+	const FLinearColor SeaGlintDay(1.25f, 1.20f, 1.05f), SeaGlintDusk(1.30f, 0.86f, 0.46f), SeaGlintNight(0.50f, 0.61f, 0.80f);
 
 	FLinearColor FxLerp3(const FLinearColor& A, const FLinearColor& B, float T) { return A + (B - A) * FMath::Clamp(T, 0.0f, 1.0f); }
 	FLinearColor FxVec(const FVector& V) { return FLinearColor(float(V.X), float(V.Y), float(V.Z), 0.0f); }
@@ -406,6 +408,15 @@ void ADysisDirector::UpdateFx(float Dt)
 		SeaRingK = FMath::FInterpTo(SeaRingK, Want, Dt, 2.5f);
 		SeaMirrorMID->SetVectorParameterValue(TEXT("Player"), FLinearColor(float(Foot.X), float(Foot.Y), float(Foot.Z)));
 		SeaMirrorMID->SetScalarParameterValue(TEXT("PlayerK"), SeaRingK);
+		// 波光（2026-10-11 用户：从高处看水面要波光粼粼，现在太平了）：一粒粒明灭的闪光是材质里现算的（M_DysisSeaMirror 的 Glint…），
+		// 这里只告诉它太阳、月亮在哪边（它们在水里的倒影那一路闪得最密）和这一刻闪光的颜色：白天暖白、黄昏金色、夜里月白；
+		// 太阳 / 月亮落到地平线上就淡完（天光暗下来的那一阵海面是静的）。
+		const FVector SunD = Sky ? Sky->GetSunDir().GetSafeNormal() : FVector::UpVector, MoonD = Sky ? Sky->GetMoonDir().GetSafeNormal() : -FVector::UpVector;
+		const float GlintSun = DysisGB::Smoothstep(-1.0f, 5.0f, SunAlt), GlintMoon = Night * DysisGB::Smoothstep(1.0f, 10.0f, MoonAlt);
+		SeaMirrorMID->SetVectorParameterValue(TEXT("GlintSunDir"), FLinearColor(float(SunD.X), float(SunD.Y), float(SunD.Z)));
+		SeaMirrorMID->SetVectorParameterValue(TEXT("GlintMoonDir"), FLinearColor(float(MoonD.X), float(MoonD.Y), float(MoonD.Z)));
+		SeaMirrorMID->SetVectorParameterValue(TEXT("GlintSunColor"), FxLerp3(SeaGlintDay, SeaGlintDusk, Dusk) * GlintSun);
+		SeaMirrorMID->SetVectorParameterValue(TEXT("GlintMoonColor"), SeaGlintNight * GlintMoon);
 	}
 	if (PoolMID)
 	{

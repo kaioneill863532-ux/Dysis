@@ -85,6 +85,14 @@ void ADysisDirector::SetupScenery()
 	if (CloudMIDs.Num() == 0)
 		if (UMaterialInterface* Cloud = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Sky/M_DysisCloud.M_DysisCloud")))
 			for (int32 i = 0; i < 3; ++i) CloudMIDs.Add(UMaterialInstanceDynamic::Create(Cloud, this));
+	// 镜湖的海面映不到画面以外的东西时，会退回去查天光的那张环境图——那张图里只有“算作天”的东西。
+	// 头一版直接把云的材质标成“天”（2026-10-11）：环境图里有云了，可“算作天”的模型不记远近，入夜以后会被夜空 / 暮色那层天幕整个盖住
+	// （用户：在殿顶能看到水面上云的倒影但天上没有云了；换个角度倒影又没了）。
+	// 现在：云本体还是普通的模型（和原来一样，天幕在它后面）；每朵云里面另套一份略小一点、“算作天”的（M_DysisCloudSky）——
+	// 画面上它整个藏在本体里面看不见，只有环境图里看得到它。
+	if (CloudSkyMIDs.Num() == 0)
+		if (UMaterialInterface* CloudSky = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Sky/M_DysisCloudSky.M_DysisCloudSky"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			for (int32 i = 0; i < 3; ++i) CloudSkyMIDs.Add(UMaterialInstanceDynamic::Create(CloudSky, this));
 
 	auto Place = [this](UStaticMesh* Mesh, const FVector& Loc, float Yaw, const FVector& Scale, bool bShadow, bool bSolid)
 	{
@@ -389,6 +397,11 @@ void ADysisDirector::SetupScenery()
 				At.Z *= SceneryCloudLift;
 				UStaticMeshComponent* C = Place(Mesh, At, It.Yaw + SceneryFarTurnDeg + Turn, It.Scale * SceneryCloudScale, false, false);
 				for (int32 Slot = 0; Slot < 3 && CloudMIDs.IsValidIndex(Slot); ++Slot) C->SetMaterial(Slot, CloudMIDs[Slot]);
+				if (CloudSkyMIDs.Num() >= 3)
+				{
+					UStaticMeshComponent* S = Place(Mesh, At, It.Yaw + SceneryFarTurnDeg + Turn, It.Scale * (SceneryCloudScale * 0.985f), false, false);
+					for (int32 Slot = 0; Slot < 3; ++Slot) S->SetMaterial(Slot, CloudSkyMIDs[Slot]);
+				}
 			}
 			continue;
 		}
@@ -462,8 +475,14 @@ void ADysisDirector::SetupScenery()
 				const float Wide = 60.0f * (Dist / 34000.0f) * Rng.FRandRange(0.34f, 1.05f);
 				const FVector Scale(Wide * Rng.FRandRange(0.42f, 0.62f), Wide, Wide * Rng.FRandRange(0.28f, 0.50f));
 				const FVector At = DysisGB::PolarCm(Az, Dist, Dist * FMath::Tan(FMath::DegreesToRadians(Elev)));
-				UStaticMeshComponent* C = Place(CloudMesh, At, Az - 70.0f - Rng.FRandRange(0.0f, 34.0f), Scale, false, false);
+				const float Yaw = Az - 70.0f - Rng.FRandRange(0.0f, 34.0f);
+				UStaticMeshComponent* C = Place(CloudMesh, At, Yaw, Scale, false, false);
 				for (int32 Slot = 0; Slot < 3 && CloudMIDs.IsValidIndex(Slot); ++Slot) C->SetMaterial(Slot, CloudMIDs[Slot]);
+				if (CloudSkyMIDs.Num() >= 3)
+				{
+					UStaticMeshComponent* S = Place(CloudMesh, At, Yaw, Scale * 0.985f, false, false);
+					for (int32 Slot = 0; Slot < 3; ++Slot) S->SetMaterial(Slot, CloudSkyMIDs[Slot]);
+				}
 			}
 		}
 	}
@@ -527,6 +546,7 @@ void ADysisDirector::UpdateScenery()
 		const FLinearColor C = (Day[i] + (Dusk[i] - Day[i]) * Low) * (Sky->GetSkyGain() * SceneryCloudGain)
 			+ FLinearColor(0.11f, 0.14f, 0.22f) * (Night * (0.4f + 0.6f * MoonUp) * (1.0f - 0.2f * i));   // 比夜空稍亮一点：月光照着的云，不是天上的一块黑
 		CloudMIDs[i]->SetVectorParameterValue(TEXT("Color"), C);
+		if (CloudSkyMIDs.IsValidIndex(i)) CloudSkyMIDs[i]->SetVectorParameterValue(TEXT("Color"), C);
 	}
 }
 

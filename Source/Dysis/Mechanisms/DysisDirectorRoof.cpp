@@ -425,7 +425,7 @@ void ADysisDirector::UpdateCatch(float Dt)
 	{
 		// 金苹果是屋顶浑天仪上的“太阳”：挂在朝着太阳的那一侧
 		const FVector Sun = UDysisSkyLibrary::DysisSunDir(Time ? Time->H : RoofHOc);
-		Apple->SetWorldLocation(ArmTopCm() + Sun * 55.0);
+		Apple->SetWorldLocation(ArmTopCm() + Sun * 55.0 + FVector(0.0, 0.0, ArmTopBobCm));      // 跟着浑天仪一起轻轻地浮（见 UpdateMechPack）
 		return;
 	}
 	const float Before = CineSeconds;

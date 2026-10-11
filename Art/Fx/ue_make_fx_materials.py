@@ -861,6 +861,16 @@ if want("M_DysisSeaMirror"):
     #   · 近处糙一点（Rough → Rough + RoughNear），倒影边上是软的；
     #   · 低头看的地方镜面暗一点、偏深蓝（Deep；水是越斜着看越亮的，金属镜子从哪个角度看都一样亮），DeepK = 加多少。
     #   Tint = 镜面的颜色；Lift = 垫的一点底色 × SkyTint（代码按时刻给的天色，和原来的海用的是同一个）。
+    # 2026-10-11 用户：从高处看水面要有波光粼粼的感觉，现在从高处看太平了。
+    #   镜面本身不动（倒影还是平的、清楚的），上面加一层一粒一粒明灭的闪光（发光那一路）：
+    #   · 镜头离水面 GlintHighLo–GlintHighHi（4–14 m）以上才有（站在水面上那一段没有：那里有近处的长波和脚边的水纹）；贴着海平线的地方淡掉；
+    #   · 闪光排在绕殿心的一圈圈格子里（方位 × 1/距离）：从殿上往外看，每一格在屏幕上差不多一样大，远近都是细细碎碎的一层，
+    #     不会近处一大颗、远处糊成一片；格子按屏幕上占多少像素自动换粗细（两档之间是渐变的）。闪光是钉在水面上的，镜头转、人走都不跟着跑；
+    #   · 哪里密：太阳（夜里是月亮）在水里的倒影那一路最密最亮（“半程向量离竖直多远”——就是真的水波把日光反到眼里的那一片，
+    #     太阳低的时候是长长的一道），别处是一片一片稀疏的（一片有、一片没有，慢慢地换）；
+    #   · GlintSunDir / GlintMoonDir = 朝着太阳、月亮的方向，GlintSunColor / GlintMoonColor = 颜色 × 强弱（代码按时刻给：白天暖白、黄昏金色、夜里月白，
+    #     落到地平线以下就是 0）。Glint = 总的强弱（0 = 关掉），GlintAmbient = 倒影那一路以外有多密，GlintSigma = 那一路有多宽。
+    #   量：头一版就是现在这些数（细细的、只有一点）。又试过更大更亮更密的三档，用户看了说“第一版正好，太多了看着也乱，有点就行”——别再往上加。
     mat, full = new_mat("/Game/Dysis/Fx", "M_DysisSeaMirror", unreal.BlendMode.BLEND_OPAQUE, unlit=False, two_sided=False)
     mat.set_editor_property("tangent_space_normal", False)      # 法线直接按世界里的方向给（海面是平的，朝上）
     wp, time, depth = node(mat, unreal.MaterialExpressionWorldPosition, -1500, 100), node(mat, unreal.MaterialExpressionTime, -1500, 200), node(mat, unreal.MaterialExpressionPixelDepth, -1500, 300)
@@ -897,7 +907,59 @@ return normalize(float3(-slope * Ripple, 1.0));
     mel.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)
     lift = node(mat, unreal.MaterialExpressionMultiply, -500, 600)
     mel.connect_material_expressions(rgb_of(mat, vector(mat, "SkyTint", (0.45, 0.62, 0.85), -900, 600), -700, 600), "", lift, "A"); mel.connect_material_expressions(scalar(mat, "Lift", 0.0, -700, 720), "", lift, "B")
-    emissive(mat, lift)
+    campos = node(mat, unreal.MaterialExpressionCameraPositionWS, -1500, 1500)
+    glint = custom(mat, noise_code("G") + """
+float k = Glint * smoothstep(HighLo, HighHi, CamPos.z - WP.z) * smoothstep(0.012, 0.06, saturate(CV.z));
+if (k <= 0.001) return float3(0.0, 0.0, 0.0);
+float2 w = WP.xy, wx = ddx(WP.xy), wy = ddy(WP.xy);
+float rho2 = max(dot(w, w), 250000.0), rho = sqrt(rho2);
+float px = ResolvedView.ViewSizeAndInvSize.y / 1080.0;
+// 格子：a = 方位（一圈 AngCells 格），b = −RadK / 距离
+float ak = AngCells / 6.2831853;
+float a = atan2(w.y, w.x) * ak, b = -RadK / rho;
+// 一个像素里 a、b 各变多少（方位在 ±180° 那里要跳一下，所以不直接对 a 求导，按位置的导数算）
+float da = max(length(float2(w.x * wx.y - w.y * wx.x, w.x * wy.y - w.y * wy.x)) / rho2 * ak, 1.0e-7);
+float db = max(length(float2(dot(w, wx), dot(w, wy))) * RadK / (rho2 * rho), 1.0e-9);
+float la = clamp(log2(1.0 / (CellPx.x * px * da)), -3.0, 8.0), lb = clamp(log2(1.0 / (CellPx.y * px * db)), -8.0, 12.0);
+float ka = floor(la), kb = floor(lb), fa = la - ka, fb = lb - kb;
+// 哪里密：太阳 / 月亮的倒影那一路
+float3 V = normalize(CV);
+float3 Hs = normalize(V + SunDir), Hm = normalize(V + MoonDir);
+float ps = exp(-(1.0 - Hs.z * Hs.z) / max(Hs.z * Hs.z, 1.0e-4) / (Sigma * Sigma)) * step(0.0, SunDir.z);
+float pm = exp(-(1.0 - Hm.z * Hm.z) / max(Hm.z * Hm.z, 1.0e-4) / (Sigma * Sigma)) * step(0.0, MoonDir.z);
+float ks = saturate(dot(SunCol, float3(1.0, 1.0, 1.0)) * 3.0), km = saturate(dot(MoonCol, float3(1.0, 1.0, 1.0)) * 3.0);
+float2 pw = float2(dot(w, float2(0.83, 0.56)), dot(w, float2(-0.56, 0.83))) / float2(PatchCm, PatchCm * 0.4);
+float patch = smoothstep(0.38, 0.72, NZ.n(float3(pw, Time * 0.035)));
+float dens = saturate(Ambient * patch * saturate(ks + km) + ps * ks + pm * km) * DensMax;
+float3 col = SunCol * (0.55 + 0.9 * ps) + MoonCol * (0.55 + 0.9 * pm);
+float sum = 0.0;
+for (int i = 0; i < 2; i++)
+  for (int j = 0; j < 2; j++)
+  {
+    float oa = ka + float(i), ob = kb + float(j);
+    float2 uv = float2(a * exp2(oa), b * exp2(ob));
+    float sd = oa * 17.0 + ob * 31.0;
+    uv.x += NZ.h(float3(floor(uv.y), sd, 4.2));      // 每一行错开一段：不然一格一颗，看得出是横平竖直的格子
+    float2 id = floor(uv), f = frac(uv);
+    float r1 = NZ.h(float3(id, sd + 1.3)), r2 = NZ.h(float3(id, sd + 7.7)), r3 = NZ.h(float3(id, sd + 13.1)), r4 = NZ.h(float3(id, sd + 21.9));
+    float rad = DotR * (0.5 + 0.5 * r3);               // 这一颗多大；在格子里随便放，只要不切到格子边上
+    float2 q = (f - (rad + (1.0 - 2.0 * rad) * float2(r1, r2))) / rad;
+    float d = saturate(1.0 - dot(q, q));
+    float tw = pow(0.5 + 0.5 * sin(Time * Twinkle * (0.6 + 0.9 * r3) + r1 * 43.0), TwinklePow);
+    sum += d * d * tw * smoothstep(0.0, 0.12, dens - r4) * (i == 0 ? 1.0 - fa : fa) * (j == 0 ? 1.0 - fb : fb);
+  }
+return col * (sum * k);
+""", [("WP", wp), ("Time", time), ("CV", cam), ("CamPos", campos),
+      ("SunDir", rgb_of(mat, vector(mat, "GlintSunDir", (0.5, 0.3, 0.8), -1800, 1600), -1600, 1600)), ("SunCol", rgb_of(mat, vector(mat, "GlintSunColor", (1.3, 1.25, 1.1), -1800, 1760), -1600, 1760)),
+      ("MoonDir", rgb_of(mat, vector(mat, "GlintMoonDir", (0.0, 0.0, -1.0), -1800, 1920), -1600, 1920)), ("MoonCol", rgb_of(mat, vector(mat, "GlintMoonColor", (0.0, 0.0, 0.0), -1800, 2080), -1600, 2080)),
+      ("CellPx", rgb_of(mat, vector(mat, "GlintCellPx", (11.0, 5.0, 0.0), -1800, 2240), -1600, 2240)),
+      ("Glint", scalar(mat, "Glint", 1.0, -1500, 2400)), ("DensMax", scalar(mat, "GlintDensMax", 1.0, -1500, 3280)), ("HighLo", scalar(mat, "GlintHighLo", 400.0, -1500, 2480)), ("HighHi", scalar(mat, "GlintHighHi", 1400.0, -1500, 2560)),
+      ("AngCells", scalar(mat, "GlintAngCells", 512.0, -1500, 2640)), ("RadK", scalar(mat, "GlintRadK", 1.0e6, -1500, 2720)),
+      ("Sigma", scalar(mat, "GlintSigma", 0.16, -1500, 2800)), ("Ambient", scalar(mat, "GlintAmbient", 0.30, -1500, 2880)), ("PatchCm", scalar(mat, "GlintPatchCm", 6000.0, -1500, 2960)),
+      ("DotR", scalar(mat, "GlintDotR", 0.30, -1500, 3040)), ("Twinkle", scalar(mat, "GlintTwinkle", 3.2, -1500, 3120)), ("TwinklePow", scalar(mat, "GlintTwinklePow", 5.0, -1500, 3200))], F3, -900, 1800)
+    glow = node(mat, unreal.MaterialExpressionAdd, -350, 700)
+    mel.connect_material_expressions(lift, "", glow, "A"); mel.connect_material_expressions(glint, "", glow, "B")
+    emissive(mat, glow)
     vector(mat, "Pivot", (0.0, 0.0, 0.0), -1800, 1300)      # FxMaterial 会写这个参数；这个材质用不上
     finish(mat, full)
 
@@ -936,6 +998,31 @@ float h = f * 1.5 + Time * 0.07;
 float3 bow = 0.5 + 0.5 * cos(6.2831853 * (h + float3(0.0, 0.33, 0.67)));
 return bow * ring * Opacity;
 """, [("N", nws), ("V", cam), ("Time", time), ("Opacity", scalar(mat, "Opacity", 0.0, -1500, 300))], F3, -900, 0)
+    emissive(mat, glow)
+    finish(mat, full)
+
+# ───────────────────────── 月石：被月光照到以后慢慢化开的石头 ─────────────────────────
+if want("M_DysisStoneFade"):
+    # 封着波吕丢刻斯那个龛口的石头（2026-10-11 用户：墙面被月光照射后渐渐隐藏起来的动画好像丢了——原来是到时候整块一下子没了）。
+    # 平时就是一块和墙一个颜色的石头（BaseColor、Roughness 代码照它原来的样子写）；Fade 0 → 1：从 Center 往四周一点点化掉，
+    # 化的边是碎的（噪声），边上带一圈月色的光（EdgeColor × Glow）。用“遮罩 + 抖动”来化，不是半透明——石头后面的东西不会排错前后。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisStoneFade", unreal.BlendMode.BLEND_MASKED, unlit=False, two_sided=False)
+    wp = node(mat, unreal.MaterialExpressionWorldPosition, -1500, 0)
+    alpha = custom(mat, NOISE + """
+float n = NZ.n(WP / 22.0) * 0.6 + NZ.n(WP / 7.0) * 0.4;                    // 0–1 的斑驳
+float d = saturate(length(WP - Center) / max(Radius, 1.0));                  // 离正中多远
+float g = n * 0.5 + d * 0.5;                                                 // 中间先化、边上后化
+return saturate((g - (Fade * 1.3 - 0.15)) / 0.10);
+""", [("WP", wp), ("Center", rgb_of(mat, vector(mat, "Center", (0.0, 0.0, 0.0), -1500, 150), -1300, 150)), ("Radius", scalar(mat, "Radius", 150.0, -1500, 300)),
+      ("Fade", scalar(mat, "Fade", 0.0, -1500, 380))], F1, -900, 100)
+    # 抖动：每个像素拿一个固定的小随机数和 A 比（半透不透的地方是细细的点阵，引擎的抗锯齿会把它抹匀）
+    dither = custom(mat, "float r = frac(52.9829189 * frac(dot(Parameters.SvPosition.xy, float2(0.06711056, 0.00583715)))); return A > r * 0.98 + 0.01 ? 1.0 : 0.0;", [("A", alpha)], F1, -600, 100)
+    mel.connect_material_property(dither, "", unreal.MaterialProperty.MP_OPACITY_MASK)
+    mel.connect_material_property(rgb_of(mat, vector(mat, "BaseColor", (0.72, 0.60, 0.44), -900, -300), -700, -300), "", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(scalar(mat, "Roughness", 0.92, -700, -150), "", unreal.MaterialProperty.MP_ROUGHNESS)
+    glow = custom(mat, "float e = saturate(1.0 - abs(A - 0.35) / 0.35); return EdgeColor * (e * e * Glow * step(0.002, Fade));",
+                  [("A", alpha), ("Fade", scalar(mat, "Fade", 0.0, -1500, 380)), ("EdgeColor", rgb_of(mat, vector(mat, "EdgeColor", (0.62, 0.78, 1.0), -900, 500), -700, 500)),
+                   ("Glow", scalar(mat, "Glow", 0.9, -900, 650))], F3, -500, 400)
     emissive(mat, glow)
     finish(mat, full)
 

@@ -722,9 +722,16 @@ void ADysisDirector::SetupMechPack()
 		for (const TCHAR* Part : Parts) if (!MpMesh(*FString::Printf(TEXT("Arm%s%s"), Which, Part))) bAll = false;
 		if (!bAll) continue;
 		HideLook(A);
+		const int32 Seat = FCString::Strcmp(Which, TEXT("Top")) == 0 ? 0 : 1;
 		for (int32 i = 0; i < 3; ++i)
+		{
+			ArmPart[Seat][i] = nullptr;
 			if (UStaticMeshComponent* C = Put(A, *FString::Printf(TEXT("Arm%s%s"), Which, Parts[i]), A->GetActorLocation(), float(A->GetActorRotation().Yaw), One, EMpLook::Stone))
+			{
 				if (Mats[i]) C->SetMaterial(0, Mats[i]);
+				ArmPart[Seat][i] = C; ArmPartLoc[Seat][i] = C->GetRelativeLocation(); ArmPartRot[Seat][i] = C->GetRelativeRotation().Quaternion();
+			}
+		}
 		ArmGold = Mats[1]; ArmSilver = Mats[2];
 		if (FCString::Strcmp(Which, TEXT("Top")) == 0)
 		{
@@ -940,6 +947,36 @@ void ADysisDirector::UpdateMechPack(float Dt)
 		if (C->IsVisible() != bSeleneOn) C->SetVisibility(bSeleneOn);
 	// 三相像的手轮：绕轮轴（部件自己的 Y）转
 	if (UStaticMeshComponent* C = MirrorCrankWheel.Get()) C->SetRelativeRotation(FRotator(MirrorCrankDeg, 0.0f, 0.0f));
+
+	// 两座浑天仪（2026-10-11 用户：殿顶那座连里面的零件在空中轻轻地起伏飘动，整座有在转的感觉；水亭中心那座也慢慢转）：
+	//   · 铜架（两道竖着的环和那根斜轴）绕竖轴慢慢转——金环、银环是横着的圆，转不转看不出来，所以“在转”靠铜架；
+	//     太阳（金苹果 / 金珠）和月托还是指着真的日月，不跟着转。
+	//   · 殿顶那座：整座上下浮 ±3 cm（5 秒一个来回），金环、银环各自再轻轻地晃（歪 3°–4°、各差半拍），银环带着那颗小月珠反着转。
+	//   · 水亭那座只转不浮（它托着最后放上去的金苹果，位置不能动）。
+	{
+		const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+		ArmTopBobCm = 3.0f * FMath::Sin(T * 2.0f * PI / 5.0f);
+		for (int32 Seat = 0; Seat < 2; ++Seat)
+			for (int32 i = 0; i < 3; ++i)
+				if (UStaticMeshComponent* C = ArmPart[Seat][i].Get())
+				{
+					FVector Off = FVector::ZeroVector;
+					FQuat Spin = FQuat::Identity;
+					if (i == 0) Spin = FQuat(FVector::UpVector, FMath::DegreesToRadians(T * (Seat == 0 ? 9.0f : 6.0f)));      // 铜架
+					if (Seat == 0)
+					{
+						const float Ph = 1.7f * float(i);
+						Off.Z = ArmTopBobCm + (i == 0 ? 0.0f : 1.2f * FMath::Sin(T * 2.0f * PI / 3.6f + Ph));
+						if (i > 0)
+						{
+							const FQuat Tilt = FQuat(FVector::ForwardVector, FMath::DegreesToRadians(3.5f * FMath::Sin(T * 2.0f * PI / 6.4f + Ph)))
+								* FQuat(FVector::RightVector, FMath::DegreesToRadians(3.0f * FMath::Cos(T * 2.0f * PI / 7.3f + Ph)));
+							Spin = FQuat(FVector::UpVector, FMath::DegreesToRadians(i == 2 ? -T * 13.0f : 0.0f)) * Tilt;
+						}
+					}
+					C->SetRelativeLocationAndRotation(ArmPartLoc[Seat][i] + Off, Spin * ArmPartRot[Seat][i]);
+				}
+	}
 
 	// 日之龛的盖：轴在靠墙的那条边上，朝着人掀开（1 秒掀到 80°，竖在墙前面，不蹭墙）
 	if (UStaticMeshComponent* C = SunLidModel.Get())
