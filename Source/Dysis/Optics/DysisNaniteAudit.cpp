@@ -8,6 +8,9 @@
 #include "EngineUtils.h"
 #include "HAL/ConsoleManager.h"
 
+// 只在编辑器里有：网格的 Nanite 设置（NaniteSettings）是编辑器才带的数据，打包的游戏里没有这个成员
+//（2026-10-11 头一回编译正式版时才发现：以前只编过编辑器）。这本来也只是在编辑器里用的核查命令。
+#if WITH_EDITOR
 namespace
 {
 	FAutoConsoleCommandWithWorldAndArgs GDysisCheckNanite(
@@ -33,3 +36,4 @@ namespace
 				Total, NaniteOn);
 		}));
 }
+#endif
