@@ -92,6 +92,10 @@ def main():
     yield from wait(300)
 
     # ── A 天鹅：每一格、几个时刻 ──
+    # 2026-10-11（第八轮）用户要天鹅像再靠近墙一点：整组顺着“解开那一刻的月光”往墙那边挪了 45 cm（影子还落在浮雕上原来那一点）。
+    # 和灰盒逐点比的时候临时放回灰盒的位置（核的是“月光照没照到、影子落在哪”的算法没变），比完再挪回去；后面 B 段是按挪过以后的位置走的。
+    cmd(w, "Dysis.SwanShift 0")
+    yield from wait(10)
     n = ok = 0; notes = []
     for r in G["swan"]:
         tc.set_forced_time(r["H"]); director.debug_set_swan(r["k"], 1.0)
@@ -108,6 +112,8 @@ def main():
     check(ok == n, "天鹅 8 格 × 9 个时刻：月光照着她多少、头的影子离浮雕的空白多远——%d/%d 和灰盒一致" % (ok, n))
     for x in notes[:8]: say("     " + x)
     tc.clear_forced_time(); director.debug_set_swan(C["SWAN"]["k0"], 0.0)
+    cmd(w, "Dysis.SwanShift 45")
+    yield from wait(10)
 
     # ── B 站到女神像旁边，转到对的那一格 ──
     fl = {f["step"]: f for f in G["flowSwan"]}

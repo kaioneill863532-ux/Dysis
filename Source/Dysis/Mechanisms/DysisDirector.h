@@ -233,7 +233,15 @@ public:
 
 	/** 把瀑布后面的女神像（像、台座、判定月光的取样点一起）从灰盒的位置绕殿心转过 DeltaAzDeg 度、往墙那边挪 DeltaRCm。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
-	void DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm);
+	void DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm, float DeltaZCm = 0.0f);
+
+	/** 测算用：世界里的一点这一刻照不照得到三相像反过来的月光（"lit" 照到 / "box" 光柱没经过 / "blk" 半路被挡住 / "nobeam" 这会儿没有这束光）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	FString DebugMoonLitAt(FVector P) const;
+
+	/** 四层的天鹅像（台座、女神像、天鹅、判定用的点一起）顺着解开那一刻的月光往墙那边挪 Cm 厘米（0 = 灰盒的位置）。 */
+	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
+	void DebugMoveSwan(float Cm);
 
 	/** 测试用：时刻 H 时屋顶细桥落在水面上的影子的四个角（JSON；月亮太低就是 null）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
@@ -475,6 +483,8 @@ private:
 	bool PlayerOnMoonstone(const FMoonstone& Ms) const;
 	FMoonstone* FindMoonstone(FName Id);
 	FVector SwanHeadCm() const;
+	FVector SwanOriginCm() const;
+	FVector SwanShift = FVector::ZeroVector;     // 天鹅像从灰盒的位置挪了多少（见 DebugMoveSwan）
 	TArray<FMoonstone> Moonstones;
 	float MoonstoneClock = 0.0f;
 	mutable TWeakObjectPtr<class ADysisBeamActor> MoonMirrorBeam;
@@ -582,8 +592,17 @@ private:
 	TObjectPtr<UProceduralMeshComponent> ShadowSpot;         // 伊莉丝浮雕下面那个空着的人形（影子的头要落进去的地方）
 	float AppleHaloK = 0.0f, IrisLitK = 0.0f, ReliefHint = 0.0f;
 	FQuat LeverMountRot = FQuat::Identity;       // 装在墙上的拉杆：没扳的时候朝哪
+	TWeakObjectPtr<UStaticMeshComponent> PolluxModel;    // 波吕丢刻斯的新模型：还封在墙里的时候不画
+	TWeakObjectPtr<UStaticMeshComponent> PavSunBead, PavMoonHolder;      // 水亭浑天仪上的太阳（和金苹果一样大）、薄薄的月托：跟着日月走
+	TWeakObjectPtr<class UCapsuleComponent> ArmTopBlocker;               // 殿顶浑天仪脚下只挡人的圆柱（原来算在虹门那个部件里）
+	float IrisNicheSinkCm = 0.0f;                // 虹之龛的碎片：门开之前比“在龛里的位置”往墙里多沉多少（门开的时候从墙里出来）
+	// 虹之龛在墙上挖的洞：墙（低模那一层）换成能挖洞的材质；龛里的五块板；洞现在开着没有（石沿伸到头、两扇门到位了才开）
+	UPROPERTY()
+	TArray<TObjectPtr<class UMaterialInstanceDynamic>> WallCutMIDs;
+	TArray<TWeakObjectPtr<UStaticMeshComponent>> IrisNicheWalls;
+	bool bIrisHoleOn = false;
 	// 瀑布后面的女神像从灰盒的位置挪了多少（绕殿心转的度数、往墙那边的厘米数）；像、台座原来在哪
-	float GodShiftAz = 0.0f, GodShiftR = 0.0f;
+	float GodShiftAz = 0.0f, GodShiftR = 0.0f, GodShiftZ = 0.0f;
 	FVector GodStatueBase = FVector::ZeroVector, GodPlinthBase = FVector::ZeroVector;
 	FRotator GodStatueRot = FRotator::ZeroRotator;
 	bool bGodBase = false;

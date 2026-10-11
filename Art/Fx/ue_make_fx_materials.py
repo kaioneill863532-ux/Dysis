@@ -399,9 +399,15 @@ if want("M_DysisMoonbow"):
     # 现在：弧是软的、没有硬边；只在“有水汽的地方”显出来——两层慢慢飘的雾，一段浓一段淡；两只脚慢慢淡进水面上的水汽里；
     # 那一大片亮光去掉了，只留贴着弧的一点点；上面偶尔有水珠闪一下。
     # 参数 W、H（片子的宽高，厘米）、Radius、Band（弧的半径、半宽）、Opacity、Glow。
+    # 2026-10-11 用户（附了照片，二层靠瀑布那头斜着往下看）：月虹的边在一些角度很明显，有一道竖着的分界。两处：
+    #   · 弧外面那一层淡淡的光、弧自己的外半边，到片子的侧边还没淡完，被片子的边齐齐切断——现在片子两侧 70 cm、顶上 30 cm 以内都渐渐淡到 0；
+    #     （弧的半径也从 6.4 m 收到 6 m，离片子的边远一点：见 DysisDirectorSky.cpp 的 BowRadius）
+    #   · 它是一张平的片子，贴着片子的方向看过去，整道弧会压成一根竖着的细亮线——视线和片子的夹角小到 9° 以内开始淡、3° 以内就不画了。
     mat, full = new_mat("/Game/Dysis/Night", "M_DysisMoonbow", unreal.BlendMode.BLEND_ADDITIVE)
     lp = local_of(mat, node(mat, unreal.MaterialExpressionWorldPosition, -1700, 0), -1450, 0)
     time = node(mat, unreal.MaterialExpressionTime, -1450, 150)
+    camv = node(mat, unreal.MaterialExpressionCameraVectorWS, -1450, 900)
+    nrm = axis_world(mat, (0, 0, 1), -1450, 1000)
     P = [scalar(mat, n, v, -1450, 260 + 100 * i) for i, (n, v) in enumerate([("W", 1400.0), ("H", 760.0), ("Radius", 640.0), ("Band", 42.0), ("Glow", 0.38), ("Opacity", 0.0)])]
     c = custom(mat, NOISE + """
 float2 p = float2(LP.x * W / 100.0, H * 0.5 - LP.y * H / 100.0);             // 横向离中线多远、离底边多高（厘米）
@@ -419,8 +425,10 @@ float foot = smoothstep(0.04, 0.40, ang);                                    // 
 float3 col = lerp(float3(0.82, 0.88, 1.0), sp, 0.30);                        // 月虹颜色很淡，近乎白
 float halo = exp(-abs(d) * 0.6) * 0.06;                                      // 贴着弧的一点点光
 float glint = NZ.sp(p * 0.03, Time * 1.3) * band * 1.4;                      // 水珠偶尔闪一下
-return (col * (band * (0.22 + 0.78 * mist) + glint) + float3(0.70, 0.80, 1.0) * (halo * mist)) * (foot * Glow * Opacity);
-""" % SPECTRUM, [("LP", lp), ("Time", time)] + [(p.get_editor_property("parameter_name"), p) for p in P], F3, -900, 0)
+float edge = smoothstep(0.0, 5.0, 50.0 - abs(LP.x)) * smoothstep(0.0, 4.0, LP.y + 50.0);   // 片子的两侧、顶边：淡到 0，不留一道直边
+float graze = smoothstep(0.05, 0.16, abs(dot(normalize(CamV), normalize(Nrm))));          // 贴着片子看：淡掉，不压成一根线
+return (col * (band * (0.22 + 0.78 * mist) + glint) + float3(0.70, 0.80, 1.0) * (halo * mist)) * (foot * edge * graze * Glow * Opacity);
+""" % SPECTRUM, [("LP", lp), ("Time", time), ("CamV", camv), ("Nrm", nrm)] + [(p.get_editor_property("parameter_name"), p) for p in P], F3, -900, 0)
     emissive(mat, c)
     finish(mat, full)
 
@@ -859,4 +867,26 @@ if want("M_DysisBlobShadow"):
         [("UV", node(mat, unreal.MaterialExpressionTextureCoordinate, -850, 0)), ("Opacity", scalar(mat, "Opacity", 0.5, -850, 120))], F1, -500, 0)
     mel.connect_material_property(node(mat, unreal.MaterialExpressionConstant3Vector, -500, -160, constant=unreal.LinearColor(0.0, 0.0, 0.0, 1.0)), "", unreal.MaterialProperty.MP_BASE_COLOR)
     mel.connect_material_property(op, "", unreal.MaterialProperty.MP_OPACITY)
+    finish(mat, full)
+
+# ───────────────────────── 能挖一个方洞的墙 ─────────────────────────
+if want("M_DysisWallCut"):
+    # 和殿里的墙一个样（底色、粗糙度两个参数，照 M_MATCH_Palette），只是多一个“洞”：世界里一个方盒子范围以内的墙面不画。
+    # 虹之龛用：墙是实心的一整个网格，没法真去挖；把龛口那一块墙面不画，后面另摆一个五面的小龛（DysisDirectorMechPack.cpp）
+    # （2026-10-11 用户：虹之龛嵌进墙体了，但对应的墙体没有挖空）。
+    # 参数：HoleCenter（洞口的中心）、HoleOut（从殿心朝外的方向，单位向量）、HoleHalf（顺着墙的半宽、进深的一半、半高，厘米；全 0 = 没有洞）
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisWallCut", unreal.BlendMode.BLEND_MASKED, unlit=False, two_sided=False)
+    mel.connect_material_property(rgb_of(mat, vector(mat, "BaseColor", (0.72, 0.60, 0.44), -900, -300), -650, -300), "", unreal.MaterialProperty.MP_BASE_COLOR)
+    mel.connect_material_property(scalar(mat, "Roughness", 0.92, -900, -120), "", unreal.MaterialProperty.MP_ROUGHNESS)
+    wp = node(mat, unreal.MaterialExpressionWorldPosition, -1100, 100)
+    hc = rgb_of(mat, vector(mat, "HoleCenter", (0.0, 0.0, -1000000.0), -1100, 250), -850, 250)
+    ho = rgb_of(mat, vector(mat, "HoleOut", (1.0, 0.0, 0.0), -1100, 450), -850, 450)
+    hh = rgb_of(mat, vector(mat, "HoleHalf", (0.0, 0.0, 0.0), -1100, 650), -850, 650)
+    c = custom(mat, """
+float3 d = WP - HoleCenter;
+float3 o = normalize(float3(HoleOut.x, HoleOut.y, 0.0));
+float3 t = float3(-o.y, o.x, 0.0);
+return (abs(dot(d, t)) < HoleHalf.x && abs(dot(d, o)) < HoleHalf.y && abs(d.z) < HoleHalf.z) ? 0.0 : 1.0;
+""", [("WP", wp), ("HoleCenter", hc), ("HoleOut", ho), ("HoleHalf", hh)], F1, -500, 300)
+    mel.connect_material_property(c, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     finish(mat, full)

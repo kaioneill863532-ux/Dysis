@@ -29,7 +29,7 @@ namespace
 	constexpr float BowAz = 128.0f, BowR = 1040.0f;          // 片子立在水帘前面 2 m 的空里（再靠外、再宽就插进回廊的栏杆了）
 	constexpr float BowW = 1400.0f, BowH = 760.0f;           // 片子的宽、高
 	constexpr float BowBottomZ = -45.0f;                     // 片子的底边 = 水面；虹的圆心就在底边上
-	constexpr float BowRadius = 640.0f, BowBand = 58.0f;     // 虹的半径、色带的半宽（软边的，比灰盒的 42 宽一点）
+	constexpr float BowRadius = 600.0f, BowBand = 58.0f;     // 虹的半径、色带的半宽（软边的，比灰盒的 42 宽一点）。半径原来 640：弧的外半边到片子的侧边还没淡完，收小一点
 	constexpr float BowAltLo0 = 12.0f, BowAltLo1 = 20.0f, BowAltHi0 = 40.0f, BowAltHi1 = 50.0f;   // 月亮“不高不低”：高度 20°–40° 最清楚，12° 以下、50° 以上没有
 
 	// 结局的星座

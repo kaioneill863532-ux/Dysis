@@ -59,9 +59,10 @@ def main():
         t0 = now()
         while now() - t0 < t: yield
     def roof(): return json.loads(director.describe_roof())
-    def walk_try(n=40):
-        f0 = foot()
-        for _ in range(n):
+    def walk_try(sec=0.9):
+        # 按时间走（原来是走 40 帧：编辑器在前台帧率高的时候 40 帧只有半秒多，走 160 的速度刚起步就停了，量出来不到 1 m——偶发不过）
+        f0 = foot(); t0 = unreal.GameplayStatics.get_time_seconds(w)
+        while unreal.GameplayStatics.get_time_seconds(w) - t0 < sec:
             pawn.add_movement_input(unreal.Vector(1, 0, 0), 1.0, False); yield
         f1 = foot(); return math.dist(f0[:2], f1[:2])
 
@@ -131,7 +132,7 @@ def main():
         pawn.advance_pressed()
         yield from wait(10)
         after = pawn.in_dialogue()
-        moved = yield from walk_try()
+        moved = yield from walk_try(1.6)      # 对话框收起来还要零点几秒人才松开：多走一会儿再量
         check(not after and moved > 100.0, "单击鼠标：这一句翻过去，对话结束，人又能走了（走了 %.0f cm）" % moved)
         yield from seconds(3.0)
         go(polar(250.0, 1400.0, 600.0)); look(250.0 + 180.0 - 25.0, 8.0)

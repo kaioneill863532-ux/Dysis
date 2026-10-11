@@ -50,9 +50,10 @@ def main():
     # ── 美术的机关模型 ──
     if on("models"):
         # 面数：这几件是照“保住原有大平面”的办法减的，面数落在各自的范围里（被引擎按面数硬减过的话会是整三千、五千五）
-        want = {"TwinCastor": (3500, 4500), "TwinPollux": (3800, 4800), "Selene": (4300, 6000), "IrisRelief": (7000, 12500), "SwanRelief": (1500, 2600),
+        # （2026-10-11：塞勒涅、伊莉丝减面时护住了弯的棱线——弧不再是折线——面数多了一倍；拱和门板换成现做的素石拱）
+        want = {"TwinCastor": (3500, 4500), "TwinPollux": (3800, 4800), "Selene": (9000, 13500), "IrisRelief": (14000, 20000), "SwanRelief": (1500, 2600),
                 "MirrorSun": (5000, 6600), "MirrorMoon": (4500, 6000), "MirrorDark": (4800, 6300), "FacadeStatue": (2400, 3200), "Goddess": (3800, 5200),
-                "GateArch": (300, 650), "GateDoor": (200, 450), "NicheBox": (1800, 3400), "NicheLid": (600, 1200), "Apple": (200, 400)}
+                "GateArch": (700, 1000), "GateDoor": (350, 500), "NicheBox": (1800, 3400), "NicheLid": (600, 1200), "Apple": (200, 400)}
         got = {}
         for name in want:
             m = unreal.load_asset("/Game/Dysis/MechPack_20261010/SM_MP_" + name)
@@ -60,7 +61,7 @@ def main():
         off = [n for n in want if not (want[n][0] <= got[n] <= want[n][1])]
         check(not off, "机关模型的面数都在该在的范围里：%s%s" % (", ".join("%s %d" % (n, got[n]) for n in sorted(got)), ("；不对的：%s" % off) if off else ""))
         # 浮雕没有背板：最凸的地方离墙面十几厘米，整件的底就是墙面（Y 从 0 起）
-        for name, deep in (("Selene", 30.0), ("IrisRelief", 14.0), ("SwanRelief", 18.0)):
+        for name, deep in (("Selene", 30.0), ("IrisRelief", 16.5), ("SwanRelief", 18.0)):
             b = unreal.load_asset("/Game/Dysis/MechPack_20261010/SM_MP_" + name).get_bounding_box()
             check(-0.5 < b.min.y < 1.0 and 8.0 < b.max.y < deep, "%s：贴在墙面上（从墙面起 %.1f cm），最凸 %.1f cm" % (name, b.min.y, b.max.y))
         mp = str(director.describe_mech_pack())
@@ -71,7 +72,7 @@ def main():
             for a in tagged(tag):
                 comps = a.get_components_by_class(unreal.StaticMeshComponent)
                 new = [c for c in comps if c.static_mesh and c.static_mesh.get_name().startswith("SM_MP_")]
-                old = [c for c in comps if c.static_mesh and not c.static_mesh.get_name().startswith("SM_MP_") and c.is_visible()]
+                old = [c for c in comps if c.static_mesh and not c.static_mesh.get_name().startswith("SM_MP_") and c.static_mesh.get_name() != "Cylinder" and c.is_visible()]      # Cylinder = 女神像脚下另放的圆台
                 if not new or old: shown.append(tag)
         check(not shown, "双子、塞勒涅、伊莉丝、天鹅浮雕、三相像、瀑布后女神：都换上了新模型，原来的灰盒件不画%s" % (("（不对的：%s）" % shown) if shown else ""))
         mpj = json.loads(mp)
@@ -87,10 +88,16 @@ def main():
         off = math.hypot(fo.x - so.x, fo.y - so.y)
         check(abs(form.get_world_scale().x - 1.4) < 0.01 and off < 0.5 and abs(pl.get_actor_scale3d().x - 1.0) < 0.01 and abs(pe.x - 106.6) < 3.0 and len(plv) == 1 and abs(pe.z * 2.0 - 40.0) < 1.0 and abs(fo.z - (po.z + pe.z)) < 1.0 and gap > 5.0,
               "三相像放大到 %.1f 倍、站在底座正中（偏 %.1f cm）、脚踩在底座面上；圆底座半径 %.0f cm、高 %.0f cm，手轮离它 %.0f cm" % (form.get_world_scale().x, off, pe.x, pe.z * 2.0, gap))
-        # 日之龛：盖子是单装的（朝着人掀）、关着的时候是平的；碎片从盒子正中、盒面上面出来
-        bo, be = bounds(named("SM_Mech_SunNiche_Box", "SM_MP_NicheBox")[0]); sb = mpj["sunShardBase"]
-        check(mpj["lidModel"] and mpj["lidTiltDeg"] < 1.0 and math.hypot(sb[0] - bo.x, sb[1] - bo.y) < 2.0 and 0.0 < sb[2] - (bo.z + be.z) < 16.0 and bo.z + be.z > 2040.0,
-              "日之龛：盖子关着是平的（%.1f°）；碎片从盒子正中出来（离中心 %.1f cm、比盒面高 %.0f cm）" % (mpj["lidTiltDeg"], math.hypot(sb[0] - bo.x, sb[1] - bo.y), sb[2] - (bo.z + be.z)))
+        # 日之龛：换回原来那个盒子，但是空心的（四面壁 + 底，五块）；盖子单装（朝着人掀）、关着的时候是平的；碎片在盒子里面、正中
+        sbox = tagged("SM_Mech_SunNiche_Box")[0]
+        walls = [c for c in sbox.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "Cube" and c.is_visible()]
+        rest = [c.static_mesh.get_name() for c in sbox.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() != "Cube" and c.is_visible()]
+        lidc = [n for n in rest if "Lid" in n]; solid = [n for n in rest if "Lid" not in n]
+        los = [bounds(c) for c in walls]
+        bx0 = min(o.x - e.x for o, e in los); bx1 = max(o.x + e.x for o, e in los); by0 = min(o.y - e.y for o, e in los); by1 = max(o.y + e.y for o, e in los)
+        bz0 = min(o.z - e.z for o, e in los); bz1 = max(o.z + e.z for o, e in los); sb = mpj["sunShardBase"]
+        check(len(walls) == 5 and len(lidc) == 1 and not solid and mpj["lidModel"] and mpj["lidTiltDeg"] < 1.0 and math.hypot(sb[0] - (bx0 + bx1) * 0.5, sb[1] - (by0 + by1) * 0.5) < 2.0 and bz0 + 4.0 < sb[2] < bz1,
+              "日之龛：原来的盒子换成空心的（%d 块壁板），盖子关着是平的（%.1f°）；碎片在盒子里面正中（离中心 %.1f cm，比盒底高 %.0f cm）" % (len(walls), mpj["lidTiltDeg"], math.hypot(sb[0] - (bx0 + bx1) * 0.5, sb[1] - (by0 + by1) * 0.5), sb[2] - bz0))
         # 拉杆：缩小、装到墙上；原来立在地上的那两件不挡人
         lb = named("SM_Mech_LeverA_Base", "SM_MP_LeverBase")[0]
         lo, le = bounds(lb)
@@ -102,15 +109,71 @@ def main():
         ap = [c for c in director.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "SM_MP_Apple"]
         ah = bounds(ap[0])[1].z * 2.0 if ap else 99.0
         check(len(ap) == 1 and ah < 15.5 and ap[0].get_material(0).get_name() == "M_DysisAppleGold" and not mpj["appleHalo"], "金苹果高 %.0f cm，材质 %s（周围的虹光做出来以后用户说不要，没装）" % (ah, ap[0].get_material(0).get_name() if ap else "-"))
-        # 瀑布后面的女神像：从灰盒的位置往瀑布中间转了 2°、往墙那边挪了 68 cm；模型自己带圆台座（原来的方墩子不画）
-        gs = tagged("SM_Mech_Goddess_Statue")[0].get_actor_location(); gaz = math.degrees(math.atan2(gs.y, gs.x)) % 360.0
+        # 瀑布后面的女神像：挪到瀑布正中（人的轴线离正中 128° 不到 1°）、站低了；脚下是一个圆台（原来的方墩子不画）
+        gm = [c for c in tagged("SM_Mech_Goddess_Statue")[0].get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "SM_MP_Goddess"]
+        gped = [c for c in tagged("SM_Mech_Goddess_Statue")[0].get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "Cylinder" and c.is_visible()]
+        gl = gm[0].get_world_location() if gm else unreal.Vector(); gaz = math.degrees(math.atan2(gl.y, gl.x)) % 360.0
         gpl = [c for a in tagged("SM_Mech_Goddess_Plinth") for c in a.get_components_by_class(unreal.StaticMeshComponent) if c.is_visible()]
-        check(abs(gaz - 133.68) < 0.05 and abs(math.hypot(gs.x, gs.y) - 1488.3) < 0.5 and not gpl, "瀑布后面的女神像挪到方位 %.2f°、离殿心 %.0f cm（灰盒 135.68° / 1420）；原来的方墩子不画了" % (gaz, math.hypot(gs.x, gs.y)))
+        check(len(gm) == 1 and abs(gaz - 128.0) < 1.0 and 1460.0 < math.hypot(gl.x, gl.y) < 1520.0 and abs(gl.z) < 12.0 and len(gped) == 1 and not gpl,
+              "瀑布后面的女神像：人的轴线在方位 %.2f°（瀑布正中 128°）、离殿心 %.0f cm，脚在高 %.0f（和水庭的地面一样高）；脚下一个圆台，原来的方墩子不画了" % (gaz, math.hypot(gl.x, gl.y), gl.z))
         # 虹之龛做出了进深：门在柜子的前口上、碎片在柜子里面
-        # （门和碎片的新位置要等石沿伸出来、整组重新摆的时候才落到位——pie_rainbow 里开龛那一段会走到；这里核四面龛壁加上了、进深 28 cm）
-        walls = [c for c in tagged("SM_Mech_Sill_Niche")[0].get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "Cube"]
-        deep = sorted(round(c.get_editor_property("relative_scale3d").y * 100.0) for c in walls)
-        check(len(walls) == 4 and deep == [28, 28, 28, 28], "虹之龛：加了四面龛壁，做成一个 %s cm 深的小柜子（碎片 22 cm 大，放得进去）" % (deep[0] if deep else "?"))
+        # 虹之龛：深色的背板不画了，两扇门贴在墙面上，碎片沉在墙里（门开了才出来）。石沿还缩在墙里的时候它们都比伸出来以后靠外 90 cm
+        plate = [c for c in tagged("SM_Mech_Sill_Niche")[0].get_components_by_class(unreal.StaticMeshComponent) if c.is_visible()]
+        sx, sy = 90.0 * math.cos(math.radians(166.0)), 90.0 * math.sin(math.radians(166.0))
+        nr = {t: math.hypot(tagged(t)[0].get_actor_location().x - sx, tagged(t)[0].get_actor_location().y - sy) for t in ("SM_Mech_Sill_NicheDoorL", "SM_Mech_Sill_NicheShard")}
+        check(not plate and abs(nr["SM_Mech_Sill_NicheDoorL"] - 1548.4) < 0.6 and abs(nr["SM_Mech_Sill_NicheShard"] - (1536.0 + 28.0)) < 0.6,
+              "虹之龛：背板不画了，两扇门贴在墙面上（离殿心 %.1f cm，墙面 1550），碎片沉在墙里（%.0f cm），门开了才出来" % (nr["SM_Mech_Sill_NicheDoorL"], nr["SM_Mech_Sill_NicheShard"]))
+        # 波吕丢刻斯还封在墙里：新模型不画
+        pol = named("SM_Mech_Twins_Pollux", "SM_MP_TwinPollux")
+        check(len(pol) == 1 and not pol[0].is_visible(), "波吕丢刻斯还封在墙里的时候，他的新模型不画（墙化开了才画）")
+
+        # ── 2026-10-11 这一批 ──
+        dcomps = [c for c in director.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh]
+        def dmesh(name): return [c for c in dcomps if c.static_mesh.get_name() == name]
+        def raz(v): return math.hypot(v.x, v.y), math.degrees(math.atan2(v.y, v.x)) % 360.0
+        # 月牙：现做的圆滑月牙（七百来个面；美术那枚只有 84 个大平面）
+        cres = unreal.load_asset("/Game/Dysis/MechPack_20261010/SM_MP_MoonGateCrescent")
+        check(cres.get_num_triangles(0) > 600, "月门上的月牙换成了弧线圆滑的（%d 个面）" % cres.get_num_triangles(0))
+        # 日之龛：盒子矮到 32 cm
+        check(abs((bz1 - bz0) - 32.0) < 1.0, "日之龛的盒子高 %.0f cm（原来 50）" % (bz1 - bz0))
+        # 拉杆：没扳的时候杆贴着墙竖直朝上
+        arm = dmesh("SM_MP_LeverArm")
+        check(len(arm) == 1 and arm[0].get_up_vector().z > 0.98, "拉杆没扳的时候竖直朝上（杆的方向 z = %.2f）" % (arm[0].get_up_vector().z if arm else -9))
+        # 桥门：换成素石拱（不放大），整个在叶片盘的铜边（离殿心 11.18 m）外面；金苹果那里的虹门不画、不挡人
+        ga = dmesh("SM_MP_GateArch"); gr, _ = raz(ga[0].get_world_location()) if ga else (0.0, 0.0)
+        arch = tagged("SM_Mech_RainbowArch_Arch")[0]
+        arch_seen = [c for c in arch.get_components_by_class(unreal.StaticMeshComponent) if c.is_visible()]
+        arch_blocks = [c for c in arch.get_components_by_class(unreal.PrimitiveComponent) if c.get_collision_response_to_channel(unreal.CollisionChannel.ECC_PAWN) != unreal.CollisionResponseType.ECR_IGNORE]
+        check(len(ga) == 1 and abs(ga[0].get_world_scale().x - 1.0) < 0.01 and gr - 17.0 > 1125.0 and not arch_seen and not arch_blocks,
+              "桥门是素石拱（拱心离殿心 %.0f cm，最靠里的面 %.0f，叶片盘的铜边到 1118）；金苹果那里的虹门不画、不挡人" % (gr, gr - 17.0))
+        # 两座浑天仪：环和轴换成不带球的；殿顶那座在最高一级的正中（方位 34.33°、半径 13.225 m）；水亭那座的太阳和金苹果一样大（14 cm），月托是薄碟子
+        at = tagged("SM_Mech_Armillary_Top")[0]; ap_ = tagged("SM_Mech_Armillary_Pavilion")[0]
+        old_arm = [c for a in (at, ap_) for c in a.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name().startswith("SM_Kit_") and c.is_visible()]
+        new_arm = [c for a in (at, ap_) for c in a.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name().startswith("SM_MP_Arm")]
+        tr, ta = raz(at.get_actor_location())
+        bead = [c for c in dcomps if c.static_mesh.get_name() == "Sphere" and abs(c.get_world_scale().x - 0.14) < 0.005]
+        hold = dmesh("SM_MP_MoonHolder")
+        bd = bead[0].get_world_location() if bead else unreal.Vector(); hd = hold[0].get_world_location() if hold else unreal.Vector()
+        check(not old_arm and len(new_arm) == 6 and abs(ta - 34.333) < 0.05 and abs(tr - 1322.5) < 1.0 and len(bead) == 1 and abs(math.dist((bd.x, bd.y, bd.z), (0.0, 0.0, 180.0)) - 52.0) < 0.5
+              and len(hold) == 1 and abs(math.dist((hd.x, hd.y, hd.z + 4.2), (0.0, 0.0, 180.0)) - 47.84) < 0.5,
+              "浑天仪：环上不再焊着球（新环 %d 件）；殿顶那座在方位 %.2f°、半径 %.0f cm（最高一级的正中）；水亭那座的太阳直径 14 cm、在 52 cm 的圈上，月托是薄碟子、在 47.8 cm 的圈上" % (len(new_arm), ta, tr))
+        # 金苹果就是殿顶浑天仪的太阳：在浑天仪中心朝着太阳的方向、55 cm 的圈上
+        al = ap[0].get_world_location() if ap else unreal.Vector(); ac = at.get_actor_location()
+        check(abs(math.dist((al.x, al.y, al.z), (ac.x, ac.y, ac.z)) - 55.0) < 1.0, "金苹果在殿顶浑天仪的环上（离中心 %.0f cm）——它就是那座浑天仪的太阳" % math.dist((al.x, al.y, al.z), (ac.x, ac.y, ac.z)))
+        # 天鹅像：整组往墙那边挪了 45 cm（台座中心离殿心 13.4 m，栏杆在 12.5 m）
+        sp = tagged("SM_Mech_Swan_Plinth")[0].get_actor_location(); sw = tagged("SM_Mech_Swan_Swan")[0].get_actor_location(); sg = tagged("SM_Mech_Swan_Goddess")[0].get_actor_location()
+        check(abs(math.hypot(sp.x, sp.y) - 1340.0) < 1.0 and abs(math.hypot(sw.x, sw.y) - 1340.0) < 1.0 and abs(math.hypot(sg.x, sg.y) - 1340.0) < 1.0 and 2325.0 < sg.z < 2340.0,
+              "天鹅像往墙那边挪了：台座、女神像、天鹅都在离殿心 %.0f cm（原来 1295），顺着月光矮了 %.0f cm" % (math.hypot(sp.x, sp.y), 2350.0 - sg.z))
+        # 二层外立面：十尊神像（单数开间；正门上面那一间和开着楼梯窗的那一间不放）
+        l1 = [c for c in dmesh("SM_MP_FacadeStatue") if abs(c.get_world_location().z - 833.0) < 3.0]
+        l1az = sorted(round(raz(c.get_world_location())[1], 1) for c in l1)
+        check(l1az == [52.5, 82.5, 112.5, 172.5, 202.5, 232.5, 262.5, 292.5, 322.5, 352.5], "二层外立面放了 %d 尊神像：方位 %s" % (len(l1), l1az))
+        # 虹之龛：墙换成了能挖洞的材质，龛里的五块板先藏着（石沿伸到头、门到位了洞才开）
+        wall = [c for a in tagged("SM_Wall") for c in a.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "LP_SM_Wall"]
+        cut = [m for c in wall for m in c.get_materials() if m and m.get_base_material().get_name() == "M_DysisWallCut"]
+        rec = [c for c in dcomps if c.static_mesh.get_name() == "Cube" and abs(raz(c.get_world_location())[1] - 161.07) < 1.5 and 1830.0 < c.get_world_location().z < 1910.0 and raz(c.get_world_location())[0] > 1549.0]
+        check(len(wall) == 1 and len(cut) == wall[0].get_num_materials() and len(rec) == 5 and not any(c.is_visible() for c in rec),
+              "虹之龛：墙用上了能挖洞的材质（%d 个材质段），龛里的五块板备着、先不画（%d 块）" % (len(cut), len(rec)))
         # 外立面神像：没有底座、往墙里收
         fo2, fe2 = bounds(named("SM_Facade_Statue_L3_01", "SM_MP_FacadeStatue")[0])
         check(math.hypot(fo2.x, fo2.y) < 1745.0 and abs((fo2.z - fe2.z) - (2420.0 + 13.0)) < 2.0, "外立面神像往墙里收了（中心离殿心 %.0f cm；原来 1757），脚踩在窗台上（底在 %.0f）" % (math.hypot(fo2.x, fo2.y), fo2.z - fe2.z))

@@ -40,7 +40,12 @@ namespace
 	const FVector RoofBridgeS(-346.331, -271.394, 0.0), RoofBridgeE(-813.948, -776.604, 0.0), RoofBridgeEnd(-824.137, -787.612, 0.0);
 	constexpr float RoofBridgeTopZ = 3045.0f, RoofBridgeHalfW = 60.0f;
 	constexpr float RoofDoorSwingDeg = -97.742f;         // 桥门从关到开转过的角度（UE 的 Yaw）
-	const FVector RoofArmTop(1167.291, 616.306, 3185.0); // 浑天仪中心（踏步没升时；升起来跟着最高一级走）
+	// 浑天仪中心（踏步没升时；升起来跟着最高一级走）。灰盒里它在最高一级靠来路的那一头（方位 27.83°、半径 13.2 m，坐标 1167.291, 616.306）。
+	// 2026-10-11 用户：放到那一级台阶的正中 → 方位 34.33°、半径 13.225 m（那一级的部件自己的原点）。
+	// 人的时刻还是跟着人的位置走、没改：走到 27.83° 是“岛影刚漫过架上的苹果”的那一刻，再往前每度 +0.02——
+	// 量下来方位 32.5° 以内举起来的苹果还在光里（接得到），浑天仪挡着人最近能走到 31.1°（余量 17 cm）；
+	// 绕到它侧面、后面去按，会提示“岛影已经漫过这里了，往回走几步”（灰盒里走过了头也是这句）。
+	const FVector RoofArmTop(1092.084, 745.895, 3185.0);
 
 	enum ERoofKind { RoofLand = 0, RoofUp = 1, RoofDn = 2, RoofFix = 3 };
 

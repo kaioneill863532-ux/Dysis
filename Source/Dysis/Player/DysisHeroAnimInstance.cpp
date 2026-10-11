@@ -317,13 +317,17 @@ namespace
 					Off += Weights[i] * (Ground[i].SwayAt(Players[i].GetAccumulatedTime()) + FVector(Keep[i].X, Keep[i].Y, 0.0));
 			// 步子迈大了：人矮一点，腿才够得着。矮的只是胯——脚还在动作里原来的高度上（下面算脚的落点时把这一截加回去；
 			// 头一版脚也跟着矮下去、再被地面顶回来，抬脚的高度就没了，腿反而更够不着）
-			const float BaseDrop = StrideDropCm * FMath::Max(Stride - 1.0f, 0.0f) / 0.3f;
+			// 步幅、坡度、“腿够不着就把胯压低”这些修正是给走和跑用的：按这两段动作现在占多少来算（LocoK）。
+			// 头一版不管放的是什么动作都修——起跳那一下腿是蹬直的，被当成“够不着”把胯猛地往下拽，落地时又来一次，
+			// 看着就是抽了一下（2026-10-11 用户：跳起来的时候动作有点抽搐）。现在起跳、下落、落地时它们跟着走跑的比重淡出去。
+			const float Loco = Weights[HeroClip_Walk] + Weights[HeroClip_Run], LocoK = FMath::Clamp(Loco, 0.0f, 1.0f);
+			const float StrideNow = 1.0f + (Stride - 1.0f) * LocoK;
+			const float BaseDrop = StrideDropCm * FMath::Max(StrideNow - 1.0f, 0.0f) / 0.3f;
 			Off.Z -= BaseDrop;
 			const bool bMove = !Off.IsNearlyZero(0.01);
 			// 脚下有坡（上下台阶）：脚按坡度落，迈步时抬高一些
-			const float Loco = Weights[HeroClip_Walk] + Weights[HeroClip_Run];
 			const float SlopeNow = Slope * Loco, SlopeK = FMath::Clamp(FMath::Abs(SlopeNow) / 0.42f, 0.0f, 1.0f), LiftK = 1.0f + (StairLift - 1.0f) * SlopeK;
-			const bool bWarp = (FMath::Abs(Stride - 1.0f) > 0.005f || FMath::Abs(SlopeNow) > 0.02f) && Legs[0].IsValid(BC) && Legs[1].IsValid(BC);
+			const bool bWarp = LocoK > 0.02f && (FMath::Abs(StrideNow - 1.0f) > 0.005f || FMath::Abs(SlopeNow) > 0.02f) && Legs[0].IsValid(BC) && Legs[1].IsValid(BC);
 			// 上半身：只在走、上台阶的时候动（跑的那一段手本来就摆得开）。UpK = 往上走的坡有多陡（身子往前倾多少）
 			const float UpK = FMath::Max(Weights[HeroClip_Upstairs], FMath::Clamp(SlopeNow / 0.42f, 0.0f, 1.0f) * Weights[HeroClip_Walk]);
 			const float UpperK = bFixUpper && UpperValid(BC) ? FMath::Clamp(Weights[HeroClip_Walk] + Weights[HeroClip_Upstairs], 0.0f, 1.0f) : 0.0f;
@@ -353,12 +357,12 @@ namespace
 					const FVector Hip = CS.GetComponentSpaceTransform(L.Thigh.GetCompactPoseIndex(BC)).GetLocation(), Knee = CS.GetComponentSpaceTransform(L.Calf.GetCompactPoseIndex(BC)).GetLocation(),
 						Foot = CS.GetComponentSpaceTransform(L.Foot.GetCompactPoseIndex(BC)).GetLocation();
 					const double Reach = ((Knee - Hip).Size() + (Foot - Knee).Size()) * 0.995;
-					FVector Goal(Foot.X, Hip.Y + (Foot.Y - Hip.Y) * Stride, FMath::Max(Foot.Z + BaseDrop, double(L.GroundZ)));
+					FVector Goal(Foot.X, Hip.Y + (Foot.Y - Hip.Y) * StrideNow, FMath::Max(Foot.Z + BaseDrop, double(L.GroundZ)));
 					Goal.Z = L.GroundZ + (Goal.Z - L.GroundZ) * LiftK + SlopeNow * (Goal.Y - Hip.Y) * (SlopeNow * (Goal.Y - Hip.Y) < 0.0 ? 0.6 : 1.0);
 					const double Flat = FVector2D(Goal - Hip).Size();
 					if (Flat < Reach) Need = FMath::Max(Need, float((Hip.Z - Goal.Z) - FMath::Sqrt(Reach * Reach - Flat * Flat)));
 				}
-				ExtraDrop = FMath::Max(FMath::Clamp(Need, 0.0f, 12.0f), ExtraDrop - 30.0f * LastDt);
+				ExtraDrop = FMath::Max(FMath::Clamp(Need * LocoK, 0.0f, 12.0f), ExtraDrop - 30.0f * LastDt);
 				if (ExtraDrop > 0.01f)
 				{
 					const FCompactPoseBoneIndex Pi = Pelvis.GetCompactPoseIndex(BC);
@@ -376,7 +380,7 @@ namespace
 					const FVector Hip = ThighT.GetLocation(), Knee = CalfT.GetLocation(), Foot = FootT.GetLocation();
 					// 步幅：脚相对胯的前后距离放大（模型的前方是 +Y；人总是脸朝着走的方向）
 					FVector Goal = Foot;
-					Goal.Y = Hip.Y + (Foot.Y - Hip.Y) * Stride;
+					Goal.Y = Hip.Y + (Foot.Y - Hip.Y) * StrideNow;
 					Goal.Z = FMath::Max(Goal.Z + BaseDrop + ExtraDrop, double(L.GroundZ));   // 脚的高度照动作里原来的；不踩进地里
 					// 坡上：迈步抬高一些；前脚落在高处、后脚在低处（低处那只脚只探六成：人上楼时后脚是踮着的，全探下去胯就得跟着蹲）
 					Goal.Z = L.GroundZ + (Goal.Z - L.GroundZ) * LiftK + SlopeNow * (Goal.Y - Hip.Y) * (SlopeNow * (Goal.Y - Hip.Y) < 0.0 ? 0.6 : 1.0);
@@ -384,7 +388,13 @@ namespace
 					// 头一版是“朝原来弯的那一边”：腿快伸直的时候膝盖几乎就在胯和脚的连线上，“那一边”全凭零点几厘米的偏差定——
 					// 步幅一放大（腿更直），膝盖就一会儿朝前一会儿朝外，看着是腿往外撇（2026-10-10 用户：膝盖怪怪的、腿外扩）
 					FVector Bend = Knee - (Hip + Foot) * 0.5;
+					const FVector Was = Bend.GetSafeNormal();
 					Bend = FVector(FMath::Clamp(Bend.X, -1.5, 1.5) * 0.25, 10.0, 0.0).GetSafeNormal();
+					if (LocoK < 0.999f)      // 正在换到别的动作（起跳、落地、站住）：脚的落点、膝盖的朝向都跟着淡回动作里原来的
+					{
+						Goal = FMath::Lerp(Foot, Goal, double(LocoK));
+						if (!Was.IsNearlyZero()) Bend = FMath::Lerp(Was, Bend, double(LocoK)).GetSafeNormal();
+					}
 					AnimationCore::SolveTwoBoneIK(ThighT, CalfT, FootT, Knee + Bend * 100.0, Goal, /*bAllowStretching*/ false, 1.0, 1.0);
 					TArray<FBoneTransform> Three;
 					Three.Emplace(Ti, ThighT); Three.Emplace(Ci, CalfT); Three.Emplace(Fi, FootT);

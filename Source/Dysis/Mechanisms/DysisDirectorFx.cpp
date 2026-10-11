@@ -482,7 +482,8 @@ void ADysisDirector::UpdateFx(float Dt)
 		FVector P = GateSpray->GetComponentLocation();
 		P.Z = FxRoofRingZ + FxRoofTopZEnd * CrownUp + GateSpray->GetComponentScale().Z * 50.0;
 		GateSpray->SetWorldLocation(P);
-		GateSpray->SetVisibility(On > 0.005f);
+		// 2026-10-11 用户：金苹果那里的拱门不要了，彩虹也不要了——虹和水珠都不画（机关的逻辑没动，想要回来把这里改回 On > 0.005f）
+		GateSpray->SetVisibility(false);
 		GateSprayMID->SetVectorParameterValue(TEXT("LightDir"), FxVec(-Sun));
 		GateSprayMID->SetVectorParameterValue(TEXT("Eye"), FxVec(Eye));
 		GateSprayMID->SetVectorParameterValue(TEXT("SunColor"), SunCol);
@@ -493,7 +494,7 @@ void ADysisDirector::UpdateFx(float Dt)
 		if (GateDrops)
 		{
 			GateDrops->SetWorldLocation(P);
-			GateDrops->SetOpacity(Up * (0.15f + 0.6f * DysisGB::Smoothstep(-2.0f, 2.0f, SunAlt)));
+			GateDrops->SetOpacity(0.0f);
 		}
 	}
 

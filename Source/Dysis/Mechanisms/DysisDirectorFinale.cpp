@@ -181,7 +181,15 @@ namespace
 
 FVector ADysisDirector::GodPoint(const FVector& P) const
 {
-	return FinShifted(P, GodShiftAz, GodShiftR);
+	return FinShifted(P, GodShiftAz, GodShiftR) + FVector(0.0, 0.0, GodShiftZ);
+}
+
+FString ADysisDirector::DebugMoonLitAt(FVector P) const
+{
+	FMoonstone Probe; Probe.Source = 2;
+	const TCHAR* Why = TEXT("?");
+	MoonSampleLit(Probe, P, &Why);
+	return Why;
 }
 
 FString ADysisDirector::DebugGoddessShift(float DeltaAzDeg, float DeltaRCm) const
@@ -200,7 +208,7 @@ FString ADysisDirector::DebugGoddessShift(float DeltaAzDeg, float DeltaRCm) cons
 	return FString::Printf(TEXT("%d|%s"), N, *S);
 }
 
-void ADysisDirector::DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm)
+void ADysisDirector::DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm, float DeltaZCm)
 {
 	AActor* St = Piece(TEXT("SM_Mech_Goddess_Statue"));
 	AActor* Pl = Piece(TEXT("SM_Mech_Goddess_Plinth"));
@@ -210,12 +218,12 @@ void ADysisDirector::DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm)
 		if (Pl) GodPlinthBase = Pl->GetActorLocation();
 		bGodBase = true;
 	}
-	GodShiftAz = DeltaAzDeg; GodShiftR = DeltaRCm;
+	GodShiftAz = DeltaAzDeg; GodShiftR = DeltaRCm; GodShiftZ = DeltaZCm;
 	for (AActor* A : { St, Pl })
 		if (A)
 			if (USceneComponent* Root = A->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
-	if (St) St->SetActorLocationAndRotation(FinShifted(GodStatueBase, DeltaAzDeg, DeltaRCm), GodStatueRot + FRotator(0.0f, DeltaAzDeg, 0.0f));
-	if (Pl) Pl->SetActorLocation(FinShifted(GodPlinthBase, DeltaAzDeg, DeltaRCm));
+	if (St) St->SetActorLocationAndRotation(FinShifted(GodStatueBase, DeltaAzDeg, DeltaRCm) + FVector(0.0, 0.0, DeltaZCm), GodStatueRot + FRotator(0.0f, DeltaAzDeg, 0.0f));
+	if (Pl) Pl->SetActorLocation(FinShifted(GodPlinthBase, DeltaAzDeg, DeltaRCm) + FVector(0.0, 0.0, DeltaZCm));
 	if (UDysisWorldState* S = UDysisWorldState::Get(this)) S->BumpLight();
 }
 

@@ -113,7 +113,7 @@ void ADysisDirector::AddNightInteracts()
 		// 女神像（黑天鹅）的底座：按一次转一格
 		FDysisInteract I;
 		I.Id = TEXT("swan");
-		I.Pos = []() { return NgtSwanOrigin; };
+		I.Pos = [this]() { return SwanOriginCm(); };
 		I.ZRange = []() { return FVector2D(2280.0, 2500.0); };
 		I.RadiusCm = 220.0f;
 		I.Label = []() { return FText::FromString(DysisCopy::PromptRotateStatue); };
@@ -140,7 +140,36 @@ FVector ADysisDirector::SwanHeadCm() const
 {
 	// 天鹅的头：朝着她面对的方向往前 0.58 m、高 1.38 m，跟着天鹅现在的大小缩放（灰盒 swan.scale = 0.4 + 0.6 × form）
 	const float Y = FMath::DegreesToRadians(SwanYawNow), S = 0.4f + 0.6f * SwanForm;
-	return NgtSwanOrigin + FVector(58.0 * FMath::Cos(Y), 58.0 * FMath::Sin(Y), 138.0) * S;
+	return SwanOriginCm() + FVector(58.0 * FMath::Cos(Y), 58.0 * FMath::Sin(Y), 138.0) * S;
+}
+
+FVector ADysisDirector::SwanOriginCm() const
+{
+	return NgtSwanOrigin + SwanShift;
+}
+
+void ADysisDirector::DebugMoveSwan(float Cm)
+{
+	// 2026-10-11 用户：天鹅雕像再靠近墙一点，现在太贴着围栏了（台座压在栏杆上；天鹅转到朝殿心的那几格时身子还穿过栏杆）。
+	// 灰盒里它的位置是算出来的：解开的那一刻月光正好顺着半径照过来，天鹅头的影子落在浮雕上空着的那一只那里。
+	// 所以整组（台座、女神像、天鹅、判定用的点）是顺着“那一刻的光线”挪的：往墙那边 Cm 厘米、同时矮下去一点——
+	// 头的影子还落在原来那一点，要转到哪一格、要等到什么时刻都不变；月光照到她的时刻只会早一点点（她离月眼投下来的那片光的边更远了）。
+	const float Y = FMath::DegreesToRadians(NgtSwanSlots[0]);
+	const FVector Head0 = NgtSwanOrigin + FVector(58.0 * FMath::Cos(Y), 58.0 * FMath::Sin(Y), 138.0);
+	const FVector Ray = NgtSwanGap - Head0;
+	const FVector New = Ray.Size2D() > 1.0 ? Ray * (Cm / Ray.Size2D()) : FVector::ZeroVector;
+	AActor* Parts[3] = { Piece(TEXT("SM_Mech_Swan_Plinth")), SwanGoddess.Get(), SwanBird.Get() };
+	for (AActor* A : Parts)
+		if (A)
+		{
+			// 挂在这三件里另一件身上的（关卡里天鹅是挂着的）跟着它爹走，不再单挪——不然挪两遍
+			const AActor* Dad = A->GetAttachParentActor();
+			if (Dad && (Dad == Parts[0] || Dad == Parts[1] || Dad == Parts[2])) continue;
+			if (USceneComponent* Root = A->GetRootComponent()) Root->SetMobility(EComponentMobility::Movable);
+			A->SetActorLocation(A->GetActorLocation() - SwanShift + New);
+		}
+	SwanShift = New;
+	if (UDysisWorldState* S = UDysisWorldState::Get(this)) S->BumpLight();
 }
 
 void ADysisDirector::UpdateSwan(float Dt)
@@ -158,7 +187,8 @@ void ADysisDirector::UpdateSwan(float Dt)
 	{
 		const float Y = FMath::DegreesToRadians(SwanYawNow);
 		const FVector Fwd(FMath::Cos(Y), FMath::Sin(Y), 0.0);
-		const FVector Pts[3] = { NgtSwanOrigin + FVector(0.0, 0.0, 50.0), NgtSwanOrigin + Fwd * 40.0 + FVector(0.0, 0.0, 90.0), NgtSwanOrigin + Fwd * 58.0 + FVector(0.0, 0.0, 138.0) };
+		const FVector Org = SwanOriginCm();
+		const FVector Pts[3] = { Org + FVector(0.0, 0.0, 50.0), Org + Fwd * 40.0 + FVector(0.0, 0.0, 90.0), Org + Fwd * 58.0 + FVector(0.0, 0.0, 138.0) };
 		FCollisionQueryParams Params(TEXT("DysisSwanLit"), /*bTraceComplex*/ true);
 		if (const APlayerController* PC = World->GetFirstPlayerController())
 			if (const APawn* Pawn = PC->GetPawn()) Params.AddIgnoredActor(Pawn);

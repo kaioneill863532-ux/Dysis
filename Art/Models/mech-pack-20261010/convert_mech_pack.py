@@ -206,11 +206,14 @@ def taubin(P, C, T, iters, pin=None, lam=0.60, mu=-0.63, color=0.5):
         K = Y
     return [tuple(p) for p in X], [tuple(c) for c in K]
 
-def simplify(P, C, T, eps, accent_sat=0.38, keep_border=True):
+def simplify(P, C, T, eps, accent_sat=0.38, keep_border=True, crease=0.0, crease_cos=0.80):
     """保住大平面的减面。美术的这些模型本身是“一块一块平面”的低模造型，只是每块平面切成了几十上百个小三角：
     这里把同一块平面里多余的点一个个并掉（并掉以后形状偏离不超过 eps 米的才并），棱线、转角上的点留着——出来就是原来那些大平面，一块对一块。
     （头一版是让引擎按“降到几千面”硬减，面数一到不管是不是棱线都削，削出来是碎块。）
-    做法：边收缩 + 二次误差（Garland–Heckbert），收缩到边的一头；有颜色的点缀（金、蓝、彩虹）和石头之间不并，点缀之间颜色差得多的也不并。"""
+    做法：边收缩 + 二次误差（Garland–Heckbert），收缩到边的一头；有颜色的点缀（金、蓝、彩虹）和石头之间不并，点缀之间颜色差得多的也不并。
+    crease > 0：棱线（两个面夹角大于 crease_cos 对应的角度）也护着——顺着直的棱线并点不要钱，把弯的棱线并成折线要算偏差。
+    不护的话，一条平顶的弯带子（浮雕上的弧、彩虹）顶面是平的、怎么并都“没偏差”，会被并成寥寥几段折线
+    （2026-10-11 用户：塞勒涅左边和上边的弧、伊莉丝的彩虹太生硬）。数越大护得越紧：2 = 棱线最多偏 eps，8 = 最多偏半个 eps。"""
     import heapq
     nv = len(P)
     tris = [[T[k], T[k + 1], T[k + 2]] for k in range(0, len(T) - 2, 3)]
@@ -235,6 +238,20 @@ def simplify(P, C, T, eps, accent_sat=0.38, keep_border=True):
             for k in range(10): Qv[k] += q[k]
         for x, y in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
             key = (x, y) if x < y else (y, x); edge_cnt.setdefault(key, []).append(n)
+    if crease > 0.0:     # 棱线：两个面各加一张“竖在这条棱上、垂直于那个面”的墙
+        for (x, y), lst in edge_cnt.items():
+            if len(lst) != 2: continue
+            n1, n2 = lst
+            if n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2] > crease_cos: continue
+            a, b = P[x], P[y]
+            e = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+            for n in (n1, n2):
+                m = (e[1] * n[2] - e[2] * n[1], e[2] * n[0] - e[0] * n[2], e[0] * n[1] - e[1] * n[0]); l = math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2])
+                if l < 1e-14: continue
+                m = (m[0] / l, m[1] / l, m[2] / l); q = plane_q(m, -(m[0] * a[0] + m[1] * a[1] + m[2] * a[2]), crease * (W[x] + W[y]) * 0.5)
+                for v in (x, y):
+                    Qv = Q[v]
+                    for k in range(10): Qv[k] += q[k]
     if keep_border:      # 敞着的边（只有一个面用到）：加一张竖在边上的“墙”，边线不许挪
         for (x, y), lst in edge_cnt.items():
             if len(lst) != 1: continue
@@ -489,8 +506,9 @@ PIECES = [
     dict(name="MirrorDark", src="三相像_下", want=ALL, kind="statue", size=("k", 1.50 / 1.90), cell=0.004, eps=0.002, fix_black=True),
     # 瀑布后面的女神（2026-10-10 用户：怀里那面圆的内部有点碎，修成平整的圆面；底座和手里的月亮都改成正圆）：
     # 也改成保平面的减法；怀里的圆盘、脚下三级的台座另做成规整的圆（round_disc / round_base）
-    dict(name="Goddess",    src="瀑布后女神", want=ALL, kind="statue", size=("h", 5.40), cell=0.008, eps=0.004, fix_black=True, round_disc=True,
-         cut_base=0.585, round_base=[(1.41, 0.0, 0.16), (1.37, 0.16, 0.44), (1.27, 0.44, 0.585)]),
+    # 2026-10-11 用户：下面那两层台子不要了，换成一层小一点的。——这里干脆不带台座（脚底在 0），台座在游戏里另放一个圆台（要多大、多高好调）。
+    # 倍数还是按“连原来的台座一共 5.40 m”算的：人自己高 4.815 m，怀里圆盘的圆心离脚 3.368 m、在身子的轴线右边 0.638 m、前面 0.485 m，半径 0.514 m
+    dict(name="Goddess",    src="瀑布后女神", want=ALL, kind="statue", size=("h", 5.40), cell=0.008, eps=0.004, fix_black=True, round_disc=True, cut_base=0.585),
     # 外立面神像：2026-10-10 用户要把脚下那块方底座撤掉（人直接站在窗台上、往墙里收），所以也改成在这里减面
     dict(name="FacadeStatue", src="外立面神像", want=ALL, kind="statue", size=("h", 3.20), cell=0.006, eps=0.003, cut_base=0.20, fix_black=True),
     # 双子：原来方的台座换成圆的（用户要的）
@@ -502,16 +520,23 @@ PIECES = [
     # 背板不是绝对平的（塞勒涅的背板本身就是一块块高低差一两厘米的面），bias 是整体再往墙里沉多少，沉到背板全在墙面以下为止（用 zhist=1 查）
     # 2026-10-10 用户：这两块的边上还有凸出来的边（边框没压干净的残条）→ 边框压平的范围加宽，贴着墙面不到 1 cm 高的薄片也丢掉；
     # 塞勒涅放大到 1.393 倍（3.62 m 高）：眼睛的位置是灰盒定死的，放大以后人的脚正好落到地面上（各个尺寸都跟着乘了 1.393）
-    dict(name="Selene",     src="塞勒涅", want=ALL, kind="relief", size=("h", 2.60 * 1.393), cell=0.0055, eps=0.0028, drop_back=0.010, bias=0.036, frame=(0.0975, 0.195, 0.195), edge=0.02 / 1.6, islands_after=2500),
-    dict(name="IrisRelief", src="伊莉丝与彩虹浮雕", want=ALL, kind="relief", size=("w", 2.34), cell=0.004, eps=0.002, drop_back=0.008, bias=0.003, frame=(0.05, 0.14, 0.14), edge=0.015 / 2.34, islands_after=120),
+    # 2026-10-11 用户：塞勒涅左边和上边的弧太生硬、伊莉丝的彩虹也是，还缺了一小块；伊莉丝整体不如别的几件自然。
+    #   · crease=2：减面的时候护住弯的棱线（见 simplify）——那几道弧原来被并成了五六段折线；面数多一倍（塞勒涅 5 千 → 1.2 万，伊莉丝 0.9 万 → 1.7 万）；
+    #   · 伊莉丝：顶框一刀切（hard_top，框高 10 cm）、背板丢得浅一点（4 mm：彩虹只凸出来七八毫米，原来 8 mm 的线把它丢成一截一截的）；
+    #     整块放大到 1.15 倍（人太小了，一米出头）——各个尺寸都跟着乘了 1.15。
+    dict(name="Selene",     src="塞勒涅", want=ALL, kind="relief", size=("h", 2.60 * 1.393), cell=0.0055, eps=0.0028, crease=2.0, drop_back=0.010, bias=0.036, frame=(0.0975, 0.195, 0.195), edge=0.02 / 1.6, islands_after=2500),
+    dict(name="IrisRelief", src="伊莉丝与彩虹浮雕", want=ALL, kind="relief", size=("w", 2.34 * 1.15), cell=0.0046, eps=0.0023, crease=2.0, drop_back=0.0046, bias=0.0035, frame=(0.0575, 0.161, 0.115), hard_top=True,
+         edge=0.015 / 2.34, islands_after=120),
     dict(name="SwanRelief", src="四小天鹅浮雕", want=ALL, kind="relief", size=("w", 4.20), cell=0.004, eps=0.002, drop_back=0.0015, bias=0.006, frame=(0.05, 0.26, 0.17), edge=0.02 / 4.2, islands_after=800),
     # 神龛通体是金色的：accent_sat 调到 9 = 不把金色当“点缀”去护着（不然贴图上的深浅会挡住合并，一万多面减不下去）
     dict(name="NicheBox",   src="神龛_底部", want=ALL, kind="statue", size=("w", 0.80), cell=0.003, eps=0.0035, accent_sat=9.0),
     dict(name="NicheLid",   src="神龛_顶部", want=ALL, kind="statue", size=("w", 0.80), cell=0.003, eps=0.0035, accent_sat=9.0),
     # 拱门：拱和门各一个文件，但摆的是拼在一起的位置（门在拱洞里）——都不挪原点，装的时候两件放同一处就对上了
     # （2026-10-10 用户：拱门看着太碎，面数和殿里的柱子差不多就行 → 允许偏离放到 1–1.5 cm，拱 470 面、门 330 面）
-    dict(name="GateArch",   src="拱门_拱", want=ALL, kind="part", origin=(0.0, 0.0, 0.0), k=1.0, cell=0.008, eps=0.010, fix_black=True),
-    dict(name="GateDoor",   src="拱门_门", want=ALL, kind="part", origin=(0.0, 0.0, 0.0), k=1.0, cell=0.008, eps=0.015, fix_black=True),
+    # （2026-10-11 用户又说：拱的边缘弄平滑一点、或者干脆就是弧面，再缩窄一点，现在看着臃肿。——美术这座拱不用了，
+    #   GateArch / GateDoor 改成按尺寸现做的素石拱和门板，见 make_extra_shapes.py。下面两行留着备查，不再转。）
+    # dict(name="GateArch",   src="拱门_拱", want=ALL, kind="part", origin=(0.0, 0.0, 0.0), k=1.0, cell=0.008, eps=0.010, fix_black=True),
+    # dict(name="GateDoor",   src="拱门_门", want=ALL, kind="part", origin=(0.0, 0.0, 0.0), k=1.0, cell=0.008, eps=0.015, fix_black=True),
     # 金苹果（2026-10-10 用户：面数再少一些、小巧精致一些 → 高 14 cm、340 面）。原点放在正中：游戏里是按球心摆的
     dict(name="Apple",      src="golden_apple_lowpoly_leaf", want=ALL, kind="statue", size=("h", 0.14), cell=0, eps=0.0015, accent_sat=9.0, center=True),
     # ── 下面四个是要拆开的低模（没有贴图，颜色就是材质的颜色；不压面）。kind="part"：origin 是原模型里的哪一点放到原点，k 是倍数（可以三个方向不一样） ──
@@ -526,7 +551,8 @@ PIECES = [
     # （门板原来是深紫的黑曜石。2026-10-10 用户：不要深紫色，和周围的墙一个颜色——这里把它的颜色换成中性的灰，材质会把没有颜色的石头统一成墙的颜色）
     dict(name="MoonGateSlab",     src="月门_初定", want=has("Door |"), kind="part", origin="slab", k=(1.285 / 1.78, 2.40 / 3.09, 1.285 / 1.78), cell=0, color=(0.55, 0.55, 0.55)),
     dict(name="MoonGateFrame",    src="月门_初定", want=lambda n: ("Frame |" in n or "Foot |" in n or "柱体" in n), kind="part", origin="slab", k=(1.285 / 1.78, 2.40 / 3.09, 1.285 / 1.78), cell=0),
-    dict(name="MoonGateCrescent", src="月门_初定", want=has("Crescent"), kind="part", origin="slab", k=(1.285 / 1.78, 2.40 / 3.09, 1.285 / 1.78), cell=0),
+    # （月牙也改成现做的了——美术那枚是几块大平面拼的，外弧是折线；见 make_extra_shapes.py）
+    # dict(name="MoonGateCrescent", src="月门_初定", want=has("Crescent"), kind="part", origin="slab", k=(1.285 / 1.78, 2.40 / 3.09, 1.285 / 1.78), cell=0),
     # 天鹅：圆台座一件（竖着拉高到 0.5 m，和原来的台座一样高）；天鹅一件，原点在台座顶面的中心（原模型 y = 0.76）
     dict(name="SwanPlinth", src="天鹅_再定", want=has("plinth", "Laurel", "drum flute", "bead molding", "mounting disk", "Rim diamond"), kind="part", origin=(0.0, 0.0, 0.0), k=(0.42, 0.50 / 0.76, 0.42), cell=0),
     dict(name="SwanBird",   src="天鹅_再定", want=hasnt("plinth", "Laurel", "drum flute", "bead molding", "mounting disk", "Rim diamond"), kind="part", origin=(0.0, 0.76, 0.0), k=0.42, cell=0),
@@ -614,9 +640,14 @@ def convert(pc, src_dir, out_dir, report):
         fs, fb, ft = frame if isinstance(frame, tuple) else (frame * W,) * 3
         Q = []; C = list(C)
         for i, (x, y, z) in enumerate(P):
-            m = min(W * 0.5 - abs(x) - fs, y - fb, H - y - ft)   # 离最近的边多远（方框那一圈以内算 0）
+            # hard_top：顶上那道横框一刀切——框以内整个压平，框以下一点不动（不做“渐渐压平”的那一段）。
+            # 伊莉丝的彩虹是一路伸到顶框底下的：渐渐压平的话，彩虹快到顶的那一截被压成薄片、当成背板丢掉，看着就是断的、缺了一块
+            # （2026-10-11 用户：伊莉丝的彩虹缺失了一小部分）
+            hard = pc.get("hard_top", False)
+            m = min(W * 0.5 - abs(x) - fs, y - fb) if hard else min(W * 0.5 - abs(x) - fs, y - fb, H - y - ft)   # 离最近的边多远（方框那一圈以内算 0）
             f = 1.0 if m >= edge else max(0.0, m / edge)
             f = f * f * (3 - 2 * f)
+            if hard and H - y < ft: f = 0.0
             z = max(z - bias, 0.0) * f                           # 边上压平；背板后面的收到 0
             g = min(1.0, z / 0.02)                               # 离墙面 2 cm 以内：颜色渐渐换成标准的石头灰（STONE_GREY = 材质里的 LumRef）
             if g < 1.0: C[i] = tuple(STONE_GREY + (C[i][q] - STONE_GREY) * g for q in range(3))
@@ -657,7 +688,7 @@ def convert(pc, src_dir, out_dir, report):
         C, nfix = fix_black(P, C, T)
         if nfix: note += " 填掉黑点 %d 个" % nfix
     if pc.get("eps"):
-        n0 = len(T) // 3; P, C, T = simplify(P, C, T, pc["eps"], accent_sat=pc.get("accent_sat", 0.38)); note += " 保平面减面 %d → %d" % (n0, len(T) // 3)
+        n0 = len(T) // 3; P, C, T = simplify(P, C, T, pc["eps"], accent_sat=pc.get("accent_sat", 0.38), crease=pc.get("crease", 0.0), crease_cos=pc.get("crease_cos", 0.80)); note += " 保平面减面 %d → %d" % (n0, len(T) // 3)
     if pc.get("round_disc"):
         P, C, T, disc = round_disc(P, C, T, pc["name"])
         if disc: note += " 圆盘正面的圆心 (%.3f, %.3f, %.3f) 半径 %.3f" % (disc[0][0], disc[0][1], disc[0][2], disc[2])

@@ -226,8 +226,10 @@ void ADysisDirector::SetupScenery()
 				{
 					// 西侧靠檐口的那一段，墙里是夜里的楼梯 TS（墙厚的中间是空的：半径 15.8–16.8 m）。屋面伸到墙厚的中间就捅进楼梯里了
 					// （2026-10-10 用户：暗门楼梯里有穿模出来的东西）——这一段只伸进外面那层墙皮（16.8–17.1 m），条切得窄一些。
+					// 2026-10-11 用户又拍到了（四层下三层的楼梯里，外墙上方戳进来两片）：上一版留的余量只有 4 cm，可屋面是斜着的一块厚板，
+					// 板的下沿比“条的后端”还要往里探出 8 cm 左右——现在后端只到 17.12 m、最靠里的角不过 17.02 m（楼梯的外壁在 16.8 m）。
 					const bool bStairs = Side < 0.0f && S0 >= 1290.0f;
-					const float BackR = bStairs ? 1703.0f : WallMidR, KeepR = bStairs ? 1684.0f : WallInR + 15.0f;
+					const float BackR = bStairs ? 1712.0f : WallMidR, KeepR = bStairs ? 1702.0f : WallInR + 15.0f;
 					auto BackOf = [&](float S) { return FMath::Sqrt(FMath::Max(BackR * BackR - S * S, 0.0f)); };
 					float S1 = FMath::Min(S0 + 260.0f, EaveS);
 					// 这一条的后端按它外边那一侧定；里边那一侧不能越过内墙面（有楼梯的那一段：不能越过外面那层墙皮的里面）
@@ -467,7 +469,8 @@ void ADysisDirector::ApplyPalette()
 			// （夜里的环境光是蓝的：暖白的墙把它吃掉大半、看着是深灰；偏紫灰的地面照出来就是一片蓝）——改成和墙一样的暖白。Dysis.FloorTone 0 可以切回去对比
 			if (Label.StartsWith(TEXT("SM_Floor_L"))) Name = bFloorsLikeWalls ? TEXT("MI_MATCH_WarmWhite") : TEXT("MI_MATCH_InteriorFloor");
 			// 屋顶桥门前那几级固定的台阶：和那一圈会升降的台阶一个颜色（2026-10-10 用户：那一排阶梯颜色和别的不一样——美术给它配的是沙色）
-			else if (Label.StartsWith(TEXT("SM_Roof_Fix"))) Name = TEXT("MI_MATCH_WarmWhite");
+			// （2026-10-11：桥门脚下那块平台 SM_Roof_Land 也是沙色，上一轮漏了——用户：拱门所在的那片地面颜色还是和别处有色差）
+			else if (Label.StartsWith(TEXT("SM_Roof_Fix")) || Label == TEXT("SM_Roof_Land")) Name = TEXT("MI_MATCH_WarmWhite");
 			else if (Label == TEXT("SM_Portico_Roof")) Name = Slot == 0 ? TEXT("MI_MATCH_PedimentStone") : TEXT("MI_MATCH_WarmWhite");   // 门廊的山花和屋面深一档，线脚还是浅的
 			else if (Label == TEXT("SM_Terrain")) Name = Slot == 0 ? TEXT("M_MATCH_Ground") : TEXT("MI_MATCH_Peach");      // 台地：顶上沙地 / 草 / 路，侧面的崖壁
 			else if (Label == TEXT("SM_Island")) Name = TEXT("MI_MATCH_Peach");                                             // 开局的小岛

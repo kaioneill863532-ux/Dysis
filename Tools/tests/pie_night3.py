@@ -71,9 +71,10 @@ def main():
 
     # ── A 月桥上一步步往下走 ──
     fl = {f["step"]: f for f in G["flow"]}
-    # 2026-10-10（第八轮）用户要把女神像往瀑布中间挪：像、连判定月光的点一起从灰盒的位置转了 2°、往墙那边挪了 68 cm，
-    # 月光全照到她的那一步从灰盒的第 61 步变成了第 58 步。这里核：每一步的时刻还和灰盒一样；月光全照到她的只有第 58 步前后那一小段。
-    STAND = 58
+    # 2026-10-10 / 11（第八轮）用户要把女神像挪到瀑布正中：像、连判定月光的点一起从灰盒的位置转了 6.2°、往墙那边挪了 116 cm、矮了 131.5 cm
+    # （月光在月桥上越往下走照得越低、越靠中间：要到正中就得站低），月光全照到她的那一步从灰盒的第 61 步变成了第 68 步（第 67 步也差不多全照到）。
+    # 这里核：每一步的时刻还和灰盒一样；月光全照到她的只有第 68 步前后那一小段。
+    STAND = 68
     n = ok = 0; notes = []; full = []
     for s in fl["scanBridge"]["scan"]:
         go(PTS[s["i"]], 10.0)
@@ -84,7 +85,7 @@ def main():
         if not good: notes.append("第 %d 点：灰盒 H=%.2f；UE %s" % (s["i"], s["H"], state()[:30]))
     d = fin()
     check(ok == n and d["glint"] and not d["goddess"] and STAND in full and len(full) <= 3 and max(full) - min(full) == len(full) - 1,
-          "月桥上 %d 步：每一步的时刻 %d 步和灰盒一致；月光全照到她怀里那轮月亮的是第 %s 步（女神像挪过以后应当是第 58 步前后）；只是走过去她不会亮（只亮一下）" % (n, ok, full))
+          "月桥上 %d 步：每一步的时刻 %d 步和灰盒一致；月光全照到她怀里那轮月亮的是第 %s 步（女神像挪过以后应当是第 68 步前后）；只是走过去她不会亮（只亮一下）" % (n, ok, full))
     for x in notes[:8]: say("     " + x)
     st = dict(fl["stand"]); st["i"] = STAND; st["H"] = next(s["H"] for s in fl["scanBridge"]["scan"] if s["i"] == STAND)
     go(PTS[st["i"]], 10.0); look(100.0, -6.0)
@@ -168,7 +169,7 @@ def main():
         if got != exp: notes.append("时刻 %.2f：灰盒 %s；UE %s" % (r["H"], exp, got))
     check(ok == n, "女神像放回灰盒的位置：身上十个取样点、%d 个时刻，照没照到 %d 个和灰盒一致" % (n, ok))
     for x in notes[:6]: say("     " + x)
-    cmd(w, "Dysis.GoddessShift -2.0 68.3")
+    cmd(w, "Dysis.GoddessShift -6.2 116.4 -131.5")
     yield from wait(10)
     tc.clear_forced_time()
 

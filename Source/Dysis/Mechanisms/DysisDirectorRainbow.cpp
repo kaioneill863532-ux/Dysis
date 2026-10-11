@@ -448,7 +448,7 @@ void ADysisDirector::PlaceSill(float K)
 		else if (i == 3) Yaw -= DoorDeg;
 		else if (i == 4)
 		{
-			Loc += NicheIn * (30.0f * DysisGB::Smoothstep(1.0f, 2.0f, T));
+			Loc += NicheIn * (30.0f * DysisGB::Smoothstep(1.0f, 2.0f, T) - IrisNicheSinkCm * (1.0f - DysisGB::Smoothstep(0.2f, 1.0f, T)));      // 门开之前沉在墙里，门一开从墙里出来
 			A->SetActorScale3D(FVector(1.0f - 0.999f * DysisGB::Smoothstep(2.0f, 2.6f, T)));
 			Yaw += FMath::RadiansToDegrees(2.0f * T);
 			bVisible = bShow && T < 2.6f;    // 到手以后就不在龛里了
