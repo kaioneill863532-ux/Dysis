@@ -60,6 +60,20 @@ namespace
 	FLinearColor FxVec(const FVector& V) { return FLinearColor(float(V.X), float(V.Y), float(V.Z), 0.0f); }
 }
 
+void ADysisDirector::UpdatePoolMoon(float Dt, float Strength, float BridgeShown)
+{
+	// 水池夜里（2026-10-11 用户）：入夜以后整个水池变成镜湖那样的镜面；月桥映在水里（材质自己按桥的形状算）
+	if (!PoolMID) return;
+	const UDysisTimeComponent* Time = PlayerTime();
+	PoolMID->SetScalarParameterValue(TEXT("MoonMirror"), Strength);
+	PoolMID->SetScalarParameterValue(TEXT("BrReveal"), BridgeShown * Strength);      // 桥只在夜里有，倒影也是
+	// 人的倒影：镜面还没完全换上的那一阵，人在殿里、脚离了地面（在桥上、楼上）时用一根胶囊补
+	const FVector Foot = Time ? Time->FootCm : FVector(0.0, 0.0, -1.0e5);
+	PoolHeroK = FMath::FInterpTo(PoolHeroK, (Strength > 0.05f && DysisGB::ROf(Foot) < DysisGB::R_IN && Foot.Z > 60.0) ? 1.0f : 0.0f, Dt, 4.0f);
+	PoolMID->SetVectorParameterValue(TEXT("Hero"), FLinearColor(float(Foot.X), float(Foot.Y), float(Foot.Z)));
+	PoolMID->SetScalarParameterValue(TEXT("HeroK"), PoolHeroK);
+}
+
 UMaterialInstanceDynamic* ADysisDirector::FxMaterial(AActor* A, const TCHAR* Path)
 {
 	UStaticMeshComponent* C = A ? A->FindComponentByClass<UStaticMeshComponent>() : nullptr;
@@ -216,6 +230,32 @@ void ADysisDirector::SetupFx()
 			MoonDeckMID->SetScalarParameterValue(TEXT("Reveal"), 0.0f);
 			if (UStaticMeshComponent* C2 = Deck->FindComponentByClass<UStaticMeshComponent>()) C2->SetCastShadow(false);   // 光做的桥不投影子
 		}
+	// 水池夜里（2026-10-11 用户）：入夜以后整个水池变成镜湖那样的镜面（UpdatePoolMoon）；月桥映在水里——桥是半透明的光，
+	// 引擎的反射映不出来，水的材质自己按桥的形状算（圆心、半径、起止角同上，再加桥面的高度）
+	if (PoolMID && MoonN >= 3)
+	{
+		const FVector2D A(GDysisMoonBridgePts[0]), B(GDysisMoonBridgePts[MoonN / 2]), C(GDysisMoonBridgePts[MoonN - 1]);
+		const double D = 2.0 * (A.X * (B.Y - C.Y) + B.X * (C.Y - A.Y) + C.X * (A.Y - B.Y));
+		if (FMath::Abs(D) > 1.0e-3)
+		{
+			const FVector2D O(
+				(A.SizeSquared() * (B.Y - C.Y) + B.SizeSquared() * (C.Y - A.Y) + C.SizeSquared() * (A.Y - B.Y)) / D,
+				(A.SizeSquared() * (C.X - B.X) + B.SizeSquared() * (A.X - C.X) + C.SizeSquared() * (B.X - A.X)) / D);
+			const double Ang0 = FMath::Atan2(A.Y - O.Y, A.X - O.X);
+			const double Sgn = FVector2D::CrossProduct(A - O, B - O) >= 0.0 ? 1.0 : -1.0;
+			double Span = Sgn * (FMath::Atan2(C.Y - O.Y, C.X - O.X) - Ang0);
+			while (Span <= 0.0) Span += 2.0 * UE_DOUBLE_PI;
+			// 桥面的高度沿桥几乎是匀着降的：过头、中、尾三点的二次式
+			const double Z0 = GDysisMoonBridgePts[0].Z, Zm = GDysisMoonBridgePts[MoonN / 2].Z, Z1 = GDysisMoonBridgePts[MoonN - 1].Z;
+			PoolMID->SetVectorParameterValue(TEXT("BrArcC"), FLinearColor(float(O.X), float(O.Y), 0.0f, 0.0f));
+			PoolMID->SetScalarParameterValue(TEXT("BrArcR"), float((A - O).Size()));
+			PoolMID->SetScalarParameterValue(TEXT("BrAng0"), float(Ang0));
+			PoolMID->SetScalarParameterValue(TEXT("BrAngSpan"), float(Sgn * Span));
+			PoolMID->SetVectorParameterValue(TEXT("BrZ"), FLinearColor(float(Z0), float(-3.0 * Z0 + 4.0 * Zm - Z1), float(2.0 * Z0 - 4.0 * Zm + 2.0 * Z1), 0.0f));
+		}
+		PoolMID->SetScalarParameterValue(TEXT("BrReveal"), 0.0f);
+		PoolMID->SetScalarParameterValue(TEXT("MoonMirror"), 0.0f);
+	}
 
 	// 虹桥上往上飘的光点：一个顺着桥斜放的盒子
 	{
@@ -473,6 +513,7 @@ void ADysisDirector::UpdateFx(float Dt)
 	if (const FMoonstone* Br = FindMoonstone(TEXT("moonBridge"))) MoonK = Br->K;
 	if (MoonDeckMID) MoonDeckMID->SetScalarParameterValue(TEXT("Reveal"), MoonK);
 	for (UDysisMoteField* M : MoonMotes) if (M) M->SetOpacity(MoonK);
+	UpdatePoolMoon(Dt, Night, MoonK);
 
 	// 桥落地的那几汪光：虹桥从桥头长到桥尾，月桥从一层淌到水庭——哪一头到了哪一头才亮
 	const float GlowK[4] = {

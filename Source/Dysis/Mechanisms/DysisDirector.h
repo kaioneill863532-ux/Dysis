@@ -700,6 +700,9 @@ private:
 	TObjectPtr<class UMaterialInstanceDynamic> SeaMirrorMID;
 	bool bSeaMirror = false;
 	float SeaRingK = 0.0f;      // 镜湖：人脚边那一圈圈水纹现在多强（人离水面近才有，走着的时候更明显）
+	// 水池：入夜以后整个变成镜面；月桥和桥上的人映在水里
+	float PoolHeroK = 0.0f;
+	void UpdatePoolMoon(float Dt, float Strength, float BridgeShown);
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> FallMID;
 	// 瀑布加厚的那几层、两头封上的两片（材质和主瀑布一样，每帧跟着写同样的数）；开闸以后挡人的墙
@@ -734,7 +737,6 @@ private:
 	// 金苹果的光、月虹、结局的星座 —— DysisDirectorSky.cpp
 	void SetupSkyFx();
 	void UpdateAppleLight(float Dt);
-	void UpdateAppleTrail(float Dt);
 	void UpdateMoonbow(float Dt);
 	void StartStarShow();
 	void UpdateEndingStars(float Dt);
@@ -748,11 +750,6 @@ private:
 	FLinearColor AppleLightColor = FLinearColor::White;
 	UPROPERTY()
 	TObjectPtr<class UPointLightComponent> AppleLight;
-	/** 金苹果的拖尾：跟着苹果的一条淡金色的光带（每帧按苹果最近零点几秒走过的位置现做，朝着镜头）。 */
-	UPROPERTY()
-	TObjectPtr<UProceduralMeshComponent> AppleTrail;
-	TArray<FVector4> AppleTrailPts;      // 苹果最近走过的位置（W = 那一刻的时间）
-	bool bAppleTrailBuilt = false;
 	/** 月之龛里碎片的一点微光（灰盒里碎片自己发光）：龛透开了、碎片还在的时候亮着，夜里远远就能看见龛在哪。 */
 	UPROPERTY()
 	TObjectPtr<class UPointLightComponent> ShrineGlow;

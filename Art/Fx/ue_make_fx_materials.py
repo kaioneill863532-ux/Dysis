@@ -767,15 +767,85 @@ shore.r=lerp(shore.r,1,inlet); shore.g=lerp(shore.g,.25,inlet); shore.b=lerp(sho
     assert "float2 flow=Texture2DSample" in code
     code = code.replace("float2 flow=Texture2DSample", INLET + "float2 flow=Texture2DSample", 1)
     color = custom(mat, code, [("P", wp), ("T", time), ("Shore", texobj(T_SHORE, -1500, -100)), ("Flow", texobj(T_FLOW, -1500, 0)), ("Shapes", texobj(T_SHAPES, -1500, 100))] + named(S) + named(V), F3, -900, 0)
-    lift = node(mat, unreal.MaterialExpressionMultiply, -500, 200)
-    mel.connect_material_expressions(color, "", lift, "A"); mel.connect_material_expressions(scalar(mat, "Lift", 0.10, -700, 320), "", lift, "B")
+    # ── 夜里（2026-10-11 用户）──
+    # ① 入夜以后整个水池变成外面镜湖那样的镜面（MoonMirror = 入夜了多少，代码给；这里的 K = 镜面占几成）。
+    #    （头一版是“月光直接照到哪儿，哪儿才是镜面”：代码现量一张小图。做出来半池镜面半池原样，用户看了说效果不好，要简单一点——整池都变。）
+    # ② 月桥映在水里：从水面上这一点顺着“朝镜头反过去的那条光线”一步步找，找它穿过桥面的那一点（桥是一段往下盘的圆弧：圆心 BrArcC、半径 BrArcR、
+    #    从 BrAng0 转过 BrAngSpan，桥面高度 = BrZ.x + BrZ.y·u + BrZ.z·u²，u = 沿桥走了几成；BrReveal = 桥显出来几成）。
+    #    桥是半透明的光，引擎的反射映不出它，所以这里自己算。殿里的柱子、水亭、走在桥上的人，镜面自己（引擎的反射）就映得出来。
+    # ③ 镜面还没完全换上的时候（黄昏那一阵），人的倒影先用一根竖着的胶囊补（脚在 Hero、高 170）。
+    cam = node(mat, unreal.MaterialExpressionCameraVectorWS, -1500, -700)
+    mirror = scalar(mat, "MoonMirror", 0.0, -1800, -520)
+    refl = custom(mat, """
+float3 V = normalize(CV);
+float3 R = normalize(float3(-V.x, -V.y, max(V.z, 0.02)));          // 水面朝上：反过去的光线往上走
+R.xy += 0.012 * float2(sin(WP.y * 0.021 + T * 0.9), cos(WP.x * 0.023 - T * 0.7));      // 水在晃
+float bridge = 0.0;
+if (BrReveal > 0.01)
+{
+    float zLo = min(BrZ.x, BrZ.x + BrZ.y + BrZ.z) - 12.0, zHi = max(BrZ.x, BrZ.x + BrZ.y + BrZ.z) + 12.0;
+    float sA = (zLo - WP.z) / R.z, sB = (zHi - WP.z) / R.z;
+    float span = abs(BrAngSpan), sgn = BrAngSpan < 0.0 ? -1.0 : 1.0;
+    float prevDz = 0.0; float3 prevQ = WP; bool prevIn = false;
+    for (int i = 0; i <= 36; i++)
+    {
+        float3 Q = WP + R * lerp(sA, sB, i / 36.0);
+        float2 rel = Q.xy - BrArcC.xy;
+        float ang = (atan2(rel.y, rel.x) - BrAng0) * sgn;
+        ang -= 6.2831853 * floor(ang / 6.2831853);
+        float u = ang / span;
+        bool inside = u <= 1.0;
+        float dz = Q.z - (BrZ.x + BrZ.y * u + BrZ.z * u * u);          // 这一步在桥面上面（+）还是下面（−）
+        if (inside && prevIn && prevDz * dz <= 0.0)
+        {
+            // 这一步和上一步之间穿过了桥面：按比例取穿过的那一点
+            float3 H = lerp(prevQ, Q, prevDz / (prevDz - dz + 1.0e-5));
+            float2 hr = H.xy - BrArcC.xy;
+            float ha = (atan2(hr.y, hr.x) - BrAng0) * sgn;
+            ha -= 6.2831853 * floor(ha / 6.2831853);
+            float hu = ha / span;
+            float across = saturate(1.0 - abs(length(hr) - BrArcR) / BrHalfW);
+            float shown = smoothstep(BrReveal + 0.02, BrReveal - 0.02, hu) * smoothstep(0.0, 0.03, hu) * smoothstep(1.0, 0.97, hu);
+            bridge = max(bridge, sqrt(across) * shown);
+        }
+        prevDz = dz; prevQ = Q; prevIn = inside;
+    }
+}
+// 人：光线离那根竖着的胶囊多近
+float hero = 0.0;
+if (HeroK > 0.01)
+{
+    float2 d = Hero.xy - WP.xy;
+    float s = dot(d, R.xy) / max(dot(R.xy, R.xy), 1.0e-4);
+    float3 Q = WP + R * max(s, 0.0);
+    float side = length(Q.xy - Hero.xy);
+    float up = Q.z - Hero.z;
+    hero = saturate(1.0 - side / 30.0) * smoothstep(-6.0, 12.0, up) * smoothstep(182.0, 160.0, up) * HeroK;
+}
+return float2(bridge, hero);
+""", [("CV", cam), ("WP", wp), ("T", time), ("BrArcC", rgb_of(mat, vector(mat, "BrArcC", (0.0, 0.0, 0.0), -1800, -440), -1650, -440)), ("BrArcR", scalar(mat, "BrArcR", 1000.0, -1800, -360)),
+      ("BrAng0", scalar(mat, "BrAng0", 0.0, -1800, -300)), ("BrAngSpan", scalar(mat, "BrAngSpan", 1.0, -1800, -240)), ("BrZ", rgb_of(mat, vector(mat, "BrZ", (600.0, -400.0, 0.0), -1800, -180), -1650, -180)),
+      ("BrHalfW", scalar(mat, "BrHalfW", 75.0, -1800, -120)), ("BrReveal", scalar(mat, "BrReveal", 0.0, -1800, -60)),
+      ("Hero", rgb_of(mat, vector(mat, "Hero", (0.0, 0.0, -100000.0), -1800, 0), -1650, 0)), ("HeroK", scalar(mat, "HeroK", 0.0, -1800, 60))], unreal.CustomMaterialOutputType.CMOT_FLOAT2, -1150, -300)
+    mat.set_editor_property("tangent_space_normal", False)      # 法线直接按世界里的方向给（水面是平的，朝上）
     # 受光的那一份只留一部分（LitShare）：殿里的光是暖的，整份受光的话青绿和蓝紫会被照成发灰的米色；水自己的颜色主要靠上面垫的那一层
-    lit = node(mat, unreal.MaterialExpressionMultiply, -500, -100)
-    mel.connect_material_expressions(color, "", lit, "A"); mel.connect_material_expressions(scalar(mat, "LitShare", 0.35, -700, -40), "", lit, "B")
-    mel.connect_material_property(lit, "", unreal.MaterialProperty.MP_BASE_COLOR)
-    emissive(mat, lift)
-    for prop, name, val, y in ((unreal.MaterialProperty.MP_ROUGHNESS, "Roughness", 0.70, 480), (unreal.MaterialProperty.MP_SPECULAR, "Specular", 0.16, 570), (unreal.MaterialProperty.MP_METALLIC, "Metallic", 0.0, 660)):
-        mel.connect_material_property(scalar(mat, name, val, -350, y), "", prop)
+    base = custom(mat, "return lerp(Col * LitShare, MirrorTint, K * K * K);", [("Col", color), ("LitShare", scalar(mat, "LitShare", 0.35, -700, -40)), ("K", mirror),
+                  ("MirrorTint", rgb_of(mat, vector(mat, "MirrorTint", (0.74, 0.82, 0.92), -900, -160), -750, -160))], F3, -500, -100)
+    mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    glow = custom(mat, "return Col * Lift * (1.0 - 0.9 * K) + BrColor * (RF.x * BrGlow + K * MirrorLift) + HeroColor * (RF.y * HeroGlow * (1.0 - K));",
+                  [("Col", color), ("Lift", scalar(mat, "Lift", 0.10, -700, 320)), ("K", mirror), ("RF", refl), ("BrColor", rgb_of(mat, vector(mat, "BrColor", (0.60, 0.76, 1.0), -900, 420), -750, 420)),
+                   ("BrGlow", scalar(mat, "BrGlow", 0.5, -700, 520)), ("MirrorLift", scalar(mat, "MirrorLift", 0.035, -700, 780)), ("HeroColor", rgb_of(mat, vector(mat, "HeroColor", (0.95, 0.86, 0.72), -900, 600), -750, 600)), ("HeroGlow", scalar(mat, "HeroGlow", 0.5, -700, 700))], F3, -500, 200)
+    emissive(mat, glow)
+    for prop, name, val, to, y in ((unreal.MaterialProperty.MP_ROUGHNESS, "Roughness", 0.70, 0.07, 480), (unreal.MaterialProperty.MP_SPECULAR, "Specular", 0.16, 1.0, 570), (unreal.MaterialProperty.MP_METALLIC, "Metallic", 0.0, 1.0, 660)):
+        mix = custom(mat, "return lerp(A, %s, smoothstep(0.45, 1.0, K));" % repr(to), [("A", scalar(mat, name, val, -350, y)), ("K", mirror)], F1, -150, y)
+        mel.connect_material_property(mix, "", prop)
+    # 镜面那一片里有一点缓缓的起伏（和外面镜湖同一个路数，小一些）
+    nrm = custom(mat, """
+float2 d1 = normalize(float2(0.8, 0.6)), d2 = normalize(float2(-0.35, 0.94));
+float2 slope = (d1 * cos(dot(WP.xy, d1) / 360.0 * 6.2832 - T * 0.6) + d2 * cos(dot(WP.xy, d2) / 170.0 * 6.2832 - T * 0.85) * 0.55) * Swell * K;
+return normalize(float3(-slope, 1.0));
+""", [("WP", wp), ("T", time), ("K", mirror), ("Swell", scalar(mat, "MirrorSwell", 0.010, -700, 800))], F3, -500, 800)
+    mel.connect_material_property(nrm, "", unreal.MaterialProperty.MP_NORMAL)
     # FxMaterial 会给每个换上去的材质写一个 Pivot；这个材质用不上，留一个同名的参数接着（不接出去）
     vector(mat, "Pivot", (0.0, 0.0, 0.0), -1800, 1300)
     finish(mat, full)
@@ -866,17 +936,6 @@ float h = f * 1.5 + Time * 0.07;
 float3 bow = 0.5 + 0.5 * cos(6.2831853 * (h + float3(0.0, 0.33, 0.67)));
 return bow * ring * Opacity;
 """, [("N", nws), ("V", cam), ("Time", time), ("Opacity", scalar(mat, "Opacity", 0.0, -1500, 300))], F3, -900, 0)
-    emissive(mat, glow)
-    finish(mat, full)
-
-if want("M_DysisAppleTrail"):
-    # 金苹果的拖尾（2026-10-11 用户：金苹果能有一点光效拖尾吗）：跟着苹果的一条淡金色的光带。
-    # 带子是代码每帧现做的（DysisDirectorSky.cpp 的 UpdateAppleTrail）：顶点色的 A = 这一段有多亮（头亮尾淡），贴图坐标的 V = 横着的位置（中间亮、两边软）。
-    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisAppleTrail", unreal.BlendMode.BLEND_ADDITIVE, unlit=True, two_sided=True)
-    vc, uv = node(mat, unreal.MaterialExpressionVertexColor, -1500, 0), node(mat, unreal.MaterialExpressionTextureCoordinate, -1500, 200)
-    glow = custom(mat, "float e = saturate(1.0 - abs(UV.y * 2.0 - 1.0)); return Color * (e * e * A * Glow);",
-                  [("A", vc), ("UV", uv), ("Color", rgb_of(mat, vector(mat, "Color", (1.0, 0.70, 0.28), -1500, 400), -1300, 400)), ("Glow", scalar(mat, "Glow", 0.5, -1500, 520))], F3, -900, 0)
-    mel.connect_material_expressions(vc, "A", glow, "A")      # 顶点色只要 A 那一路
     emissive(mat, glow)
     finish(mat, full)
 

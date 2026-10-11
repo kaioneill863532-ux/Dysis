@@ -18,14 +18,9 @@
 #include "GameFramework/PlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
-#include "ProceduralMeshComponent.h"
 
 namespace
 {
-	// 金苹果的拖尾（2026-10-11 用户：金苹果能有一点光效拖尾吗——他是在苹果贴着墙走的时候看见墙上那团光拖了一道，觉得好看，想平时也有）：
-	// 带子留多久（秒）、分几段、头上的半宽（厘米）
-	constexpr float SkyTrailLife = 0.8f, SkyTrailHalfW = 6.0f;
-	constexpr int32 SkyTrailN = 28;
 	// 金苹果的光（灰盒 appleLight：暖色的点光，照 6 m）。换算 2.0 是拿灰盒的画面对出来的（夜里的曝光也是那样对的）
 	constexpr float SkyAppleGain = 2.0f;
 	const FLinearColor SkyAppleWarm = FLinearColor(FColor(0xff, 0xc0, 0x70)), SkyAppleCool = FLinearColor(FColor(0xcf, 0xdc, 0xff));
@@ -35,7 +30,10 @@ namespace
 	constexpr float BowW = 1400.0f, BowH = 760.0f;           // 片子的宽、高
 	constexpr float BowBottomZ = -45.0f;                     // 片子的底边 = 水面；虹的圆心就在底边上
 	constexpr float BowRadius = 600.0f, BowBand = 58.0f;     // 虹的半径、色带的半宽（软边的，比灰盒的 42 宽一点）。半径原来 640：弧的外半边到片子的侧边还没淡完，收小一点
-	constexpr float BowAltLo0 = 12.0f, BowAltLo1 = 20.0f, BowAltHi0 = 40.0f, BowAltHi1 = 50.0f;   // 月亮“不高不低”：高度 20°–40° 最清楚，12° 以下、50° 以上没有
+	// 月亮“不高不低”才有。原来 20°–40° 最清楚、12° 以下和 50° 以上没有——时刻是跟着人的位置走的，在楼里走着走着它就没了
+	// （2026-10-11 用户：月虹放宽）。现在 11°–54° 都是满的，5° 以下、62° 以上没有：二、三、四层整圈都看得到；
+	// 只在月亮最高的那一段（一层和月桥下半截，66° 以上）让开——那里要看的是瀑布后面的女神像
+	constexpr float BowAltLo0 = 5.0f, BowAltLo1 = 11.0f, BowAltHi0 = 54.0f, BowAltHi1 = 62.0f;
 
 	// 结局的星座
 	constexpr float ConDistCm = 420000.0f;                   // 在月亮圆盘后面、满天的星星前面
@@ -83,22 +81,6 @@ void ADysisDirector::SetupSkyFx()
 	}
 	AppleLightColor = SkyAppleWarm;
 	if (AppleLight) AppleLight->SetLightColor(AppleLightColor);
-	// 金苹果的拖尾：一条现做的带子，顶点直接按世界里的位置写
-	if (Apple && !AppleTrail)
-		if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisAppleTrail.M_DysisAppleTrail"), nullptr, LOAD_NoWarn | LOAD_Quiet))
-		{
-			AppleTrail = NewObject<UProceduralMeshComponent>(this);
-			AppleTrail->SetupAttachment(RootComponent);
-			AppleTrail->SetUsingAbsoluteLocation(true); AppleTrail->SetUsingAbsoluteRotation(true); AppleTrail->SetUsingAbsoluteScale(true);
-			AppleTrail->SetCastShadow(false);
-			AppleTrail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			AppleTrail->RegisterComponent();
-			AppleTrail->SetWorldTransform(FTransform::Identity);
-			AppleTrail->SetMaterial(0, Mat);
-			AppleTrail->SetVisibility(false);
-			bAppleTrailBuilt = false;
-		}
-	AppleTrailPts.Reset();
 
 	// 月虹
 	if (PlaneMesh && !MoonbowPlane)
@@ -173,68 +155,6 @@ void ADysisDirector::UpdateAppleLight(float Dt)
 	}
 	AppleLight->SetIntensity(Units * SkyAppleGain);
 	AppleLight->SetLightColor(AppleLightColor);
-}
-
-void ADysisDirector::UpdateAppleTrail(float Dt)
-{
-	if (!AppleTrail || !Apple) return;
-	const UWorld* World = GetWorld();
-	const APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
-	const float Now = World ? World->GetTimeSeconds() : 0.0f;
-	// 拿到手以后才有（在殿顶等着被取的时候它不动）；人带着它走、最后它飞上月托，后面都拖着一道
-	const bool bOn = bCaught && Apple->IsVisible() && PC && PC->PlayerCameraManager;
-	const FVector P = Apple->GetComponentLocation();
-	// 一下子挪了很远（重生、传送）：不连线，从头记
-	if (!bOn || (AppleTrailPts.Num() > 0 && FVector::DistSquared(FVector(AppleTrailPts.Last()), P) > FMath::Square(250.0))) AppleTrailPts.Reset();
-	if (bOn) AppleTrailPts.Add(FVector4(P, Now));
-	while (AppleTrailPts.Num() > 1 && Now - AppleTrailPts[1].W > SkyTrailLife) AppleTrailPts.RemoveAt(0);
-	// 这零点几秒里走了多远：站着不动就没有带子，走起来慢慢长出来
-	double Path = 0.0;
-	for (int32 i = 1; i < AppleTrailPts.Num(); ++i) Path += FVector::Dist(FVector(AppleTrailPts[i]), FVector(AppleTrailPts[i - 1]));
-	const bool bShow = bOn && AppleTrailPts.Num() >= 3 && Path > 8.0;
-	if (AppleTrail->IsVisible() != bShow) AppleTrail->SetVisibility(bShow);
-	if (!bShow) return;
-
-	// 按“多久以前”等分取点（0 = 现在苹果在的地方，1 = SkyTrailLife 秒以前）
-	auto At = [this, Now](float Age)
-	{
-		const float T = Now - Age;
-		for (int32 i = AppleTrailPts.Num() - 1; i > 0; --i)
-			if (AppleTrailPts[i - 1].W <= T)
-			{
-				const float Span = FMath::Max(float(AppleTrailPts[i].W - AppleTrailPts[i - 1].W), 1.0e-4f);
-				return FMath::Lerp(FVector(AppleTrailPts[i - 1]), FVector(AppleTrailPts[i]), FMath::Clamp((T - float(AppleTrailPts[i - 1].W)) / Span, 0.0f, 1.0f));
-			}
-		return FVector(AppleTrailPts[0]);
-	};
-	FVector S[SkyTrailN + 1];
-	for (int32 k = 0; k <= SkyTrailN; ++k) S[k] = At(SkyTrailLife * float(k) / float(SkyTrailN));
-	const FVector Cam = PC->PlayerCameraManager->GetCameraLocation();
-	const float Strength = FMath::Clamp(float(Path) / 70.0f, 0.0f, 1.0f);      // 走得越快越亮（0.8 秒里走 70 cm 以上就是满的）
-	TArray<FVector> Verts; TArray<FVector2D> UVs; TArray<FLinearColor> Colors;
-	Verts.Reserve(2 * (SkyTrailN + 1)); UVs.Reserve(2 * (SkyTrailN + 1)); Colors.Reserve(2 * (SkyTrailN + 1));
-	FVector Side = FVector::UpVector;
-	for (int32 k = 0; k <= SkyTrailN; ++k)
-	{
-		const float U = float(k) / float(SkyTrailN);
-		const FVector Along = S[FMath::Max(k - 1, 0)] - S[FMath::Min(k + 1, SkyTrailN)];
-		const FVector Want = FVector::CrossProduct(Along, Cam - S[k]);
-		if (Want.SizeSquared() > 1.0e-4) Side = Want.GetSafeNormal();           // 这一段几乎没动：沿用上一段的方向
-		// 头上（苹果那里）从 0 很快鼓到最宽，再一路收到尾巴尖；亮度头亮尾淡
-		const float W = SkyTrailHalfW * FMath::Min(U * 9.0f, 1.0f) * FMath::Pow(1.0f - U, 0.7f);
-		const float A = Strength * FMath::Square(1.0f - U) * FMath::Min(U * 14.0f, 1.0f);
-		Verts.Add(S[k] - Side * W); Verts.Add(S[k] + Side * W);
-		UVs.Add(FVector2D(U, 0.0)); UVs.Add(FVector2D(U, 1.0));
-		Colors.Add(FLinearColor(1.0f, 1.0f, 1.0f, A)); Colors.Add(FLinearColor(1.0f, 1.0f, 1.0f, A));
-	}
-	if (!bAppleTrailBuilt)
-	{
-		TArray<int32> Tris;
-		for (int32 k = 0; k < SkyTrailN; ++k) { Tris.Append({ 2 * k, 2 * k + 1, 2 * k + 2, 2 * k + 1, 2 * k + 3, 2 * k + 2 }); }
-		AppleTrail->CreateMeshSection_LinearColor(0, Verts, Tris, TArray<FVector>(), UVs, Colors, TArray<FProcMeshTangent>(), false);
-		bAppleTrailBuilt = true;
-	}
-	else AppleTrail->UpdateMeshSection_LinearColor(0, Verts, TArray<FVector>(), UVs, Colors, TArray<FProcMeshTangent>());
 }
 
 // ───────────────────────── 月虹 ─────────────────────────

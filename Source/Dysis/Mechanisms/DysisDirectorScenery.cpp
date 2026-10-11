@@ -437,6 +437,36 @@ void ADysisDirector::SetupScenery()
 			if (UMaterialInterface* M = ScnPalette(Name)) C->SetMaterial(Slot, M);
 		}
 	}
+	// 远处的云（2026-10-11 用户：天空远处也随机放一些云，不然云只出现在近处；不要太规整，要像真的云那样自然地排）。
+	// 美术那 6 朵（各放三份）都在离殿心 300–450 m 的一圈上。这里在 0.9–3.2 km 之间再撒十来团：
+	//   · 一团一团地来：每团 1–4 朵挤在一起，团和团之间隔多远、离多远、多高都不一样（随机数的种子是定死的，每次开游戏都是同一片天）；
+	//   · 越远的越贴近天边、看着越小（按“看上去多宽”来定大小：近处那些的三成到九成）；朝向照近处那些的样子，长的一边横着；
+	//   · 不投影子、不挡人、不挡光，颜色和近处的云同一套（跟着时刻变）。
+	if (UStaticMesh* CloudMesh = Meshes[int32(EDysisSceneryMesh::Cloud)])
+	{
+		FRandomStream Rng(20261011);
+		float GroupAz = Rng.FRandRange(0.0f, 360.0f);
+		for (int32 g = 0; g < 15; ++g)
+		{
+			GroupAz += Rng.FRandRange(13.0f, 43.0f);
+			const float Far = Rng.FRand();                                             // 0 = 这一团里最近的那一档，1 = 最远
+			const float GroupDist = FMath::Lerp(90000.0f, 320000.0f, Far * Far * 0.4f + Far * 0.6f);
+			const float GroupElev = FMath::Lerp(11.0f, 3.5f, Far) + Rng.FRandRange(-1.5f, 2.5f);      // 仰角：远的贴着天边
+			const int32 Count = Rng.RandRange(1, 4);
+			for (int32 c = 0; c < Count; ++c)
+			{
+				const float Az = GroupAz + (c == 0 ? 0.0f : Rng.FRandRange(-8.0f, 8.0f));
+				const float Dist = GroupDist * Rng.FRandRange(0.86f, 1.16f);
+				const float Elev = FMath::Max(1.8f, GroupElev + (c == 0 ? 0.0f : Rng.FRandRange(-1.6f, 1.8f)));
+				// 近处的云：横着的那一边放大 54–69 倍、离殿心 330 m 上下。看上去同样宽的话倍数跟着距离涨
+				const float Wide = 60.0f * (Dist / 34000.0f) * Rng.FRandRange(0.34f, 1.05f);
+				const FVector Scale(Wide * Rng.FRandRange(0.42f, 0.62f), Wide, Wide * Rng.FRandRange(0.28f, 0.50f));
+				const FVector At = DysisGB::PolarCm(Az, Dist, Dist * FMath::Tan(FMath::DegreesToRadians(Elev)));
+				UStaticMeshComponent* C = Place(CloudMesh, At, Az - 70.0f - Rng.FRandRange(0.0f, 34.0f), Scale, false, false);
+				for (int32 Slot = 0; Slot < 3 && CloudMIDs.IsValidIndex(Slot); ++Slot) C->SetMaterial(Slot, CloudMIDs[Slot]);
+			}
+		}
+	}
 	// 山花上的日月徽（美术在低模那一版加的小装饰：一个赭石色的环，模型自带位置，和建筑一样转 90°）
 	if (UStaticMesh* Emblem = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Dysis/LowPoly_v001/Meshes/LP_Pediment_SunMoon.LP_Pediment_SunMoon"), nullptr, LOAD_NoWarn | LOAD_Quiet))
 	{
