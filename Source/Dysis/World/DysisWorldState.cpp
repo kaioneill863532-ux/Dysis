@@ -17,7 +17,9 @@ namespace
 	constexpr float WS_F3_Z = 2300.0f;           // 四层地面
 	constexpr float WS_HARP_GAP0 = 156.06774f, WS_HARP_GAP1 = 195.86795f;   // 光阶那一段回廊的缺口（度）
 	// 海峡上的水沫（开场就有）：从台地崖边到小岛，一条 9 m 宽的带子
-	constexpr float WS_STRAIT_AZ = 23.73427f, WS_STRAIT_R0 = 3055.828f, WS_STRAIT_R1 = 5358.794f, WS_STRAIT_HALF_W = 450.0f, WS_STRAIT_Z0 = -1600.0f, WS_STRAIT_Z1 = -90.0f;
+	// （2026-10-11：开局站的地方顺着光挪到了海面上，往外 6.9 m——这条带子的外端跟着延长这么多（灰盒 5358.794），下沿放到海面以下一点（灰盒 −1600）：
+	//   不然光的最后一截不在水沫里、踩不上去）
+	constexpr float WS_STRAIT_AZ = 23.73427f, WS_STRAIT_R0 = 3055.828f, WS_STRAIT_R1 = 6048.6f, WS_STRAIT_HALF_W = 450.0f, WS_STRAIT_Z0 = -1650.0f, WS_STRAIT_Z1 = -90.0f;
 	// 远处的岩岛
 	constexpr double WS_FAR_ISLE_AZ = 240.0, WS_FAR_ISLE_DIST = 46300.0, WS_FAR_ISLE_RIDGE = 5690.0;
 

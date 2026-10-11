@@ -79,6 +79,9 @@ finish(mat, full)
 
 # ───────── 云 ─────────
 mat, full = new_mat("/Game/Dysis/Sky", "M_DysisCloud", False)
+# 云算“天”的一部分（is_sky）：天光的那张环境图里就有云了。镜湖的海面映不到画面以外的东西时会退回去查这张图——
+# 不标的话云一出画面，水里的倒影就没了（2026-10-11 用户：镜湖里有时候能看见云，镜头稍微一动就看不见）。画面上云自己的样子不变。
+mat.set_editor_property("is_sky", True)
 mel.connect_material_property(vector(mat, "Color", (0.8, 0.6, 0.65), -600, 0), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 finish(mat, full)
 

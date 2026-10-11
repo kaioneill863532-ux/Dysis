@@ -181,7 +181,14 @@ namespace
 
 FVector ADysisDirector::GodPoint(const FVector& P) const
 {
-	return FinShifted(P, GodShiftAz, GodShiftR) + FVector(0.0, 0.0, GodShiftZ);
+	// 像缩小了的话，这些点先朝她怀里那轮月亮的圆心收（圆心 = 五个点里正中的那个），再跟着整件挪
+	const FVector& C = GDysisGoddessSamples[0];
+	return FinShifted(C + (P - C) * GodScale, GodShiftAz, GodShiftR) + FVector(0.0, 0.0, GodShiftZ);
+}
+
+void ADysisDirector::DebugGoddessHome()
+{
+	DebugMoveGoddess(GodHome[0], GodHome[1], GodHome[2], GodHome[3]);
 }
 
 FString ADysisDirector::DebugMoonLitAt(FVector P) const
@@ -208,8 +215,9 @@ FString ADysisDirector::DebugGoddessShift(float DeltaAzDeg, float DeltaRCm) cons
 	return FString::Printf(TEXT("%d|%s"), N, *S);
 }
 
-void ADysisDirector::DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm, float DeltaZCm)
+void ADysisDirector::DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm, float DeltaZCm, float Scale)
 {
+	GodScale = Scale;
 	AActor* St = Piece(TEXT("SM_Mech_Goddess_Statue"));
 	AActor* Pl = Piece(TEXT("SM_Mech_Goddess_Plinth"));
 	if (!bGodBase)

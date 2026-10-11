@@ -14,12 +14,18 @@ namespace DysisGB
 	// ── 高度（厘米） ──
 	constexpr float WATER_Z = -45.0f;                    // 水庭水面
 	constexpr float SEA_Z = -1600.0f;                    // 海面
-	constexpr float ISLAND_TOP_Z = -1200.0f;             // 开局那座小岛的顶面
+	// 开局站的那一块的顶面。灰盒里是一座高出海面 4 m 的小岛（−1200）。2026-10-11 用户：海面改成镜湖以后那个台子不要了，人直接出生在水面上，
+	// 出生点 = 开场那束光延长到海面的地方。——岛不画了，只剩挡人、接光的那一层，整个顺着那束光往外、往下挪到顶面和海面一样高
+	// （IsleMoveCm；ADysisGameMode::InitGame 里连岛边的护栏、出生点一起挪）。人还是只能在这一块（半径 4.5 m）上走，走不出去。
+	constexpr float ISLAND_TOP_Z = SEA_Z;
 	// ── 接缝（瀑布那一段弧，度） ──
 	constexpr float SEAM0 = 116.0f, SEAM1 = 140.0f;
 
-	// ── 开局：站在岛的外沿，面朝神殿（灰盒 SPAWN） ──
-	inline const FVector SpawnFootCm(4978.79f, 2189.09f, -1200.0f);
+	// ── 开局：站在水面上，面朝神殿。灰盒 SPAWN 是岛外沿的 (4978.79, 2189.09, −1200)；
+	//    顺着开场那束光（开局那一刻太阳高 30.1°，光的方向 (0.7887, 0.3553, −0.5016)）再走 7.97 m 就到海面，就是这里 ──
+	inline const FVector SpawnFootCm(5607.72f, 2472.40f, -1600.0f);
+	inline const FVector IsleMoveCm(628.93f, 283.31f, -400.0f);       // 岛、岛边的护栏、出生点一起挪这么多
+	inline const FVector2D IsleWasCenterCm(4815.0f, 2114.0f);         // 岛顶面的圆心（挪之前）
 	constexpr float SpawnYawDeg = 203.7343f;             // 朝向的方位角；UE 里 Yaw 就是这个数
 
 	/** 方位角（度，0–360）：北 0，顺时针。 */

@@ -118,8 +118,14 @@ def main():
         gped = [c for c in tagged("SM_Mech_Goddess_Statue")[0].get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "Cylinder" and c.is_visible()]
         gl = gm[0].get_world_location() if gm else unreal.Vector(); gaz = math.degrees(math.atan2(gl.y, gl.x)) % 360.0
         gpl = [c for a in tagged("SM_Mech_Goddess_Plinth") for c in a.get_components_by_class(unreal.StaticMeshComponent) if c.is_visible()]
-        check(len(gm) == 1 and abs(gaz - 128.0) < 1.0 and 1460.0 < math.hypot(gl.x, gl.y) < 1520.0 and abs(gl.z) < 12.0 and len(gped) == 1 and not gpl,
-              "瀑布后面的女神像：人的轴线在方位 %.2f°（瀑布正中 128°）、离殿心 %.0f cm，脚在高 %.0f（和水庭的地面一样高）；脚下一个圆台，原来的方墩子不画了" % (gaz, math.hypot(gl.x, gl.y), gl.z))
+        # （第十批：上一版放低以后膝盖以下埋在瀑布后面 90 cm 高的石台里。现在缩到 0.68 倍、站回石台上：脚下是三级圆台，台座底在石台面上）
+        glow = min((c.get_world_location().z - c.get_world_scale().z * 50.0) for c in gped) if gped else -999.0
+        check(len(gm) == 1 and abs(gaz - 128.0) < 0.5 and 1430.0 < math.hypot(gl.x, gl.y) < 1460.0 and abs(gm[0].get_world_scale().x - 0.68) < 0.01 and len(gped) == 3 and 84.0 < glow < 91.0
+              and abs(gl.z - (glow + 58.5 * 0.68)) < 1.0 and not gpl,
+              "瀑布后面的女神像：人的轴线在方位 %.2f°（瀑布正中 128°）、离殿心 %.0f cm，缩到 %.2f 倍；脚下三级圆台，台座底在高 %.0f（石台面 90），脚在 %.0f；原来的方墩子不画了" % (gaz, math.hypot(gl.x, gl.y), gm[0].get_world_scale().x if gm else 0, glow, gl.z))
+        # 三相像的手轮：轮子另挂了一份会转的（原件上轮子那一块不画）
+        cw = [c for c in crank.get_components_by_class(unreal.StaticMeshComponent) if c.get_attach_parent() and c.get_attach_parent().get_owner() == crank and c.static_mesh and c.static_mesh.get_name() == "SM_Kit_Mech_Mirror_Crank"]
+        check(len(cw) == 1, "三相像的手轮：有一份单独会转的轮子（%d 份；转像的时候它绕轮轴转）" % len(cw))
         # 虹之龛做出了进深：门在柜子的前口上、碎片在柜子里面
         # 虹之龛：深色的背板不画了，两扇门贴在墙面上，碎片沉在墙里（门开了才出来）。石沿还缩在墙里的时候它们都比伸出来以后靠外 90 cm
         plate = [c for c in tagged("SM_Mech_Sill_Niche")[0].get_components_by_class(unreal.StaticMeshComponent) if c.is_visible()]
@@ -265,11 +271,12 @@ def main():
         h = unreal.SystemLibrary.line_trace_single(w, V(*polar(210.0, 1500.0, 1000.0)), V(*polar(210.0, 1250.0, 1000.0)), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, [pawn], unreal.DrawDebugTrace.NONE, True)
         hit_r = math.hypot(h.to_tuple()[4].x, h.to_tuple()[4].y) if h else 0.0
         check(col and h is not None and h.to_tuple()[9] == col[0] and abs(hit_r - 1355.4) < 1.5, "柱子的碰撞没动（二层 210° 那根从墙那边打过去，在半径 %.1f cm 挡住；原来 1355.4）" % hit_r)
-        check(not s["seaMirror"] and s["seaMaterial"] == "M_DysisSea", "海面默认还是原来那一版（%s）" % s["seaMaterial"])
-        cmd("Dysis.SeaMirror 1"); yield from wait(3)
-        m = r8()
+        # （2026-10-11 用户定了：海面用镜湖；M 键 / Dysis.SeaMirror 0 还能换回原来的）
+        check(s["seaMirror"] and s["seaMaterial"] == "M_DysisSeaMirror", "海面默认是镜湖那一版（%s）" % s["seaMaterial"])
         cmd("Dysis.SeaMirror 0"); yield from wait(3)
-        check(m["seaMirror"] and m["seaMaterial"] == "M_DysisSeaMirror" and r8()["seaMaterial"] == "M_DysisSea", "Dysis.SeaMirror 1 换成镜湖那一版（%s），0 换回来" % m["seaMaterial"])
+        m = r8()
+        cmd("Dysis.SeaMirror 1"); yield from wait(3)
+        check(not m["seaMirror"] and m["seaMaterial"] == "M_DysisSea" and r8()["seaMaterial"] == "M_DysisSeaMirror", "Dysis.SeaMirror 0 换回原来那一版（%s），1 再换成镜湖" % m["seaMaterial"])
 
     sk = pawn.get_component_by_class(unreal.SkeletalMeshComponent)
     anim = sk.get_anim_instance()

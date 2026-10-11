@@ -23,12 +23,15 @@
 
 namespace
 {
-	// Dysis.GoddessShift <度> <厘米> [抬高厘米]：把瀑布后面的女神像（连判定月光的点）从灰盒的位置绕殿心转几度、往墙那边挪几厘米、抬高几厘米（试位置用）
-	FAutoConsoleCommandWithWorldAndArgs GDysisGoddessShift(TEXT("Dysis.GoddessShift"), TEXT("瀑布后面的女神像：Dysis.GoddessShift <绕殿心转几度> <往墙那边挪几厘米> [抬高几厘米]"),
+	// Dysis.GoddessShift <度> <厘米> [抬高厘米] [缩到几倍]：把瀑布后面的女神像（连判定月光的点）从灰盒的位置绕殿心转几度、往墙那边挪几厘米、抬高几厘米（试位置用）；
+	// Dysis.GoddessShift home：放回游戏里定的位置和大小
+	FAutoConsoleCommandWithWorldAndArgs GDysisGoddessShift(TEXT("Dysis.GoddessShift"), TEXT("瀑布后面的女神像：Dysis.GoddessShift <绕殿心转几度> <往墙那边挪几厘米> [抬高几厘米] [缩到几倍]，或 Dysis.GoddessShift home"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
+			if (Args.Num() == 1 && Args[0] == TEXT("home")) { for (TActorIterator<ADysisDirector> It(World); It; ++It) It->DebugGoddessHome(); return; }
 			if (Args.Num() < 2) return;
-			for (TActorIterator<ADysisDirector> It(World); It; ++It) It->DebugMoveGoddess(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]), Args.Num() > 2 ? FCString::Atof(*Args[2]) : 0.0f);
+			for (TActorIterator<ADysisDirector> It(World); It; ++It)
+				It->DebugMoveGoddess(FCString::Atof(*Args[0]), FCString::Atof(*Args[1]), Args.Num() > 2 ? FCString::Atof(*Args[2]) : 0.0f, Args.Num() > 3 ? FCString::Atof(*Args[3]) : 1.0f);
 		}));
 	// Dysis.SwanShift <厘米>：四层的天鹅像往墙那边挪多少（0 = 灰盒的位置；和灰盒逐点比的测试用）
 	FAutoConsoleCommandWithWorldAndArgs GDysisSwanShift(TEXT("Dysis.SwanShift"), TEXT("四层的天鹅像：Dysis.SwanShift <往墙那边挪几厘米>"),
@@ -55,8 +58,17 @@ namespace
 	//     放大没有用（圆盘会更高、更偏），所以没放大。月光全照到她是在月桥的第 67–68 步（原来 58，灰盒 61）。
 	//     圆盘的圆心：方位 131.0°、离殿心 14.4 m、高 340（灰盒 137.2° / 13.24 m / 471.5）。
 	//     （2026-10-11 重新转过一遍——衣褶细了——圆盘的位置跟着差了不到 1 cm：右 64.6、前 48.2、离脚 338.4）
-	constexpr float MpGodDiscRightCm = 64.6f, MpGodDiscFwdCm = 48.2f, MpGodDiscUpCm = 338.4f, MpGodBaseRadiusCm = 122.0f;
-	constexpr float MpGodShiftAz = -6.2f, MpGodShiftR = 116.4f, MpGodShiftZ = -131.5f, MpGodScale = 1.0f;
+	//   2026-10-11（第十批）用户：现在像是腿被砍了一段——能不能抬高一点、整体缩一点，月亮还照得到；能恢复原来的位置和台子就恢复，但要在瀑布正中。
+	//   → “腿被砍”是真的：瀑布后面有一道 90 cm 高的石台（SM_Waterfall_BackLedge，离殿心 13.4–15.4 m），上一版把她放低 1.3 m，膝盖以下全埋在石台里。
+	//     原大小放回石台上、又要在正中，月光照不到（见上）。缩小就行了：圆盘跟着矮下来，正好落进照得到的那一带。
+	//     又量了一遍（石台上、轴线 127.8–128.4°、0.62–0.75 倍、月桥每一步；判定的五个点跟着像一起缩，四个照到就算）：
+	//     0.68 倍、轴线 128.2°（瀑布正中 128°，差 5 cm）时月桥第 67–71 步连着五步都算照到（第 69 步五个点全中）；0.72 倍以上中间会断一步。
+	//     所以：0.68 倍（连台座 3.7 m 高，原来 5.4 m），脚下是美术原来那座三级圆台（跟着缩），台座底落在石台面上（嵌进去 2 cm），
+	//     轴线离殿心 14.45 m——三级台（最大半径 96 cm）正好坐在 2 m 宽的石台中间。
+	constexpr float MpGodDiscRightCm = 64.6f, MpGodDiscFwdCm = 48.2f, MpGodDiscUpCm = 338.4f;
+	constexpr float MpGodScale = 0.68f, MpGodAxisAz = 128.2f, MpGodAxisR = 1445.0f, MpGodBaseZ = 88.0f;
+	// 三级圆台（美术原来那座）：每一级的半径、从台座底往上多高到多高（厘米，没缩之前）
+	constexpr float MpGodTiers[3][3] = { { 141.0f, 0.0f, 16.0f }, { 137.0f, 16.0f, 44.0f }, { 127.0f, 44.0f, 58.5f } };
 	// 四层的天鹅像往墙那边挪多少（见 DebugMoveSwan）：台座原来压在栏杆上，天鹅转到朝殿心的那几格时身子还穿过栏杆（天鹅身长的一半有 80 cm）
 	constexpr float MpSwanShiftCm = 45.0f;
 	UStaticMesh* MpMesh(const TCHAR* Name)
@@ -221,37 +233,65 @@ void ADysisDirector::SetupMechPack()
 	// ── 瀑布后面的女神、双子：都朝殿心站 ──
 	if (AActor* G = Piece(TEXT("SM_Mech_Goddess_Statue")))
 	{
-		DebugMoveGoddess(MpGodShiftAz, MpGodShiftR, MpGodShiftZ);
+		// 人的轴线、台座底在哪是定好的（MpGod…）；人朝着殿心站。由它算出怀里那面圆盘的圆心在哪——
+		// 判定月光的五个点里正中的那个就得在那儿：整件（连那几个点）从灰盒的位置转几度、往墙挪多少、抬高多少、缩到几倍
+		const FVector Out = DysisGB::PolarCm(MpGodAxisAz, 1.0, 0.0), Tan(-Out.Y, Out.X, 0.0);
+		const FVector Axis = DysisGB::PolarCm(MpGodAxisAz, MpGodAxisR, MpGodBaseZ + MpGodTiers[2][2] * MpGodScale);      // 脚底（三级台的顶面）
+		const FVector Disc = Axis + Tan * (MpGodDiscRightCm * MpGodScale) - Out * (MpGodDiscFwdCm * MpGodScale) + FVector(0.0, 0.0, MpGodDiscUpCm * MpGodScale);
+		const FVector& Disc0 = GDysisGoddessSamples[0];
+		GodHome[0] = float(DysisGB::AzOf(Disc)) - float(DysisGB::AzOf(Disc0));
+		GodHome[1] = DysisGB::ROf(Disc) - DysisGB::ROf(Disc0);
+		GodHome[2] = float(Disc.Z - Disc0.Z);
+		GodHome[3] = MpGodScale;
+		DebugGoddessHome();
 		HideLook(G); HideLook(Piece(TEXT("SM_Mech_Goddess_Plinth")));      // 原来那根方墩子不画了
-		// 怀里那面圆盘的圆心 = 判定月光的五个点里正中的那个。人朝着殿心站：轴线在哪决定了朝向，朝向又决定了圆盘在哪——来回算三遍就定住了
-		const FVector Disc = GodPoint(GDysisGoddessSamples[0]);
-		FVector Axis = Disc;
-		float Az = float(DysisGB::AzOf(Disc));
-		for (int32 i = 0; i < 3; ++i)
-		{
-			const FVector Out = DysisGB::PolarCm(Az, 1.0, 0.0), Tan(-Out.Y, Out.X, 0.0);
-			Axis = Disc - Tan * (MpGodDiscRightCm * MpGodScale) + Out * (MpGodDiscFwdCm * MpGodScale);
-			Az = float(DysisGB::AzOf(Axis));
-		}
-		Axis.Z = Disc.Z - MpGodDiscUpCm * MpGodScale;      // 脚底
-		UStaticMeshComponent* Body = Put(G, TEXT("Goddess"), Axis, Az + 90.0f, FVector(MpGodScale), EMpLook::Stone);
+		UStaticMeshComponent* Body = Put(G, TEXT("Goddess"), Axis, MpGodAxisAz + 90.0f, FVector(MpGodScale), EMpLook::Stone);
 		Soft(Body);
-		// 脚下的圆台：只有一层，比衣摆大一圈，从水面以下一直到脚底（脚踩进去 3 cm）
+		// 脚下的三级圆台（美术原来那座的尺寸，跟着像一起缩）：最上面一级的顶面就是脚底，脚踩进去 2 cm
 		if (UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
 			if (USceneComponent* Root = G->GetRootComponent())
-			{
-				UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(G);
-				C->SetupAttachment(Root);
-				C->SetMobility(EComponentMobility::Movable);
-				C->SetStaticMesh(Cyl);
-				if (Body) C->SetMaterial(0, Body->GetMaterial(0));
-				C->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
-				C->RegisterComponent();
-				const double Top = Axis.Z + 3.0, Bottom = -70.0, R = MpGodBaseRadiusCm * MpGodScale;
-				C->SetWorldTransform(FTransform(FQuat::Identity, FVector(Axis.X, Axis.Y, (Top + Bottom) * 0.5), FVector(R / 50.0, R / 50.0, (Top - Bottom) / 100.0)));
-				MechPackComps.Add(C);
-			}
+				for (int32 i = 0; i < 3; ++i)
+				{
+					UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(G);
+					C->SetupAttachment(Root);
+					C->SetMobility(EComponentMobility::Movable);
+					C->SetStaticMesh(Cyl);
+					if (Body) C->SetMaterial(0, Body->GetMaterial(0));
+					C->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					C->RegisterComponent();
+					const double R = MpGodTiers[i][0] * MpGodScale, Z0 = MpGodBaseZ + MpGodTiers[i][1] * MpGodScale, Z1 = MpGodBaseZ + MpGodTiers[i][2] * MpGodScale + (i == 2 ? 2.0 : 0.0);
+					C->SetWorldTransform(FTransform(FQuat::Identity, FVector(Axis.X, Axis.Y, (Z0 + Z1) * 0.5), FVector(R / 50.0, R / 50.0, (Z1 - Z0) / 100.0)));
+					MechPackComps.Add(C);
+				}
 	}
+
+	// ── 三相像边上的手轮：转像的时候轮子跟着转（2026-10-11 用户）。轮子和它底下的石墩是一个模型里的两块：
+	//    原件上把轮子那一块不画（材质的 ClipZ 调到天上去 = 整块不画），另挂一份只画轮子的，绕轮轴转（UpdateMechPack）。
+	//    轮心就是部件的原点，轮轴是部件自己的 Y ──
+	MirrorCrankWheel = nullptr;
+	if (AActor* Crank = Piece(TEXT("SM_Mech_Mirror_Crank")))
+		if (UStaticMeshComponent* Src = Crank->FindComponentByClass<UStaticMeshComponent>())
+			if (UMaterialInterface* Mp = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/MechPack_20261010/M_DysisMechPack.M_DysisMechPack"), nullptr, LOAD_NoWarn | LOAD_Quiet))
+			{
+				const int32 Bronze = Src->GetMaterialIndex(FName(TEXT("M_bronze"))), Stone = Src->GetMaterialIndex(FName(TEXT("M_stone")));
+				if (Bronze != INDEX_NONE && Stone != INDEX_NONE && Src->GetStaticMesh())
+				{
+					UMaterialInstanceDynamic* Unseen = UMaterialInstanceDynamic::Create(Mp, this);
+					Unseen->SetScalarParameterValue(TEXT("ClipZ"), 1.0e7f);
+					UStaticMeshComponent* Wheel = NewObject<UStaticMeshComponent>(Crank);
+					Wheel->SetupAttachment(Src);
+					Wheel->SetMobility(EComponentMobility::Movable);
+					Wheel->SetStaticMesh(Src->GetStaticMesh());
+					Wheel->SetMaterial(Bronze, Src->GetMaterial(Bronze));
+					Wheel->SetMaterial(Stone, Unseen);
+					Wheel->SetGenerateOverlapEvents(false);
+					Wheel->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					Wheel->RegisterComponent();
+					Src->SetMaterial(Bronze, Unseen);
+					MirrorCrankWheel = Wheel;
+					MechPackComps.Add(Wheel);
+				}
+			}
 	if (AActor* A = Castor.Get()) { HideLook(A); Soft(Put(A, TEXT("TwinCastor"), A->GetActorLocation(), AzOfActor(A) + 90.0f, One, EMpLook::Stone)); }
 	if (AActor* A = Pollux.Get()) { HideLook(A); PolluxModel = Put(A, TEXT("TwinPollux"), A->GetActorLocation(), AzOfActor(A) + 90.0f, FVector(MpPolluxScale), EMpLook::Stone); Soft(PolluxModel.Get()); }
 
@@ -812,9 +852,41 @@ void ADysisDirector::SetupMechPack()
 								const float PAz = float(DysisGB::AzOf(Px->GetActorLocation()));
 								MID->SetVectorParameterValue(TEXT("Hole2Center"), FLinearColor(DysisGB::PolarCm(PAz, DysisGB::R_IN, float(Px->GetActorLocation().Z) + 135.0f)));
 								MID->SetVectorParameterValue(TEXT("Hole2Out"), FLinearColor(DysisGB::PolarCm(PAz, 1.0, 0.0)));
-								MID->SetVectorParameterValue(TEXT("Hole2Half"), FLinearColor(66.0f, 24.0f, 134.0f));
+								MID->SetVectorParameterValue(TEXT("Hole2Half"), FLinearColor(70.0f, 24.0f, 135.0f));      // 和龛口一样大（宽 1.4 m、高 2.7 m）
 							}
 						}
+						// 2026-10-11 用户：波吕丢刻斯拉出来以后，放他的那个空间左右两侧的墙漏面了。
+						// ——厚墙那个部件里的龛只做了墙面以外的一段（两壁、顶到离殿心 15.5 m 为止，后壁和地面一直到 16.1 m）；
+						// 墙面以里的那 60 cm 原来是实心墙自己的凹槽，低模的墙没有，从龛口斜着看过去两侧和顶是透的。补三块板，用龛壁的那个深色
+						if (const AActor* Px = Pollux.Get())
+							if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+							{
+								UMaterialInterface* Shade = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/ReferenceMatch_20261009/Materials/MI_MATCH_WarmWhite.MI_MATCH_WarmWhite"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+								if (const AActor* Tw = Piece(TEXT("SM_Mech_Twins_ThickWall")))
+									if (const UStaticMeshComponent* TC = Tw->FindComponentByClass<UStaticMeshComponent>())
+									{
+										const int32 Slot = TC->GetMaterialIndex(FName(TEXT("M_shade")));
+										if (Slot != INDEX_NONE && TC->GetMaterial(Slot)) Shade = TC->GetMaterial(Slot);
+									}
+								// 龛自己的坐标：X 朝外（进深，0 = 内墙面）、Y 顺着墙、Z 朝上（0 = 龛的地面）
+								const float PAz = float(DysisGB::AzOf(Px->GetActorLocation()));
+								const float HW = 70.0f, H = 270.0f, D0 = -2.0f, D1 = 62.0f, W = 2.0f;
+								const FVector At[3] = { FVector((D0 + D1) * 0.5, -HW - W * 0.5, H * 0.5), FVector((D0 + D1) * 0.5, HW + W * 0.5, H * 0.5), FVector((D0 + D1) * 0.5, 0.0, H + W * 0.5) };
+								const FVector Size[3] = { FVector(D1 - D0, W, H + 2.0 * W), FVector(D1 - D0, W, H + 2.0 * W), FVector(D1 - D0, 2.0 * HW + 2.0 * W, W) };
+								const FTransform Frame(FRotator(0.0f, PAz, 0.0f), DysisGB::PolarCm(PAz, DysisGB::R_IN, Px->GetActorLocation().Z));
+								for (int32 i = 0; i < 3; ++i)
+								{
+									UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+									C->SetupAttachment(RootComponent);
+									C->SetMobility(EComponentMobility::Movable);
+									C->SetStaticMesh(Cube);
+									if (Shade) C->SetMaterial(0, Shade);
+									C->BodyInstance.SetCollisionEnabled(ECollisionEnabled::NoCollision);
+									C->RegisterComponent();
+									C->SetWorldTransform(FTransform(FQuat::Identity, At[i], Size[i] / 100.0) * Frame);
+									MechPackComps.Add(C);
+								}
+							}
 						bIrisHoleOn = false;
 						IrisNicheWalls.Reset();
 						if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
@@ -866,6 +938,8 @@ void ADysisDirector::UpdateMechPack(float Dt)
 			if (C->IsVisible() != (i == Best)) C->SetVisibility(i == Best);
 	if (UStaticMeshComponent* C = SeleneEyeGlow.Get())
 		if (C->IsVisible() != bSeleneOn) C->SetVisibility(bSeleneOn);
+	// 三相像的手轮：绕轮轴（部件自己的 Y）转
+	if (UStaticMeshComponent* C = MirrorCrankWheel.Get()) C->SetRelativeRotation(FRotator(MirrorCrankDeg, 0.0f, 0.0f));
 
 	// 日之龛的盖：轴在靠墙的那条边上，朝着人掀开（1 秒掀到 80°，竖在墙前面，不蹭墙）
 	if (UStaticMeshComponent* C = SunLidModel.Get())

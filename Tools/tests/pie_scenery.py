@@ -30,7 +30,7 @@ def shoot(w, tag):
 def polar(az, r, z): return [r * math.cos(math.radians(az)), r * math.sin(math.radians(az)), z]
 def az_alt(v): return math.degrees(math.atan2(v.y, v.x)) % 360.0, math.degrees(math.asin(max(-1.0, min(1.0, v.z))))
 
-SPAWN = [4978.79, 2189.09, -1200.0]     # 开局站的地方（小岛外沿）
+SPAWN = [5607.72, 2472.40, -1600.0]     # 开局站的地方（2026-10-11 起：海面上；原来是小岛外沿 (4978.79, 2189.09, −1200)）
 
 def main():
     unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_begin_play()
@@ -112,7 +112,7 @@ def main():
         lib = unreal.DysisSkyLibrary
         mts = [c for c in director.get_components_by_class(unreal.StaticMeshComponent) if c.static_mesh and c.static_mesh.get_name() == "SM_MATCH_Mountain"]
         hidden = 0; worst = 99.0
-        for eye in ([0.0, 0.0, 60.0], [0.0, 0.0, 3200.0], SPAWN[:2] + [-1040.0]):
+        for eye in ([0.0, 0.0, 60.0], [0.0, 0.0, 3200.0], SPAWN[:2] + [-1440.0]):
             for H in range(22, 76, 2):
                 az, alt = az_alt(lib.dysis_sun_dir(float(H)))
                 for c in mts:
@@ -131,8 +131,8 @@ def main():
         # 下午（开局 13:29 起）
         yield from spot("开局_站在小岛上（人的镜头）", SPAWN, [0.0, 0.0, 900.0], 140)
         say("  时刻 " + hour())
-        yield from view("开局_小岛上看神殿", [SPAWN[0] + 420.0, SPAWN[1] + 260.0, -1040.0], [0.0, 0.0, 700.0], 80.0)
-        yield from view("开局_小岛上回头看海", [SPAWN[0] - 300.0, SPAWN[1] - 130.0, -1040.0], [SPAWN[0] + 4000.0, SPAWN[1] + 1800.0, -1300.0], 80.0)
+        yield from view("开局_小岛上看神殿", [SPAWN[0] + 420.0, SPAWN[1] + 260.0, -1440.0], [0.0, 0.0, 700.0], 80.0)
+        yield from view("开局_小岛上回头看海", [SPAWN[0] - 300.0, SPAWN[1] - 130.0, -1440.0], [SPAWN[0] + 4000.0, SPAWN[1] + 1800.0, -1700.0], 80.0)
         yield from view("开局_从海上看全景", polar(8.0, 9800.0, 900.0), [0.0, 0.0, 900.0], 55.0)
         yield from view("开局_从高处看全景", polar(40.0, 11500.0, 4200.0), [-800.0, -300.0, 600.0], 50.0)
         yield from spot("台地_走上来看殿门（人的镜头）", polar(23.7, 3050.0, -120.0), [0.0, 0.0, 800.0], 140)

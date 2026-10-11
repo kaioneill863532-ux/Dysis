@@ -4,7 +4,7 @@
 import unreal, os, glob, math, traceback
 SAVED = unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())
 OUT = SAVED + "pie_player.txt"
-SPAWN = (4978.79, 2189.09, -1200.0)
+SPAWN = (5607.72, 2472.40, -1600.0)     # 2026-10-11：开局的小岛不要了，人出生在海面上（灰盒的 (4978.79, 2189.09, −1200) 顺着开场那束光延长到海面）
 lines = []; bad = [0]
 def say(s):
     lines.append(str(s)); open(OUT, "w", encoding="utf-8").write("\n".join(lines))
@@ -46,7 +46,7 @@ def main():
 
     # 1 出生点和朝向
     f = foot(); rot = pc.get_control_rotation()
-    check(math.dist(f, SPAWN) < 6, "出生在岛的外沿：脚 (%.0f, %.0f, %.0f)，应为 (%.0f, %.0f, %.0f)" % (f + SPAWN))
+    check(math.dist(f, SPAWN) < 6, "出生在海面上：脚 (%.0f, %.0f, %.0f)，应为 (%.0f, %.0f, %.0f)" % (f + SPAWN))
     check(abs(((rot.yaw - 203.7343) + 540) % 360 - 180) < 0.5 and abs(rot.pitch - (-12.6)) < 0.5, "面朝神殿、微微俯视：yaw %.1f pitch %.1f" % (rot.yaw % 360, rot.pitch))
     t = pawn.get_component_by_class(unreal.DysisTimeComponent)
     say("   时间组件：" + str(t.describe_state()) if hasattr(t, "describe_state") else "   （时间组件没有 describe_state）")

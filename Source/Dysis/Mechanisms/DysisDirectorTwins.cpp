@@ -261,6 +261,7 @@ void ADysisDirector::UpdateTwins(float Dt)
 		TwinState = TwnInNiche;
 		ADysisHUD::Notify(GetWorld(), DysisCopy::FeedbackPolluxRevealed, 4.6f);
 	}
+	PolluxPushHold = FMath::Max(0.0f, PolluxPushHold - Dt);
 	if (TwinState == TwnPulling)
 	{
 		TwinT += Dt;
@@ -285,7 +286,11 @@ void ADysisDirector::UpdateTwins(float Dt)
 			{
 				const float A = FMath::DegreesToRadians(PolluxAz);
 				const double V = FVector::DotProduct(Want, FVector(-FMath::Sin(A), FMath::Cos(A), 0.0));   // 厘米每秒，顺时针为正
-				if (V > 30.0) PolluxAz = FMath::Min(TwnEndAz, PolluxAz + FMath::RadiansToDegrees(float(V * Dt / TwnROut)));
+				if (V > 30.0)
+				{
+					PolluxAz = FMath::Min(TwnEndAz, PolluxAz + FMath::RadiansToDegrees(float(V * Dt / TwnROut)));
+					PolluxPushHold = 0.2f;
+				}
 			}
 		}
 		Pos = DysisGB::PolarCm(PolluxAz, TwnROut, TwnFloorZ);

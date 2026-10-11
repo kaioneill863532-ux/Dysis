@@ -233,7 +233,11 @@ public:
 
 	/** 把瀑布后面的女神像（像、台座、判定月光的取样点一起）从灰盒的位置绕殿心转过 DeltaAzDeg 度、往墙那边挪 DeltaRCm。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
-	void DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm, float DeltaZCm = 0.0f);
+	void DebugMoveGoddess(float DeltaAzDeg, float DeltaRCm, float DeltaZCm = 0.0f, float Scale = 1.0f);
+	/** 女神像（连判定月光的点）放回游戏里定的位置和大小（测试里临时挪回灰盒原位比对完以后用）。 */
+	void DebugGoddessHome();
+	/** 人这会儿是不是正推着波吕丢刻斯走（主角的动作要用：两只手顶在像上）。 */
+	bool IsPushingPollux() const { return PolluxPushHold > 0.0f; }
 
 	/** 测算用：世界里的一点这一刻照不照得到三相像反过来的月光（"lit" 照到 / "box" 光柱没经过 / "blk" 半路被挡住 / "nobeam" 这会儿没有这束光）。 */
 	UFUNCTION(BlueprintCallable, Category = "Dysis|Director")
@@ -609,6 +613,12 @@ private:
 	bool bIrisHoleOn = false;
 	// 瀑布后面的女神像从灰盒的位置挪了多少（绕殿心转的度数、往墙那边的厘米数）；像、台座原来在哪
 	float GodShiftAz = 0.0f, GodShiftR = 0.0f, GodShiftZ = 0.0f;
+	float GodScale = 1.0f;                            // 判定月光的那几个点朝圆盘的圆心收多少（像缩小了，点也跟着收）
+	float GodHome[4] = { 0.0f, 0.0f, 0.0f, 1.0f };    // 游戏里定的：转几度、往墙挪多少、抬高多少、缩到几倍
+	float PolluxPushHold = 0.0f;      // 最近一次“推着他走”是多久以前（倒着数；松手 0.2 秒以后才算不推了，免得一帧一帧地闪）
+	// 三相像边上的手轮：转像的时候跟着转
+	TWeakObjectPtr<UStaticMeshComponent> MirrorCrankWheel;
+	float MirrorCrankDeg = 0.0f;
 	FVector GodStatueBase = FVector::ZeroVector, GodPlinthBase = FVector::ZeroVector;
 	FRotator GodStatueRot = FRotator::ZeroRotator;
 	bool bGodBase = false;
@@ -689,6 +699,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> SeaMirrorMID;
 	bool bSeaMirror = false;
+	float SeaRingK = 0.0f;      // 镜湖：人脚边那一圈圈水纹现在多强（人离水面近才有，走着的时候更明显）
 	UPROPERTY()
 	TObjectPtr<class UMaterialInstanceDynamic> FallMID;
 	// 瀑布加厚的那几层、两头封上的两片（材质和主瀑布一样，每帧跟着写同样的数）；开闸以后挡人的墙
@@ -723,6 +734,7 @@ private:
 	// 金苹果的光、月虹、结局的星座 —— DysisDirectorSky.cpp
 	void SetupSkyFx();
 	void UpdateAppleLight(float Dt);
+	void UpdateAppleTrail(float Dt);
 	void UpdateMoonbow(float Dt);
 	void StartStarShow();
 	void UpdateEndingStars(float Dt);
@@ -736,6 +748,11 @@ private:
 	FLinearColor AppleLightColor = FLinearColor::White;
 	UPROPERTY()
 	TObjectPtr<class UPointLightComponent> AppleLight;
+	/** 金苹果的拖尾：跟着苹果的一条淡金色的光带（每帧按苹果最近零点几秒走过的位置现做，朝着镜头）。 */
+	UPROPERTY()
+	TObjectPtr<UProceduralMeshComponent> AppleTrail;
+	TArray<FVector4> AppleTrailPts;      // 苹果最近走过的位置（W = 那一刻的时间）
+	bool bAppleTrailBuilt = false;
 	/** 月之龛里碎片的一点微光（灰盒里碎片自己发光）：龛透开了、碎片还在的时候亮着，夜里远远就能看见龛在哪。 */
 	UPROPERTY()
 	TObjectPtr<class UPointLightComponent> ShrineGlow;

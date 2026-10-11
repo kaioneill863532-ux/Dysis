@@ -118,6 +118,22 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
 	float StairStride = 0.85f;
 
+	/** 走路时身子往前倾几度（2026-10-11 用户：人正常走路会稍微前倾一点，现在是竖直的，不自然；一点点就够，不要多）。
+	 *  量出来的：美术“走”那一段里身子比站着还往后仰 1°。从腰（spine_01）往前倾，头只跟一半，脸还是朝前。
+	 *  按速度给：走到 WalkCadenceSpeed 时倾满；只在“走”那一段上加（跑的那一段自己带着前倾）。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float WalkLeanDeg = 4.0f;
+
+	/** 推东西时身子往前压几度（2026-10-11 用户：推波吕丢刻斯那里做一个推的动作）。美术没给这一段动作，是现算的：
+	 *  腿照常走；身子从腰往前压，两只手平着伸到胸前（胳膊留一点弯、肘朝下），手掌立起来顶在像上，头抬着看前面。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	float PushLeanDeg = 16.0f;
+
+	/** 走路时两只脚的脚尖各往里收几度（X = 左脚，Y = 右脚）。量出来的：美术“走”那一段里脚踩着地时脚尖往外撇——左 15°、右 12°；
+	 *  膝盖是朝正前弯的（我们修过），脚尖再撇这么多，看着就是外八字（2026-10-11 用户；从背后看更明显）。收到 6° 上下。 */
+	UPROPERTY(EditAnywhere, Category = "Dysis|Hero")
+	FVector2D FootTurnInDeg = FVector2D(9.5, 6.0);
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UAnimSequence>> Clips;
 
@@ -133,6 +149,8 @@ public:
 	int32 StepCount = 0;          // 脚落地了多少下（一直往上加）
 	float GroundSlope = 0.0f;     // 脚下的坡度（升高 ÷ 往前走的距离；上台阶 0.4 上下，平地 0，下台阶是负的）
 	float SlopeRise = 0.0f, SlopeRun = 0.0f;    // 最近零点几秒里升了多少、走了多远（越早的占得越少）
+	float WalkLean = 0.0f;        // 这一刻该前倾几度（按速度）
+	bool bPushing = false;        // 正推着东西走（波吕丢刻斯像）：两只手伸到胸前顶着、身子往前压
 	float AirSeconds = 0.0f;      // 这一回腾空多久了
 	bool bAirShown = false;       // 这一回腾空放过起跳 / 下落的动作了（放过才接“落地”）
 	FVector SlopePrev = FVector::ZeroVector;

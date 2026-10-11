@@ -782,25 +782,48 @@ shore.r=lerp(shore.r,1,inlet); shore.g=lerp(shore.g,.25,inlet); shore.b=lerp(sho
 
 # ───────────────────────── 海：“天空之镜”那一版 ─────────────────────────
 if want("M_DysisSeaMirror"):
-    # 2026-10-10 用户想试试把海面做成镜湖（平得像镜子，天、云、岛整个映在里面），做出来给他挑——所以单做一个材质，
-    # 游戏里用控制台 Dysis.SeaMirror 0|1 切，原来的海（M_DysisSea）不动。
-    # 做法：一面几乎不起波的镜子——金属度 1、很光滑，映什么全靠引擎的反射（映的是画面里真的天、云、岛和神殿）。
-    #   Tint = 镜面的颜色（略带一点蓝的浅色：映出来的比本体稍暗、稍冷）；Ripple = 细波有多大（0 = 纹丝不动）；RippleCm = 细波一道有多宽；
-    #   Lift = 垫的一点底色（屏幕上看着多亮；引擎的反射够不着的地方不至于是一块黑）× SkyTint（代码按时刻给的天色，和原来的海用的是同一个）。
+    # 2026-10-10 用户想试试把海面做成镜湖（平得像镜子，天、云、岛整个映在里面）；10-11 定下来用它（M 键、Dysis.SeaMirror 0 还能换回原来的 M_DysisSea）。
+    # 做法：一面镜子——金属度 1、很光滑，映什么全靠引擎的反射（映的是画面里真的天、云、岛和神殿）。
+    # 2026-10-11 用户（人出生在水面上以后）：加一点像水的质感——磨砂，或者一层层轻微的起伏，不然一看就是金属镜子。
+    #   只在近处加（离镜头 NearCm 以内，越近越明显）；远处还是一整片平的镜子，从殿上看下去和原来一样：
+    #   · 两层缓缓推着走的长波（Swell = 坡度有多大；波长 5.2 m 和 2.3 m，方向不同，波峰用噪声错开一点）；
+    #   · 人脚边一圈圈往外荡的水纹（Ring；圆心 Player、强弱 PlayerK 由代码按人在不在水面上、走没走来给）；
+    #   · 近处糙一点（Rough → Rough + RoughNear），倒影边上是软的；
+    #   · 低头看的地方镜面暗一点、偏深蓝（Deep；水是越斜着看越亮的，金属镜子从哪个角度看都一样亮），DeepK = 加多少。
+    #   Tint = 镜面的颜色；Lift = 垫的一点底色 × SkyTint（代码按时刻给的天色，和原来的海用的是同一个）。
     mat, full = new_mat("/Game/Dysis/Fx", "M_DysisSeaMirror", unreal.BlendMode.BLEND_OPAQUE, unlit=False, two_sided=False)
-    mel.connect_material_property(rgb_of(mat, vector(mat, "Tint", (0.80, 0.86, 0.92), -900, -400), -700, -400), "", unreal.MaterialProperty.MP_BASE_COLOR)
-    for prop, name, val, y in ((unreal.MaterialProperty.MP_METALLIC, "Metallic", 1.0, -250), (unreal.MaterialProperty.MP_ROUGHNESS, "Roughness", 0.04, -160), (unreal.MaterialProperty.MP_SPECULAR, "Specular", 1.0, -70)):
-        mel.connect_material_property(scalar(mat, name, val, -700, y), "", prop)
+    mat.set_editor_property("tangent_space_normal", False)      # 法线直接按世界里的方向给（海面是平的，朝上）
     wp, time, depth = node(mat, unreal.MaterialExpressionWorldPosition, -1500, 100), node(mat, unreal.MaterialExpressionTime, -1500, 200), node(mat, unreal.MaterialExpressionPixelDepth, -1500, 300)
+    cam = node(mat, unreal.MaterialExpressionCameraVectorWS, -1500, -500)
+    near = custom(mat, "float n = saturate(1.0 - PD / NearCm); return n * n;", [("PD", depth), ("NearCm", scalar(mat, "NearCm", 5000.0, -1500, 420))], F1, -1150, 360)
+    tint = rgb_of(mat, vector(mat, "Tint", (0.80, 0.86, 0.92), -1500, -400), -1300, -400)
+    deep = rgb_of(mat, vector(mat, "Deep", (0.36, 0.50, 0.66), -1500, -250), -1300, -250)
+    player = rgb_of(mat, vector(mat, "Player", (0.0, 0.0, -100000.0), -1500, 560), -1300, 560)
+    # 人脚边的水纹（−1…1）：一圈圈往外走，几米以外就平了。法线用它（倒影跟着晃），颜色也用它（一圈亮一圈暗，俯看也看得出来：RingShade）
+    ringv = custom(mat, "float pd = length(WP.xy - Player.xy) + 1.0; return cos(pd / RingCm * 6.2832 - Time * RingSpeed) * exp(-pd / RingFadeCm) * saturate(pd / 45.0) * PlayerK;",
+                   [("WP", wp), ("Time", time), ("Player", player), ("PlayerK", scalar(mat, "PlayerK", 0.0, -1500, 660)), ("RingCm", scalar(mat, "RingCm", 85.0, -1500, 900)),
+                    ("RingSpeed", scalar(mat, "RingSpeed", 2.4, -1500, 980)), ("RingFadeCm", scalar(mat, "RingFadeCm", 320.0, -1500, 1060))], F1, -1150, 700)
+    base = custom(mat, "float f = pow(1.0 - saturate(CV.z), FresnelPow); return lerp(Tint, lerp(Deep, Tint, f), saturate(Near * DeepK)) * (1.0 + RingV * RingShade);",
+                  [("CV", cam), ("Tint", tint), ("Deep", deep), ("Near", near), ("DeepK", scalar(mat, "DeepK", 1.0, -1500, -120)), ("FresnelPow", scalar(mat, "FresnelPow", 2.0, -1500, -40)),
+                   ("RingV", ringv), ("RingShade", scalar(mat, "RingShade", 0.10, -1500, 1220))], F3, -900, -400)
+    mel.connect_material_property(base, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    for prop, name, val, y in ((unreal.MaterialProperty.MP_METALLIC, "Metallic", 1.0, -250), (unreal.MaterialProperty.MP_SPECULAR, "Specular", 1.0, -70)):
+        mel.connect_material_property(scalar(mat, name, val, -700, y), "", prop)
+    rough = custom(mat, "return Rough + RoughNear * Near;", [("Rough", scalar(mat, "Rough", 0.04, -1150, -180)), ("RoughNear", scalar(mat, "RoughNear", 0.06, -1150, -100)), ("Near", near)], F1, -900, -160)
+    mel.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     normal = custom(mat, noise_code("M") + """
-float2 w = WP.xy; float t = Time * 0.25;
-float far = saturate(1.0 - PD / (RippleCm * 70.0));                 // 远处压平：镜面远看是一整片，不起花
-#define DYSIS_MH(q) (NZ.n(float3((q) / RippleCm + float2(t * 0.11, t * 0.07), t * 0.13)) * 0.7 + NZ.n(float3((q) / (RippleCm * 3.0) - float2(t * 0.05, -t * 0.03), 3.0)) * 0.3)
-float e = RippleCm * 0.05;
-float h0 = DYSIS_MH(w), hx = DYSIS_MH(w + float2(e, 0.0)), hy = DYSIS_MH(w + float2(0.0, e));
-float k = Ripple * far / e;
-return normalize(float3(-(hx - h0) * k, -(hy - h0) * k, 1.0));
-""", [("WP", wp), ("Time", time), ("PD", depth), ("Ripple", scalar(mat, "Ripple", 3.0, -1500, 400)), ("RippleCm", scalar(mat, "RippleCm", 900.0, -1500, 500))], F3, -900, 150)
+float2 w = WP.xy; float t = Time;
+// 两层长波：高度 = sin(相位)，这里直接算它对位置的导数（坡度的方向 × cos）
+float2 d1 = normalize(float2(0.8, 0.6)), d2 = normalize(float2(-0.35, 0.94));
+float nz = NZ.n(float3(w / 700.0, t * 0.08));
+float p1 = dot(w, d1) / 520.0 * 6.2832 - t * 0.55 + nz * 2.0, p2 = dot(w, d2) / 230.0 * 6.2832 - t * 0.8 - nz * 1.5;
+float2 slope = (d1 * cos(p1) + d2 * cos(p2) * 0.55) * Swell * Near;
+// 人脚边的水纹
+float2 pv = w - Player.xy;
+slope += pv / (length(pv) + 1.0) * RingV * Ring;
+return normalize(float3(-slope * Ripple, 1.0));
+""", [("WP", wp), ("Time", time), ("Near", near), ("Player", player), ("RingV", ringv), ("Swell", scalar(mat, "Swell", 0.012, -1500, 740)),
+      ("Ring", scalar(mat, "Ring", 0.035, -1500, 820)), ("Ripple", scalar(mat, "Ripple", 1.0, -1500, 1140))], F3, -900, 150)
     mel.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)
     lift = node(mat, unreal.MaterialExpressionMultiply, -500, 600)
     mel.connect_material_expressions(rgb_of(mat, vector(mat, "SkyTint", (0.45, 0.62, 0.85), -900, 600), -700, 600), "", lift, "A"); mel.connect_material_expressions(scalar(mat, "Lift", 0.0, -700, 720), "", lift, "B")
@@ -843,6 +866,17 @@ float h = f * 1.5 + Time * 0.07;
 float3 bow = 0.5 + 0.5 * cos(6.2831853 * (h + float3(0.0, 0.33, 0.67)));
 return bow * ring * Opacity;
 """, [("N", nws), ("V", cam), ("Time", time), ("Opacity", scalar(mat, "Opacity", 0.0, -1500, 300))], F3, -900, 0)
+    emissive(mat, glow)
+    finish(mat, full)
+
+if want("M_DysisAppleTrail"):
+    # 金苹果的拖尾（2026-10-11 用户：金苹果能有一点光效拖尾吗）：跟着苹果的一条淡金色的光带。
+    # 带子是代码每帧现做的（DysisDirectorSky.cpp 的 UpdateAppleTrail）：顶点色的 A = 这一段有多亮（头亮尾淡），贴图坐标的 V = 横着的位置（中间亮、两边软）。
+    mat, full = new_mat("/Game/Dysis/Fx", "M_DysisAppleTrail", unreal.BlendMode.BLEND_ADDITIVE, unlit=True, two_sided=True)
+    vc, uv = node(mat, unreal.MaterialExpressionVertexColor, -1500, 0), node(mat, unreal.MaterialExpressionTextureCoordinate, -1500, 200)
+    glow = custom(mat, "float e = saturate(1.0 - abs(UV.y * 2.0 - 1.0)); return Color * (e * e * A * Glow);",
+                  [("A", vc), ("UV", uv), ("Color", rgb_of(mat, vector(mat, "Color", (1.0, 0.70, 0.28), -1500, 400), -1300, 400)), ("Glow", scalar(mat, "Glow", 0.5, -1500, 520))], F3, -900, 0)
+    mel.connect_material_expressions(vc, "A", glow, "A")      # 顶点色只要 A 那一路
     emissive(mat, glow)
     finish(mat, full)
 

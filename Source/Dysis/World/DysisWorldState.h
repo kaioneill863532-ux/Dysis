@@ -68,6 +68,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Dysis|World")
 	float IsleGrowK = 0.0f;
 
+	/** 开局落脚的那一块顶面有多高（厘米）。游戏里是海面（DysisGB::ISLAND_TOP_Z = −1600）；
+	 *  测试里和灰盒逐点比开场那束光的时候，临时放回灰盒里小岛的高度 −1200（Dysis.StartPad 0）。 */
+	float StartPadTopZ = -1600.0f;
+
 	// ───── 屋顶的光圈 ─────
 
 	/** 光圈现在张到多大（半径，厘米；合拢 40，全开 1100）。机关总管每帧写，圆眼光柱读。 */

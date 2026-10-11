@@ -350,7 +350,10 @@ void UDysisCharacterMovement::UpdateRespawn(float DeltaTime)
 	// 掉进水池（或瀑布那一段的水里）、掉进海里
 	const float R = DysisGB::ROf(Foot);
 	const bool bOverWater = R < DysisGB::R_POOL || (R < DysisGB::R_IN && DysisGB::InArc(DysisGB::AzOf(Foot), DysisGB::SEAM0, DysisGB::SEAM1));
-	if ((bOverWater && Foot.Z < DysisGB::WATER_Z - 50.0f) || Foot.Z < DysisGB::SEA_Z + 150.0f) RespawnNow();
+	// 开局站的那一块顶面就是海面（见 DysisGB::ISLAND_TOP_Z）：站在它上面不算掉进海里
+	const bool bOnStartPad = Foot.Z > DysisGB::SEA_Z - 30.0f
+		&& FVector2D::DistSquared(FVector2D(Foot), DysisGB::IsleWasCenterCm + FVector2D(DysisGB::IsleMoveCm)) < FMath::Square(560.0);
+	if ((bOverWater && Foot.Z < DysisGB::WATER_Z - 50.0f) || (Foot.Z < DysisGB::SEA_Z + 150.0f && !bOnStartPad)) RespawnNow();
 }
 
 void UDysisCharacterMovement::RespawnNow()

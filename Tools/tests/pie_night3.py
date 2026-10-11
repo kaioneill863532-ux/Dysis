@@ -74,18 +74,21 @@ def main():
     # 2026-10-10 / 11（第八轮）用户要把女神像挪到瀑布正中：像、连判定月光的点一起从灰盒的位置转了 6.2°、往墙那边挪了 116 cm、矮了 131.5 cm
     # （月光在月桥上越往下走照得越低、越靠中间：要到正中就得站低），月光全照到她的那一步从灰盒的第 61 步变成了第 68 步（第 67 步也差不多全照到）。
     # 这里核：每一步的时刻还和灰盒一样；月光全照到她的只有第 68 步前后那一小段。
+    # 2026-10-11（第十批）：上一版把她放低以后膝盖以下埋在瀑布后面的石台里（用户：像是腿被砍了一段）。现在缩到 0.68 倍、站回石台上的三级圆台，
+    # 还在瀑布正中；判定的五个点跟着像一起缩。月桥上第 67–71 步都算照到（四个点以上；判定是“四个就算”），五个点全中的是第 69 步。
+    # 灰盒导出的这一段只扫到第 68 步：这里核第 67、68 步算照到、再往上的不算，站在第 68 步上她会亮。
     STAND = 68
     n = ok = 0; notes = []; full = []
     for s in fl["scanBridge"]["scan"]:
         go(PTS[s["i"]], 10.0)
         yield from hold(0.22)
         d = fin(); good = abs(H() - s["H"]) < 0.05 and zone() == "moonbr"
-        if d["lit"] > 0.99: full.append(s["i"])
+        if d["lit"] > 0.75: full.append(s["i"])
         n += 1; ok += 1 if good else 0
         if not good: notes.append("第 %d 点：灰盒 H=%.2f；UE %s" % (s["i"], s["H"], state()[:30]))
     d = fin()
     check(ok == n and d["glint"] and not d["goddess"] and STAND in full and len(full) <= 3 and max(full) - min(full) == len(full) - 1,
-          "月桥上 %d 步：每一步的时刻 %d 步和灰盒一致；月光全照到她怀里那轮月亮的是第 %s 步（女神像挪过以后应当是第 68 步前后）；只是走过去她不会亮（只亮一下）" % (n, ok, full))
+          "月桥上 %d 步：每一步的时刻 %d 步和灰盒一致；月光照到她怀里那轮月亮（五个点里四个以上）的是第 %s 步（应当是第 67、68 步，再往下到 71）；只是走过去她不会亮（只亮一下）" % (n, ok, full))
     for x in notes[:8]: say("     " + x)
     st = dict(fl["stand"]); st["i"] = STAND; st["H"] = next(s["H"] for s in fl["scanBridge"]["scan"] if s["i"] == STAND)
     # 2026-10-11 用户要这一处的判定松一点：五个点里照到四个就开始计时（灰盒要五个全照到）。上面一步步扫过来的时候，
@@ -173,7 +176,7 @@ def main():
         if got != exp: notes.append("时刻 %.2f：灰盒 %s；UE %s" % (r["H"], exp, got))
     check(ok == n, "女神像放回灰盒的位置：身上十个取样点、%d 个时刻，照没照到 %d 个和灰盒一致" % (n, ok))
     for x in notes[:6]: say("     " + x)
-    cmd(w, "Dysis.GoddessShift -6.2 116.4 -131.5")
+    cmd(w, "Dysis.GoddessShift home")
     yield from wait(10)
     tc.clear_forced_time()
 

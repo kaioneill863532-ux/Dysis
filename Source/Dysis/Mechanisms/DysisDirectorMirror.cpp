@@ -202,7 +202,13 @@ void ADysisDirector::UpdateMirrors(float Dt)
 	}
 	// 底座朝着选中的那一格转过去（每秒 90°，走近路）
 	const float D = float(DysisGB::AngDiff(MirSlots[MirrorSlot], MirrorYawNow));
-	if (FMath::Abs(D) > 1.0e-3f) { MirrorYawNow += FMath::Clamp(D, -90.0f * Dt, 90.0f * Dt); bChanged = true; }
+	if (FMath::Abs(D) > 1.0e-3f)
+	{
+		const float Step = FMath::Clamp(D, -90.0f * Dt, 90.0f * Dt);
+		MirrorYawNow += Step;
+		MirrorCrankDeg += 3.0f * Step;      // 手轮转得比像快三倍（转一格 60°，轮子转半圈）
+		bChanged = true;
+	}
 
 	if (bChanged)
 	{

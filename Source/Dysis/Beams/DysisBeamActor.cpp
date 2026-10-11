@@ -500,7 +500,7 @@ void ADysisBeamActor::UpdateGreybox(double H)
 		Z0 = FMath::Max(Z0, GB_TERR_Z + 18.0 + X * Tn);
 		if (Z0 > Z1 - 20.0) { Done(); return; }
 		WalkFrom = (X - 30.0) / Hz;
-		NeedCm = (Z0 - DysisGB::ISLAND_TOP_Z) / Sun.Z - 80.0;
+		NeedCm = (Z0 - (State ? double(State->StartPadTopZ) : double(DysisGB::ISLAND_TOP_Z))) / Sun.Z - 80.0;
 	}
 	else if (W.bHasFloor) NeedCm = (W.Z0Cm - W.FloorZ) / FMath::Max(0.05, double(Sun.Z)) - 150.0;
 

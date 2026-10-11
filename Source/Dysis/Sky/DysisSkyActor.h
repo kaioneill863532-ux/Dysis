@@ -133,9 +133,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Dysis|Sky")
 	FLinearColor DayFillColor = FLinearColor(0.479f, 0.552f, 0.631f);
 
-	/** 落日以后那一阵天的颜色（灰蒙蒙的暮色；灰盒里是它的天空着色器在太阳落到地平线下时画出来的样子），随着天黑慢慢换成夜空。 */
+	/** 落日以后那一阵天的颜色，随着天黑慢慢换成夜空。原来是照灰盒对出来的一种灰蒙蒙的暖灰（0.055, 0.049, 0.043）——
+	 *  屏幕上是发黄发绿的土色，拿到金苹果、从殿顶往下走的那一阵整片天都是它（2026-10-11 用户：天有点发绿，不是我们调的颜色）。
+	 *  改成偏紫的暮蓝：一头接得上落日时天顶的蓝紫，一头接得上夜空的深蓝。 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dysis|Sky")
-	FLinearColor TwilightSkyColor = FLinearColor(0.055f, 0.049f, 0.043f);
+	FLinearColor TwilightSkyColor = FLinearColor(0.053f, 0.046f, 0.093f);
 
 	// ───── 黄昏的调子：太阳快落山时画面压暗、偏橙红，天边的红更浓（2026-10-08 用户：走到殿顶时不像黄昏、太亮、没有橙红色的感觉） ─────
 

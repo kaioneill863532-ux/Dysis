@@ -73,6 +73,8 @@ def main():
             say("%s %s：%d/%d 个时刻一致" % ("✔" if bad == 0 else "✘", gid, n - bad, n))
             for e in ex: say("     " + e)
 
+    # （2026-10-11 起开局落脚的那一块在海面上，开场那束光比灰盒多伸 8 m。和灰盒逐点比的时候把它临时放回灰盒里小岛的位置，比完再放回去）
+    cmd(w, "Dysis.StartPad 0")
     # 第一组：雾满、开场的光伸到头
     cmd(w, "Dysis.Mist 1 3150"); cmd(w, "Dysis.IsleGrow 1 1")
     yield from wait(3)
@@ -91,6 +93,7 @@ def main():
         ok = exp["valid"] == got["valid"] and exp["walkable"] == got["walkable"] and (not exp["valid"] or max(abs(a - b) for a, b in zip(exp["c"], got["c"])) <= TOL_LEN)
         stat["n"] += 1; stat["bad"] += 0 if ok else 1
         say("%s 进度 %.2f：灰盒照到 %s，UE %s，能踩 %s / %s" % ("✔" if ok else "✘", g["k"], [round(x) for x in exp.get("c", [])], [round(x) for x in got.get("c", [])], exp["walkable"], got["walkable"]))
+    cmd(w, "Dysis.StartPad 1")
     cmd(w, "Dysis.WorldRelease")
     say("合计 %d 项，%d 项不一致" % (stat["n"], stat["bad"]))
 

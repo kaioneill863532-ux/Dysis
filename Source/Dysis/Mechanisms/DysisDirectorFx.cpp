@@ -14,6 +14,7 @@
 #include "Camera/CameraActor.h"
 #include "Components/BoxComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -27,7 +28,7 @@
 
 namespace
 {
-	// Dysis.SeaMirror 0|1：海面用原来那一版（0，默认）还是“天空之镜”那一版（1）
+	// Dysis.SeaMirror 0|1：海面用原来那一版（0）还是“天空之镜”那一版（1，默认）
 	FAutoConsoleCommandWithWorldAndArgs GDysisSeaMirror(TEXT("Dysis.SeaMirror"), TEXT("海面：Dysis.SeaMirror 1 = 镜湖（平得像镜子，天和云映在里面），0 = 原来的"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
@@ -142,6 +143,20 @@ void ADysisDirector::SetupFx()
 {
 	// 海、水庭的水、瀑布、月桥：换材质
 	SeaMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Sea")), TEXT("/Game/Dysis/Fx/M_DysisSea.M_DysisSea"));
+	// 2026-10-11 用户：海面用镜湖（M 键、Dysis.SeaMirror 0 还能换回原来的）
+	DebugSetSeaMirror(true);
+	// 镜湖里的云：镜面映的是“这一刻画面里有的东西”，云一出画面倒影就没了（用户：有时候能看见云，镜头稍微一动就看不见）。
+	// 映不到的时候引擎退回去查天光的那张环境图——云的材质标成“天”（Art/Scenery 的材质脚本），环境图里就有云了；
+	// 环境图从 128 提到 512（128 时云的倒影是一团糊的），量过帧数没有差别
+	if (UWorld* World = GetWorld())
+		for (TActorIterator<AActor> It(World); It; ++It)
+			if (USkyLightComponent* SkyLight = It->FindComponentByClass<USkyLightComponent>())
+				if (SkyLight->CubemapResolution < 512)
+				{
+					SkyLight->CubemapResolution = 512;
+					SkyLight->MarkRenderStateDirty();
+					SkyLight->RecaptureSky();
+				}
 	// 水庭的水：场景美术 2026-10-09 的动画水面（大色块、断线、岸边的波纹）；找不到就退回原来那个
 	const bool bAnimeWater = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater"), nullptr, LOAD_NoWarn | LOAD_Quiet) != nullptr;
 	PoolMID = FxMaterial(Piece(TEXT("SM_Mech_Water_Pool")), bAnimeWater ? TEXT("/Game/Dysis/Fx/M_DysisAnimeWater.M_DysisAnimeWater") : TEXT("/Game/Dysis/Fx/M_DysisPool.M_DysisPool"));
@@ -334,7 +349,24 @@ void ADysisDirector::UpdateFx(float Dt)
 	const FLinearColor SkyTint = FxLerp3(FLinearColor(0.40f, 0.58f, 0.86f), FLinearColor(0.92f, 0.54f, 0.44f), Dusk) * (Daylight * 0.9f)
 		+ FLinearColor(0.035f, 0.055f, 0.12f) * (Night * (0.7f + 0.9f * MoonUp));
 	if (SeaMID) SeaMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint);
-	if (SeaMirrorMID) SeaMirrorMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint);
+	if (SeaMirrorMID)
+	{
+		SeaMirrorMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint);
+		// 人脚边的水纹（2026-10-11 用户：人靠近水面的时候镜湖要有点像水；不要一离开水面就没了）：
+		// 圆心跟着人走；人站在水面上最强，往上走（顺着开场那束光）到离水面 9 m 才淡完；站着不动时弱一半
+		float Want = 0.0f;
+		FVector Foot(0.0, 0.0, -1.0e5);
+		if (Time)
+		{
+			Foot = Time->FootCm;
+			const APawn* Pawn = GetWorld() && GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetPawn() : nullptr;
+			const float Moving = Pawn ? FMath::Clamp(float(Pawn->GetVelocity().Size2D()) / 160.0f, 0.0f, 1.0f) : 0.0f;
+			Want = (1.0f - DysisGB::Smoothstep(100.0f, 900.0f, float(Foot.Z) - DysisGB::SEA_Z)) * (0.5f + 0.5f * Moving);
+		}
+		SeaRingK = FMath::FInterpTo(SeaRingK, Want, Dt, 2.5f);
+		SeaMirrorMID->SetVectorParameterValue(TEXT("Player"), FLinearColor(float(Foot.X), float(Foot.Y), float(Foot.Z)));
+		SeaMirrorMID->SetScalarParameterValue(TEXT("PlayerK"), SeaRingK);
+	}
 	if (PoolMID)
 	{
 		PoolMID->SetVectorParameterValue(TEXT("SkyTint"), SkyTint * 0.8f);          // 原来那个水面用的；动画水面没有这个参数

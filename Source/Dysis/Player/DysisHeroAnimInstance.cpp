@@ -1,5 +1,6 @@
 ﻿#include "DysisHeroAnimInstance.h"
 #include "DysisCharacter.h"
+#include "Mechanisms/DysisDirector.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "Animation/AnimNode_SequencePlayer.h"
 #include "Animation/AnimSequence.h"
@@ -157,6 +158,11 @@ namespace
 		bool bFixUpper = true;
 		float ArmBase = 1.15f, ArmGain = 1.6f, TwistDeg = 5.0f, UpstairsLeanDeg = 8.0f, UpstairsArmPhase = 0.478f;
 		float ExtraDrop = 0.0f, LastDt = 0.0f;                       // 腿够不着时另外再矮多少（厘米）
+		float LeanTarget = 0.0f, LeanNow = 0.0f;                     // 走路时身子往前倾几度：游戏那边按速度给的、这边慢慢跟上的
+		float FootIn[2] = { 0.0f, 0.0f };                            // 走路时左、右脚尖各往里收几度
+		float PushTarget = 0.0f, PushNow = 0.0f, PushLean = 16.0f;   // 推东西的姿势：要不要、现在占几成、身子压几度
+		FBoneReference LowerArm[2], Middle[2], Index[2];             // 小臂、中指根、食指根（推的时候摆胳膊和手掌用）
+		TArray<FCompactPoseBoneIndex> FingerBones;                   // 两只手底下所有的骨头（手指）：推的时候把手张开
 		float Slope = 0.0f, StairLift = 1.9f;                        // 脚下的坡度；上下台阶时脚抬高到几倍
 		float LastTwist = 0.0f, LastArmGain = 1.0f, LastUpper = 0.0f, LastArmDeg[2] = { 0.0f, 0.0f };   // 上一帧实际用的数（测试和排查用）
 		FBoneReference Spine1, Spine2, Chest, Neck, UpperArm[2], Hand[2];
@@ -193,7 +199,23 @@ namespace
 			}
 			Spine1.BoneName = TEXT("spine_01"); Spine2.BoneName = TEXT("spine_02"); Chest.BoneName = TEXT("spine_03"); Neck.BoneName = TEXT("neck_01");
 			UpperArm[0].BoneName = TEXT("upperarm_l"); UpperArm[1].BoneName = TEXT("upperarm_r"); Hand[0].BoneName = TEXT("hand_l"); Hand[1].BoneName = TEXT("hand_r");
-			for (FBoneReference* R : { &Spine1, &Spine2, &Chest, &Neck, &UpperArm[0], &UpperArm[1], &Hand[0], &Hand[1] }) R->Initialize(BC);
+			LowerArm[0].BoneName = TEXT("lowerarm_l"); LowerArm[1].BoneName = TEXT("lowerarm_r"); Middle[0].BoneName = TEXT("middle_01_l"); Middle[1].BoneName = TEXT("middle_01_r");
+			Index[0].BoneName = TEXT("index_01_l"); Index[1].BoneName = TEXT("index_01_r");
+			for (FBoneReference* R : { &Spine1, &Spine2, &Chest, &Neck, &UpperArm[0], &UpperArm[1], &Hand[0], &Hand[1], &LowerArm[0], &LowerArm[1], &Middle[0], &Middle[1], &Index[0], &Index[1] }) R->Initialize(BC);
+			FingerBones.Reset();
+			if (Hand[0].IsValidToEvaluate(BC) && Hand[1].IsValidToEvaluate(BC))
+			{
+				const FCompactPoseBoneIndex H0 = Hand[0].GetCompactPoseIndex(BC), H1 = Hand[1].GetCompactPoseIndex(BC);
+				TArray<bool> In;
+				In.Init(false, BC.GetCompactPoseNumBones());
+				for (int32 b = 0; b < In.Num(); ++b)      // 骨头是按“爹在前”排的
+				{
+					const FCompactPoseBoneIndex Bi(b), Parent = BC.GetParentBoneIndex(Bi);
+					const bool bHand = Bi == H0 || Bi == H1;
+					In[b] = bHand || (Parent.GetInt() != INDEX_NONE && In[Parent.GetInt()]);
+					if (In[b] && !bHand) FingerBones.Add(Bi);
+				}
+			}
 			UpperBones.Reset();
 			if (Spine1.IsValidToEvaluate(BC))
 			{
@@ -218,6 +240,8 @@ namespace
 			if (!Players.IsValidIndex(Target) || Players.Num() < int32(EDysisHeroClip::Count)) return;
 			const float Dt = Context.GetDeltaTime();
 			LastDt = Dt;
+			LeanNow = FMath::FInterpTo(LeanNow, LeanTarget, Dt, 5.0f);      // 一停下速度立刻是 0；前倾跟着“走”那一段的比重淡出去，这里只管别跳
+			PushNow = FMath::FInterpTo(PushNow, PushTarget, Dt, 7.0f);
 			// 这一帧各段想要多少
 			for (float& W : Want) W = 0.0f;
 			const bool bLoco = Target == HeroClip_Walk || Target == HeroClip_Run;
@@ -361,12 +385,25 @@ namespace
 			const float UpK = FMath::Max(Weights[HeroClip_Upstairs], FMath::Clamp(SlopeNow / 0.42f, 0.0f, 1.0f) * Weights[HeroClip_Walk]);
 			const float UpperK = bFixUpper && UpperValid(BC) ? FMath::Clamp(Weights[HeroClip_Walk] + Weights[HeroClip_Upstairs], 0.0f, 1.0f) : 0.0f;
 			const bool bUpper = UpperK > KINDA_SMALL_NUMBER;
+			// 走路：脚尖往里收、身子往前倾一点（都只按“走”那一段占多少来加；上台阶时身子另有它的前倾）
+			const float WalkW = Weights[HeroClip_Walk];
+			const bool bToe = WalkW > KINDA_SMALL_NUMBER && (FootIn[0] != 0.0f || FootIn[1] != 0.0f) && Legs[0].IsValid(BC) && Legs[1].IsValid(BC);
+			const float WalkLean = LeanNow * WalkW * (1.0f - UpK);
+			const bool bPush = PushNow > 0.01f && UpperValid(BC) && Spine1.IsValidToEvaluate(BC) && LowerArm[0].IsValidToEvaluate(BC) && LowerArm[1].IsValidToEvaluate(BC);
 			if (!bWarp) ExtraDrop = FMath::Max(0.0f, ExtraDrop - 30.0f * LastDt);
-			if (!bMove && !bWarp && !bUpper) return;
+			if (!bMove && !bWarp && !bUpper && !bToe && !bPush) return;
 			LastOffset = Off;
 
 			FCSPose<FCompactPose> CS;
 			CS.InitPose(Output.Pose);
+			auto Turn = [&CS](FCompactPoseBoneIndex Bi, const FQuat& By)      // 一根骨头原地转（它底下的跟着转）
+			{
+				FTransform T = CS.GetComponentSpaceTransform(Bi);
+				T.SetRotation((By * T.GetRotation()).GetNormalized());
+				TArray<FBoneTransform> One;
+				One.Emplace(Bi, T);
+				CS.SafeSetCSBoneTransforms(One);
+			};
 			if (bMove)
 			{
 				const FCompactPoseBoneIndex Pi = Pelvis.GetCompactPoseIndex(BC);
@@ -430,16 +467,21 @@ namespace
 					CS.SafeSetCSBoneTransforms(Three);
 				}
 			}
+			if (bToe)
+			{
+				// 脚绕竖轴转（模型的左边是 +X、前面是 +Y：左脚尖往外 = 偏向 +X，绕 +Z 正着转是往 −X 收；右脚反过来）。只转脚，膝盖、脚踝的位置不动
+				for (int32 k = 0; k < 2; ++k)
+				{
+					const FCompactPoseBoneIndex Fi = Legs[k].Foot.GetCompactPoseIndex(BC);
+					FTransform FootT = CS.GetComponentSpaceTransform(Fi);
+					FootT.SetRotation((FQuat(FVector::ZAxisVector, FMath::DegreesToRadians((k == 0 ? 1.0f : -1.0f) * FootIn[k] * WalkW)) * FootT.GetRotation()).GetNormalized());
+					TArray<FBoneTransform> One;
+					One.Emplace(Fi, FootT);
+					CS.SafeSetCSBoneTransforms(One);
+				}
+			}
 			if (bUpper)
 			{
-				auto Turn = [&CS](FCompactPoseBoneIndex Bi, const FQuat& By)      // 一根骨头原地转（它底下的跟着转）
-				{
-					FTransform T = CS.GetComponentSpaceTransform(Bi);
-					T.SetRotation((By * T.GetRotation()).GetNormalized());
-					TArray<FBoneTransform> One;
-					One.Emplace(Bi, T);
-					CS.SafeSetCSBoneTransforms(One);
-				};
 				// 两只手这一刻各在胸口前面（+）还是后面（−）多远；垂着不摆时手在胸口前 2 cm
 				const double ChestY = CS.GetComponentSpaceTransform(Chest.GetCompactPoseIndex(BC)).GetLocation().Y;
 				float D[2], Len[2];
@@ -453,8 +495,10 @@ namespace
 				// 肩膀跟着手拧（左手在前，左肩也往前；模型的左边是 +X、前面是 +Y）；上台阶时身子往前倾。头少跟一些，脸还是朝前
 				const float Twist = TwistDeg * FMath::Clamp((D[0] - D[1]) / 26.0f, -1.5f, 1.5f) * FMath::Min(G * 0.5f, 1.0f) * UpperK, Lean = -UpstairsLeanDeg * UpK;
 				const FQuat Body = FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(Twist)) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(Lean));
+				// 走路：整个上身从腰往前倾一点（见头文件 WalkLeanDeg）；头往回抬一半
+				if (WalkLean > 0.01f && Spine1.IsValidToEvaluate(BC)) Turn(Spine1.GetCompactPoseIndex(BC), FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-WalkLean)));
 				Turn(Spine2.GetCompactPoseIndex(BC), Body);
-				Turn(Neck.GetCompactPoseIndex(BC), FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-Lean * 0.6f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(-Twist * 0.8f)));
+				Turn(Neck.GetCompactPoseIndex(BC), FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-Lean * 0.6f + WalkLean * 0.5f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(-Twist * 0.8f)));
 				// 手臂：这一刻偏开多少，再多摆（G − 1）倍
 				for (int32 k = 0; k < 2; ++k)
 				{
@@ -464,7 +508,58 @@ namespace
 				}
 				LastTwist = Twist; LastArmGain = G; LastUpper = UpperK;
 			}
+			if (bPush)
+			{
+				// 推东西（见头文件 PushLeanDeg）：身子从腰往前压，头抬回来；两条胳膊用两段骨头的反解伸到胸前
+				const float K = PushNow;
+				Turn(Spine1.GetCompactPoseIndex(BC), FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-PushLean * K)));
+				Turn(Neck.GetCompactPoseIndex(BC), FQuat(FVector::XAxisVector, FMath::DegreesToRadians(PushLean * 0.7f * K)));
+				for (int32 k = 0; k < 2; ++k)
+				{
+					const FCompactPoseBoneIndex Ui = UpperArm[k].GetCompactPoseIndex(BC), Li = LowerArm[k].GetCompactPoseIndex(BC), Hi = Hand[k].GetCompactPoseIndex(BC);
+					FTransform UpperT = CS.GetComponentSpaceTransform(Ui), LowerT = CS.GetComponentSpaceTransform(Li), HandT = CS.GetComponentSpaceTransform(Hi);
+					const FVector Shoulder = UpperT.GetLocation(), Elbow = LowerT.GetLocation(), Wrist = HandT.GetLocation();
+					const double ArmLen = (Elbow - Shoulder).Size() + (Wrist - Elbow).Size();
+					const double Side = k == 0 ? 1.0 : -1.0;      // 模型的左边是 +X、前面是 +Y
+					// 手：比肩膀低一点、往里收一点，胳膊几乎伸直（像离人有 1 m 远，够得着才像在推）；肘朝下、略朝外
+					const FVector Goal = Shoulder + FVector(-Side * 4.0, ArmLen * 0.95, -8.0);
+					const FVector Pole = (Shoulder + Goal) * 0.5 + FVector(Side * 22.0, -6.0, -40.0);
+					const FQuat LowerWas = LowerT.GetRotation(), HandWas = HandT.GetRotation();
+					// 手指原来朝哪、掌心原来朝哪（照手自己的坐标记下来）。掌心 = 中指根 ×（食指根 − 中指根）那一面：食指在拇指那一侧，
+					// 右手是这个方向，左手反过来
+					FVector FingerLocal = FVector::ZeroVector, PalmLocal = FVector::ZeroVector;
+					if (Middle[k].IsValidToEvaluate(BC) && Index[k].IsValidToEvaluate(BC))
+					{
+						const FVector ToMiddle = HandWas.UnrotateVector(CS.GetComponentSpaceTransform(Middle[k].GetCompactPoseIndex(BC)).GetLocation() - Wrist);
+						const FVector ToIndex = HandWas.UnrotateVector(CS.GetComponentSpaceTransform(Index[k].GetCompactPoseIndex(BC)).GetLocation() - Wrist);
+						FingerLocal = ToMiddle.GetSafeNormal();
+						PalmLocal = (FVector::CrossProduct(ToMiddle, ToIndex - ToMiddle) * (k == 1 ? 1.0 : -1.0)).GetSafeNormal();
+					}
+					AnimationCore::SolveTwoBoneIK(UpperT, LowerT, HandT, FMath::Lerp(Elbow, Pole, double(K)), FMath::Lerp(Wrist, Goal, double(K)), /*bAllowStretching*/ false, 1.0, 1.0);
+					// 手腕跟着小臂转（手和小臂的相对姿势照原来的），再把手掌立起来——像按在一面墙上：手腕往后折 70°，
+					// 指尖朝上（略朝前）、掌心朝前（略朝下）。（头一版只管了指尖朝上，掌心朝哪没管；2026-10-11 用户：手掌要张开、朝前）
+					FQuat HandRot = (LowerT.GetRotation() * LowerWas.Inverse() * HandWas).GetNormalized();
+					if (!FingerLocal.IsNearlyZero() && !PalmLocal.IsNearlyZero())
+					{
+						const FQuat Is = FRotationMatrix::MakeFromXY(HandRot.RotateVector(FingerLocal), HandRot.RotateVector(PalmLocal)).ToQuat();
+						const FQuat Flat = FRotationMatrix::MakeFromXY(FVector(0.0, 0.34, 0.94), FVector(0.0, 0.94, -0.34)).ToQuat();
+						HandRot = (FQuat::Slerp(FQuat::Identity, (Flat * Is.Inverse()).GetNormalized(), K) * HandRot).GetNormalized();
+					}
+					HandT.SetRotation(HandRot);
+					TArray<FBoneTransform> Three;
+					Three.Emplace(Ui, UpperT); Three.Emplace(Li, LowerT); Three.Emplace(Hi, HandT);
+					CS.SafeSetCSBoneTransforms(Three);
+				}
+			}
 			FCSPose<FCompactPose>::ConvertComponentPosesToLocalPoses(MoveTemp(CS), Output.Pose);
+			// 推东西：手张开（手指从动作里微微蜷着的样子摊回参考姿势里伸直的样子）
+			if (bPush)
+				for (const FCompactPoseBoneIndex B : FingerBones)
+				{
+					FTransform T = Output.Pose[B];
+					T.SetRotation(FQuat::Slerp(T.GetRotation(), BC.GetRefPoseTransform(B).GetRotation(), 0.9f * PushNow).GetNormalized());
+					Output.Pose[B] = T;
+				}
 		}
 	};
 
@@ -510,6 +605,8 @@ namespace
 			Root.ArmBase = Hero->ArmSwingBase; Root.ArmGain = Hero->ArmSwingGain; Root.TwistDeg = Hero->TorsoTwistDeg;
 			Root.UpstairsLeanDeg = Hero->UpstairsLeanDeg; Root.UpstairsArmPhase = Hero->UpstairsArmPhase;
 			Root.Slope = Hero->bStairGait ? Hero->GroundSlope : 0.0f; Root.StairLift = Hero->StairLift;
+			Root.LeanTarget = Hero->WalkLean; Root.FootIn[0] = float(Hero->FootTurnInDeg.X); Root.FootIn[1] = float(Hero->FootTurnInDeg.Y);
+			Root.PushTarget = Hero->bPushing ? 1.0f : 0.0f; Root.PushLean = Hero->PushLeanDeg;
 		}
 	};
 }
@@ -605,6 +702,9 @@ void UDysisHeroAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		Clip = RunBlend >= 0.5f ? EDysisHeroClip::Run : EDysisHeroClip::Walk;
 	}
 	ActiveClip = int32(Clip);
+	WalkLean = WalkLeanDeg * FMath::Clamp(GaitSpeed / FMath::Max(WalkCadenceSpeed, 1.0f), 0.0f, 1.0f);
+	const ADysisDirector* Director = ADysisDirector::Get(Hero->GetWorld());
+	bPushing = Director && Director->IsPushingPollux() && !Move->IsFalling();
 	RestartSerial = Hero->GetTouchSerial();
 	// 脚落地：一个循环两下。相位和动作那边的一起走（那边在走、跑两段都退场以后才清零，这里一停就清，只差在急停再起步的那一瞬）
 	if (CycleRate > 0.0f)

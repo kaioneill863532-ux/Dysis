@@ -313,6 +313,7 @@ void ADysisDirector::Tick(float DeltaTime)
 	UpdateStairs(DeltaTime);
 	UpdateCatch(DeltaTime);
 	UpdateAppleLight(DeltaTime);
+	UpdateAppleTrail(DeltaTime);
 	UpdateMoonbow(DeltaTime);
 	UpdateEndingStars(DeltaTime);
 	UpdateFx(DeltaTime);
